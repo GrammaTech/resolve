@@ -1,0 +1,22 @@
+include/
+software-evolution/
+*.html
+*.info
+*.pdf
+*.svg
+*.1.gz
+
+# Automatically generated package texi files
+bi-bi-api.texi
+bi-bi-evolve-api.texi
+bi-bi-mut-api.texi
+bi-juliet-scion-creator-api.texi
+bi-scion-api.texi
+bi-utility-api.texi
+bi-weakening-mutators-api.texi
+bi-scions-clang-api.texi
+bi-scions-java-api.texi
+bi-scions-javascript-api.texi
+bug-injector-bug-injector-api.texi
+scion-index.texi
+weakening-mutation-index.texi

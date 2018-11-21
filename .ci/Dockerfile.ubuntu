@@ -1,0 +1,12 @@
+FROM docker.grammatech.com/synthesis/sel/ubuntu
+
+RUN apt-get -y update && apt-get -y install python3 expect curl
+
+COPY . /root/quicklisp/local-projects/auto-merge
+WORKDIR /root/quicklisp/local-projects/auto-merge
+
+ARG GT
+ARG REPORT
+ENV PATH=/usr/synth/bin:/root/quicklisp/local-projects/auto-merge/bin:$PATH
+RUN make
+CMD /bin/bash

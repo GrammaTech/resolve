@@ -1,0 +1,13 @@
+FROM docker.grammatech.com/synthesis/sel/arch
+
+RUN pacman -Sy  --noconfirm archlinux-keyring
+RUN pacman -Syu --noconfirm expect
+
+COPY . /root/quicklisp/local-projects/auto-merge
+WORKDIR /root/quicklisp/local-projects/auto-merge
+
+ARG GT
+ARG REPORT
+ENV PATH=/root/quicklisp/local-projects/auto-merge/bin:$PATH
+RUN make
+CMD /bin/bash
