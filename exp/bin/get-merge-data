@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Collect merge/conflict data on the repo in which this
+# script is run.  Outputs two lines: number of merges found
+# in the repo, and the number of merges that caused conflicts
+
+# This is inefficient, and we're going to want to see the merges
+# themselves anyway.  TODO: generate tables of merges (and conflicting
+# merges) separately.
+
+all-merges | wc -l
+conflicting-merges | grep "^conflict" | wc -l

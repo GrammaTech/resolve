@@ -1,0 +1,3 @@
+#!/bin/bash
+
+for d in `git log --pretty="format:%h"`; do git show $d | grep "^Merge" | sed -e "s/\$/ ==> $d/" | sed -e "s/Merge: //"; done
