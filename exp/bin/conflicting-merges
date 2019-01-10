@@ -2,20 +2,26 @@
 
 # Find the merges in a repo that cause conflicts
 
+if [ $1"" = "" ]; then
+    CONFLICTS=/tmp/conflicts$$
+else
+    CONFLICTS=$1
+fi;
+cat /dev/null > $CONFLICTS
+
 function testconflict() {
     foo=$1
     bar=$2
-#    echo "foo = " $1
-#    echo "bar = " $2
-    mergebase=$(git merge-base $foo $bar)    
+    mergebase=$(git merge-base $foo $bar)
     if [ "$mergebase" = "" ];then
-        #in case foo and bar have no common ancestor, use the empty tree as the merge base
+        # In case foo and bar have no common ancestor,
+	# use the empty tree as the merge base
         mergebase=4b825dc642cb6eb9a060e54bf8d69288fbee4904
     fi
-#    echo "base = " $mergebase
     #test if the output has conflict markers of "merge" style
     git merge-tree $mergebase $foo $bar | xargs 2>/dev/null | 
         if grep -oe '<<<<<<<.*=======.*>>>>>>>'; then
+	    echo $mergebase $foo $bar >> $CONFLICTS
             echo conflict
         else
             echo no conflict

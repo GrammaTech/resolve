@@ -1,3 +1,22 @@
 #!/bin/bash
 
-for d in `git log --pretty="format:%h"`; do git show $d | grep "^Merge" | sed -e "s/\$/ ==> $d/" | sed -e "s/Merge: //"; done
+TMPFILE=/tmp/merges$$
+
+if [ $1"" = "" ]; then
+    OUT=$TMPFILE
+else
+    OUT=$1
+fi;
+cat /dev/null > $OUT
+for d in `git log --pretty="format:%h"`; do
+    x=`git show $d | egrep "^Merge"`
+    if [ $? = "0" ]; then
+	# Merge
+	y=`echo $x | sed -e "s/^Merge: //"`
+	echo $y >> $OUT
+	echo $y | sed -e "s/\$/ ==> $d/"
+    # else
+	# no merge
+    fi;
+    # | sed -e "s/\$/ ==> $d/" | sed -e "s/Merge: //";
+done
