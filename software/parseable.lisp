@@ -1,5 +1,6 @@
-(defmethod ast-diff ((parseable-a parseable) (parseable-b parseable))
-  (ast-diff (ast-root parseable-a) (ast-root parseable-b)))
+(defmethod ast-diff ((parseable-a parseable) (parseable-b parseable) &rest args
+                     &key &allow-other-keys)
+  (apply #'ast-diff (ast-root parseable-a) (ast-root parseable-b) args))
 
 (defmethod ast-patch ((obj parseable) (diff list) &rest keys &key &allow-other-keys)
   (setf obj (copy obj))
@@ -14,5 +15,3 @@
 	(apply #'converge root1 root2 root3 args)
       (declare (ignorable problems))
       (make-instance (class-of obj1) :genome nil :ast-root merged-root))))
-
-
