@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# usage: merge-diff3 base-id branch-id1 branch-id2
+#
+# Computes a diff3 of the (conflict) merge from base-id to branch-id1 and
+# branch-id2.  The three versions are placed in tmp directories.
+
+TMP1=/tmp/md3-$1/
+TMP2=/tmp/md3-$2/
+TMP3=/tmp/md3-$3/
+
+rm -rf $TMP1 $TMP2 $TMP3
+cp -r . $TMP1
+cp -r . $TMP2
+cp -r . $TMP3
+
+(cd $TMP1 ; git checkout $1 2>/dev/null > /dev/null)
+(cd $TMP2 ; git checkout $2 2>/dev/null > /dev/null)
+(cd $TMP3 ; git checkout $3 2>/dev/null > /dev/null)
+
+for f in `git diff --name-only $2 $3`; do
+  echo
+  echo $f:
+  diff3 -A $TMP2/$f $TMP1/$f $TMP3/$f
+done
