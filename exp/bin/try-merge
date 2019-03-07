@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# usage: try-merge REPO HASH-BASE HASH-LEFT HASH-RIGHT
+#  Computes a diff of the merge from HASH-BASE to
+#  HASH-LEFT and HASH-RIGHT.
+#
+#  REPO as the base repository holding all hashes.
+#
+# OPTIONS:
+#   -h,--help ---------- print this help information
+#   -d,--diff ---------- diff tool to use to compute patches
+#                        default to diff3
+#   -l,--local --------- pass the 'local' option to git clone
+#   -w,--workdir ------- set the working directory
+#                        defaults to the current directory
+#
+LOCAL=
+WORKD=$(pwd)
+DIFF=diff3
+
+eval set -- $(getopt -o hlw:d: -l help,local,workdir:,diff: -- "$@" || help;)
+while [ $# -gt 0 ];do
+    case $1 in
+        -h|--help) help;;
+        -l|--local) LOCAL=--local;;
+        -w|--workdir) WORKD=$2; shift;;
+        -d|--diff) DIFF=$2; shift;;
+        (--) shift; break;;
+        (-*) error "unrecognized option $1";;
+        (*)  break;;
+    esac
+    shift
+done
+if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ];then
+    help
+else
+  REPO=$1
+  NAME=$(basename $REPO .git)
+  BASE=$2
+  LEFT=$3
+  RIGHT=$4
+  shift;shift;shift;shift;
+fi
+DIFFNAME=$(basename ${DIFF})
+RESULT_DIR=${WORKDIR}/${NAME}-${BASE}-${LEFT}-${RIGHT}
+
+if [ -d  ${RESULT_DIR} ];then
+  echo "${RESULT_DIR} already exists"
+else
+  mkdir -p ${RESULT_DIR}
+fi
+cd $WORKD;
+
+for dir in base left right;do
+  if [ ! -d ${NAME}-${dir} ];then
+    git clone ${LOCAL} ${REPO} ${NAME}-${dir}
+  fi
+done
+(cd ${NAME}-base; git reset --hard ${BASE})
+(cd ${NAME}-left; git reset --hard ${LEFT})
+(cd ${NAME}-right; git reset --hard ${RIGHT})
+
+for file in `git diff --name-only $2 $3 --`; do
+  echo $file:
+  mkdir -p ${RESULT_DIR}/$(dirname $file)
+  ${DIFF} -A ${NAME}-base/${file} ${NAME}-left/${file} ${NAME}-right/${file} \
+          > ${RESULT_DIR}/${file}.${DIFFNAME}-patch
+done
