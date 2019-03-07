@@ -15,7 +15,7 @@
 #                        defaults to the current directory
 #
 LOCAL=
-WORKD=$(pwd)
+WORKDIR=$(pwd)
 DIFF=diff3
 SCRIPT="$0"
 help(){
@@ -34,7 +34,7 @@ while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
-        -w|--workdir) WORKD=$2; shift;;
+        -w|--workdir) WORKDIR=$(readlink -f $2); shift;;
         -d|--diff) DIFF=$2; shift;;
         (--) shift; break;;
         (-*) error "unrecognized option $1";;
@@ -60,17 +60,18 @@ if [ -d  ${RESULT_DIR} ];then
 else
   mkdir -p ${RESULT_DIR}
 fi
-cd $WORKD;
+cd $WORKDIR;
 
 for dir in base left right;do
   if [ ! -d ${NAME}-${dir} ];then
     git clone ${LOCAL} ${REPO} ${NAME}-${dir}
   fi
 done
-(cd ${NAME}-base; git reset --hard ${BASE})
-(cd ${NAME}-left; git reset --hard ${LEFT})
-(cd ${NAME}-right; git reset --hard ${RIGHT})
+(cd $WORKDIR/${NAME}-base; git reset --hard ${BASE})
+(cd $WORKDIR/${NAME}-left; git reset --hard ${LEFT})
+(cd $WORKDIR/${NAME}-right; git reset --hard ${RIGHT})
 
+cd $WORKDIR/${NAME}-base
 for file in `git diff --name-only $2 $3 --`; do
   echo $file:
   mkdir -p ${RESULT_DIR}/$(dirname $file)
