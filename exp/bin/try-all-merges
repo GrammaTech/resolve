@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# Try all merges
+#
+for file in conflicts/*;do
+  name=$(basename $file -conflicts)
+  IFS="
+"
+  for line in $(cat $file);do
+    try-merge -l -w all-repos /elm0/eschulte/benchmark/${name} \
+              $(echo ${line}|awk '{print $1}') \
+              $(echo ${line}|awk '{print $2}') \
+              $(echo ${line}|awk '{print $3}')
+  done
+  IFS=" "
+done
