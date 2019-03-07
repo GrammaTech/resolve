@@ -17,6 +17,17 @@
 LOCAL=
 WORKD=$(pwd)
 DIFF=diff3
+SCRIPT="$0"
+help(){
+    local HELP_TEXT=$(cat "$SCRIPT" \
+        |sed '/^[^#]/q' \
+        |head -n -1 \
+        |tail -n +3 \
+        |sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+        |cut -c3-)
+    echo "$HELP_TEXT"
+    exit 1
+}
 
 eval set -- $(getopt -o hlw:d: -l help,local,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
