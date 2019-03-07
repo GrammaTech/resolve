@@ -1,16 +1,55 @@
 #!/bin/bash
 #
-# Try all merges
+# Usage: try-all-merges BENCHMARKDIR
 #
-for file in conflicts/*;do
-  name=$(basename $file -conflicts)
-  IFS="
-"
-  for line in $(cat $file);do
-    try-merge -l -w all-repos /elm0/eschulte/benchmark/${name} \
-              $(echo ${line}|awk '{print $1}') \
-              $(echo ${line}|awk '{print $2}') \
-              $(echo ${line}|awk '{print $3}')
-  done
-  IFS=" "
+#  Read conflict lines of format
+#    "benchmark base left right"
+#  from STDIN and run try-merges on benchmarks in BENCHMARKDIR
+#
+# OPTIONS:
+#   -h,--help ---------- print this help information
+#   -d,--diff ---------- diff tool to use to compute patches
+#                        default to diff3
+#   -l,--local --------- pass the 'local' option to git clone
+#   -w,--workdir ------- set the working directory
+#                        defaults to the current directory
+#
+LOCAL=
+WORKDIR=
+DIFF=diff3
+SCRIPT="$0"
+help(){
+    local HELP_TEXT=$(cat "$SCRIPT" \
+        |sed '/^[^#]/q' \
+        |head -n -1 \
+        |tail -n +3 \
+        |sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+        |cut -c3-)
+    echo "$HELP_TEXT"
+    exit 1
+}
+
+eval set -- $(getopt -o hlw:d: -l help,local,workdir:,diff: -- "$@" || help;)
+while [ $# -gt 0 ];do
+    case $1 in
+        -h|--help) help;;
+        -l|--local) LOCAL=--local;;
+        -w|--workdir) WORKDIR="--workdir $2"; shift;;
+        -d|--diff) DIFF=$2; shift;;
+        (--) shift; break;;
+        (-*) error "unrecognized option $1";;
+        (*)  break;;
+    esac
+    shift
+done
+if [ -z $1 ];then
+  help
+else
+  BENCHMARKDIR=$1
+  shift
+fi
+
+while IFS=" " read name base left right;do
+  try-merge --diff ${DIFF} ${LOCAL} ${WORKDIR} \
+            ${BENCHMARKDIR}/${name} ${base} ${left} ${right}
 done

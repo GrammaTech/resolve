@@ -1,39 +1,64 @@
 #!/bin/bash
 #
-# Find the merges in a repo that cause conflicts
+# Usage: conflicting-merges REPOS...
+#  Find the merges in REPOS(s) that cause conflicts.
 #
-if [ $1"" = "" ]; then
-    CONFLICTS=/tmp/conflicts$$
-else
-    CONFLICTS=$1
-fi;
-cat /dev/null > $CONFLICTS
-
-function testconflict() {
-    foo=$1
-    bar=$2
-    mergebase=$(git merge-base $foo $bar)
-    if [ "$mergebase" = "" ];then
-        # In case foo and bar have no common ancestor,
-	# use the empty tree as the merge base
-        mergebase=4b825dc642cb6eb9a060e54bf8d69288fbee4904
-    fi
-    #test if the output has conflict markers of "merge" style
-    git merge-tree $mergebase $foo $bar | xargs 2>/dev/null | 
-        if grep -oe '<<<<<<<.*=======.*>>>>>>>'; then
-	    echo $mergebase $foo $bar >> $CONFLICTS
-            echo conflict
-        else
-            echo no conflict
-        fi 
+# OPTIONS:
+#   -h,--help ---------- print this help information
+#
+SCRIPT="$0"
+help(){
+  local HELP_TEXT=$(cat "$SCRIPT" \
+                      |sed '/^[^#]/q' \
+                      |head -n -1 \
+                      |tail -n +3 \
+                      |sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+                      |cut -c3-)
+  echo "$HELP_TEXT"
+  exit 1
 }
 
-for d in `git log --pretty="format:%h"`; do
- m=`git show $d | grep "^Merge"`;
- if [ "$m" != "" ]
- then
-#   echo $m;
-   parts=(${m});
-   testconflict ${parts[1]} ${parts[2]};
- fi
+eval set -- $(getopt -o h -l help -- "$@" || help;)
+while [ $# -gt 0 ];do
+  case $1 in
+    -h|--help) help;;
+    (--) shift; break;;
+    (-*) error "unrecognized option $1";;
+    (*)  break;;
+  esac
+  shift
+done
+if [ -z $1 ];then
+  help
+fi
+
+function testconflict() {
+  foo=$1
+  bar=$2
+  mergebase=$(git merge-base $foo $bar)
+  if [ "$mergebase" = "" ];then
+    # In case foo and bar have no common ancestor,
+    # use the empty tree as the merge base
+    mergebase=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+  fi
+  #test if the output has conflict markers of "merge" style
+  git merge-tree $mergebase $foo $bar | xargs 2>/dev/null |
+    if grep -qoe '<<<<<<<.*=======.*>>>>>>>'; then
+      echo -e "${NAME}\tconflict\t$mergebase\t$foo\t$bar"
+    else
+      echo -e "${NAME}\tno-conflict\t$mergebase\t$foo\t$bar"
+    fi
+}
+
+for REPO in $@;do
+  pushd ${REPO} 2>/dev/null >/dev/null
+  NAME=$(basename ${REPO} .git)
+  for d in $(git log --pretty="format:%h"); do
+    m=$(git show $d | grep "^Merge");
+    if [ "$m" != "" ]; then
+      parts=(${m});
+      testconflict ${parts[1]} ${parts[2]};
+    fi
+  done
+  popd 2>/dev/null >/dev/null
 done

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# usage: try-merge REPO HASH-BASE HASH-LEFT HASH-RIGHT
+# Usage: try-merge REPO HASH-BASE HASH-LEFT HASH-RIGHT
 #  Computes a diff of the merge from HASH-BASE to
 #  HASH-LEFT and HASH-RIGHT.
 #
@@ -55,26 +55,36 @@ fi
 DIFFNAME=$(basename ${DIFF})
 RESULT_DIR=${WORKDIR}/${NAME}-${BASE}-${LEFT}-${RIGHT}
 
-if [ -d  ${RESULT_DIR} ];then
-  echo "${RESULT_DIR} already exists"
-else
+if [ ! -d  ${RESULT_DIR} ];then
   mkdir -p ${RESULT_DIR}
 fi
 cd $WORKDIR;
 
 for dir in base left right;do
   if [ ! -d ${NAME}-${dir} ];then
-    git clone ${LOCAL} ${REPO} ${NAME}-${dir}
+    git clone ${LOCAL} ${REPO} ${NAME}-${dir} -q >/dev/null
   fi
 done
-(cd $WORKDIR/${NAME}-base; git reset --hard ${BASE})
-(cd $WORKDIR/${NAME}-left; git reset --hard ${LEFT})
-(cd $WORKDIR/${NAME}-right; git reset --hard ${RIGHT})
+(cd $WORKDIR/${NAME}-base; git reset --hard ${BASE} >/dev/null)
+(cd $WORKDIR/${NAME}-left; git reset --hard ${LEFT} >/dev/null)
+(cd $WORKDIR/${NAME}-right; git reset --hard ${RIGHT} >/dev/null)
 
-cd $WORKDIR/${NAME}-base
-for file in `git diff --name-only $LEFT $RIGHT --`; do
-  echo $file:
+for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
   mkdir -p ${RESULT_DIR}/$(dirname $file)
-  ${DIFF} -A ${NAME}-base/${file} ${NAME}-left/${file} ${NAME}-right/${file} \
-          > ${RESULT_DIR}/${file}.${DIFFNAME}-patch
+  if [ -f ${NAME}-base/${file} ];then
+    OUT="$(${DIFF} ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file})"
+    ERR=$?
+    case $ERR in
+      # Delete file if no conflict.
+      0) echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.0;;
+      # Name file if conflict.
+      1) echo "${RESULT_DIR}/${file}"
+         echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.1;;
+      # Report an error if exit 2 or greater.
+      *) echo "${RESULT_DIR}/${file}*$ERR"
+         echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.$ERR;;
+    esac
+  else
+    touch ${RESULT_DIR}/${file}.no-base;
+  fi
 done
