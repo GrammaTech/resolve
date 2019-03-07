@@ -1,7 +1,7 @@
 #!/bin/bash
-
+#
 # Find the merges in a repo that cause conflicts
-
+#
 if [ $1"" = "" ]; then
     CONFLICTS=/tmp/conflicts$$
 else
