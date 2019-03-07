@@ -72,7 +72,7 @@ done
 (cd $WORKDIR/${NAME}-right; git reset --hard ${RIGHT})
 
 cd $WORKDIR/${NAME}-base
-for file in `git diff --name-only $2 $3 --`; do
+for file in `git diff --name-only $LEFT $RIGHT --`; do
   echo $file:
   mkdir -p ${RESULT_DIR}/$(dirname $file)
   ${DIFF} -A ${NAME}-base/${file} ${NAME}-left/${file} ${NAME}-right/${file} \
