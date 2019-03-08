@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# Collect diff3 stats from dirs in $@
+#
+STATS=
+
+stats_for(){
+  echo "${STATS}"\
+    |grep -c "\.$1$"; }
+
+for dir in $@;do
+  STATS="$(find ${dir} -type f)"
+  echo -e "${dir}\t$(stats_for 0)\t$(stats_for 1)\t$(stats_for 2)\t$(stats_for no-base)\t$(stats_for no-left)\t$(stats_for no-right)"
+done
