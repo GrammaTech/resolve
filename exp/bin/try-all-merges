@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Usage: try-all-merges BENCHMARKDIR
+# Usage: try-all-merges BENCHMARKDIR [-- DIFF-OPTIONS...]
 #
 #  Read conflict lines of format
 #    "benchmark base left right"
@@ -51,5 +51,6 @@ fi
 
 while IFS=" " read name base left right;do
   try-merge --diff ${DIFF} ${LOCAL} ${WORKDIR} \
-            ${BENCHMARKDIR}/${name} ${base} ${left} ${right}
+            ${BENCHMARKDIR}/${name} ${base} ${left} ${right} \
+            -- $@
 done

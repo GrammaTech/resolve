@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Usage: try-merge REPO HASH-BASE HASH-LEFT HASH-RIGHT
+# Usage: try-merge REPO HASH-BASE HASH-LEFT HASH-RIGHT [-- DIFF-OPTIONS...]
 #  Computes a diff of the merge from HASH-BASE to
 #  HASH-LEFT and HASH-RIGHT.
 #
@@ -71,9 +71,17 @@ done
 
 for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
   mkdir -p ${RESULT_DIR}/$(dirname $file)
-  if [ -f ${NAME}-base/${file} ];then
-    OUT="$(${DIFF} ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file})"
+  if [ ! -f ${NAME}-base/${file} ];then
+    touch ${RESULT_DIR}/${file}.no-base;
+  elif [ ! -f ${NAME}-left/${file} ];then
+    touch ${RESULT_DIR}/${file}.no-left;
+  elif [ ! -f ${NAME}-right/${file} ];then
+    touch ${RESULT_DIR}/${file}.no-right;
+  else
+    # echo "${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
+    OUT="$(${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file})"
     ERR=$?
+    rm -f ${RESULT_DIR}/${NAME}-base/${file}*
     case $ERR in
       # Delete file if no conflict.
       0) echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.0;;
@@ -84,7 +92,5 @@ for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
       *) echo "${RESULT_DIR}/${file}*$ERR"
          echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.$ERR;;
     esac
-  else
-    touch ${RESULT_DIR}/${file}.no-base;
   fi
 done
