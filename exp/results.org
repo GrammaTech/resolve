@@ -1,0 +1,111 @@
+#+Title: Merge Experiment Results
+#+Options: ^:{}
+
+Evaluated 5295 merge conflicts from 27864 total merges across 26 programs.
+
+| program       | commits | merge commits | merge line conflicts | merge diff3 conflicts | % merge/commits | % conflict/merge |
+|---------------+---------+---------------+----------------------+-----------------------+-----------------+------------------|
+| ...
+|---------------+---------+---------------+----------------------+-----------------------+-----------------+------------------|
+| total/average |  826495 |         27864 |                 5295 |                       |       3.3713453 |        19.003015 |
+| max           |  239048 |          9187 |                 4755 |                       |       33.047545 |        51.757919 |
+| min           |    1319 |             1 |                    0 |                       |    1.3204458e-3 |                0 |
+#+TBLFM: $5=($3/$2)*100::$6=($4/$3)*100::@28$2=vsum(@2..@-1)::@28$3=vsum(@2..@-1)::@28$4=vsum(@2..@-1)::@29$2=vmax(@2..@-2)::@29$3=vmax(@2..@-2)::@29$4=vmax(@2..@-2)::@29$5=vmax(@2..@-2)::@29$6=vmax(@2..@-2)::@30$2=vmin(@2..@-3)::@30$3=vmin(@2..@-3)::@30$4=vmin(@2..@-3)::@30$5=vmin(@2..@-3)::@30$6=vmin(@2..@-3)
+
+#+begin_src shell
+  total_commits(){
+    local prog=$1;
+    pushd $BENCHMARK_DIR/$prog >/dev/null
+    git rev-list --all --count
+    popd >/dev/null
+  }
+
+  merge_commits(){
+    local prog=$1;
+    grep $prog all-merges.stdout|wc -l
+  }
+
+  merge_line_conflicts(){
+    local prog=$1;
+    grep $prog all-merges.stdout|grep -Pc "\tconflict"
+  }
+
+  merge_diff3_commits(){
+    local prog=$1;
+    echo 0
+  }
+
+  for prog in $(cat all-merges.stdout|awk '{print $1}'|sort|uniq);do
+    echo -ne "$prog"
+    echo -ne "\t$(total_commits $prog)"
+    echo -ne "\t$(merge_commits $prog)"
+    echo -ne "\t$(merge_line_conflicts $prog)"
+    echo ""
+  done
+#+end_src
+
+#+RESULTS:
+| program             | commits | merge commits | merge line conflicts | % merge/commits | % conflict/merge |
+|---------------------+---------+---------------+----------------------+-----------------+------------------|
+| anope               |    6313 |           242 |                   26 |       3.8333597 |        10.743802 |
+| apache              |   47090 |            19 |                    2 |     0.040348269 |        10.526316 |
+| asterisk            |   62711 |          1715 |                    0 |       2.7347674 |                0 |
+| bind                |   52521 |           167 |                    2 |      0.31796805 |        1.1976048 |
+| bitcoin             |   17671 |          5528 |                   34 |       31.282893 |       0.61505065 |
+| busybox             |   15793 |            14 |                    0 |     0.088646869 |                0 |
+| curl                |   23184 |            23 |                    0 |     0.099206349 |                0 |
+| dnsmasq             |    1319 |            29 |                    2 |       2.1986353 |        6.8965517 |
+| ffmpeg              |  109209 |          9187 |                 4755 |       8.4123103 |        51.757919 |
+| ImageMagick         |   14366 |            33 |                    0 |      0.22970904 |                0 |
+| libzmq              |    6123 |          1955 |                   21 |       31.928793 |        1.0741688 |
+| lighttpd            |    3947 |             9 |                    0 |      0.22802128 |                0 |
+| memcached           |    1888 |            11 |                    2 |      0.58262712 |        18.181818 |
+| monero              |    5132 |          1696 |                   12 |       33.047545 |       0.70754717 |
+| mosh                |    1372 |             6 |                    0 |      0.43731778 |                0 |
+| net-snmp            |   62719 |          2761 |                  244 |       4.4021748 |        8.8373778 |
+| nginx               |    7317 |             5 |                    0 |     0.068334017 |                0 |
+| openssh             |    9111 |             1 |                    0 |     0.010975744 |                0 |
+| openvpn             |    2979 |            18 |                    7 |      0.60422961 |        38.888889 |
+| proftpd             |   11283 |           535 |                    4 |       4.7416467 |       0.74766355 |
+| samba               |  239048 |          1282 |                   53 |      0.53629397 |        4.1341654 |
+| sqlite              |   18304 |          1215 |                   71 |       6.6378934 |        5.8436214 |
+| squid               |   22977 |           900 |                   52 |       3.9169604 |        5.7777778 |
+| the_silver_searcher |    2010 |           433 |                    7 |       21.542289 |        1.6166282 |
+| unrealircd          |    6376 |            79 |                    1 |       1.2390213 |        1.2658228 |
+| wireshark           |   75732 |             1 |                    0 |    1.3204458e-3 |                0 |
+|---------------------+---------+---------------+----------------------+-----------------+------------------|
+| total/average       |  826495 |         27864 |                 5295 |       3.3713453 |        19.003015 |
+| max                 |  239048 |          9187 |                 4755 |       33.047545 |        51.757919 |
+| min                 |    1319 |             1 |                    0 |    1.3204458e-3 |                0 |
+#+TBLFM: $5=($3/$2)*100::$6=($4/$3)*100::@28$2=vsum(@2..@-1)::@28$3=vsum(@2..@-1)::@28$4=vsum(@2..@-1)::@29$2=vmax(@2..@-2)::@29$3=vmax(@2..@-2)::@29$4=vmax(@2..@-2)::@29$5=vmax(@2..@-2)::@29$6=vmax(@2..@-2)::@30$2=vmin(@2..@-3)::@30$3=vmin(@2..@-3)::@30$4=vmin(@2..@-3)::@30$5=vmin(@2..@-3)::@30$6=vmin(@2..@-3)
+
+* Calculations
+** Total programs
+#+name: total-programs
+#+begin_src shell
+cat all-merges.stdout|awk '{print $1}'|sort|uniq|wc -l
+#+end_src
+
+#+RESULTS: total-programs
+: 26
+
+** Total commits
+: git rev-list --all --count
+
+** Total merges
+#+name: total-merges
+#+begin_src shell
+cat all-merges.stdout|wc -l
+#+end_src
+
+#+RESULTS: total-merges
+: 27864
+
+** Total line conflicts
+#+name: total-line-conflicts
+#+begin_src shell
+grep -Pc "\tconflict" all-merges.stdout
+#+end_src
+
+#+RESULTS: total-line-conflicts
+: 5295
