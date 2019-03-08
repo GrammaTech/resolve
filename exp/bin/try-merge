@@ -45,7 +45,9 @@ done
 if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ];then
     help
 else
-  REPO=$1
+  # This use of readlink should either resolve the absolute path for
+  # files or keep the original value for git:// or http:// URLs.
+  REPO=$(readlink -f $1 || echo $1)
   NAME=$(basename $REPO .git)
   BASE=$2
   LEFT=$3
@@ -60,6 +62,7 @@ if [ ! -d  ${RESULT_DIR} ];then
 fi
 cd $WORKDIR;
 
+# TODO: Should expand REPO with readlink -f, relative to the starting dir.
 for dir in base left right;do
   if [ ! -d ${NAME}-${dir} ];then
     git clone ${LOCAL} ${REPO} ${NAME}-${dir} -q >/dev/null
