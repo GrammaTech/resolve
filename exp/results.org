@@ -109,3 +109,34 @@ grep -Pc "\tconflict" all-merges.stdout
 
 #+RESULTS: total-line-conflicts
 : 5295
+
+** Diff3 statistics
+Ran =diff3= with the following.
+#+begin_src shell :eval never
+  cat all-merges.stdout|grep -v "no-conflict"|cut -f 1,3,4,5|try-all-merges -l -w all-repos ../benchmark -- -m 2>try-diff3.stderr |tee try-diff3.stdout
+#+end_src
+
+How good is diff3 at resolving merge conflicts.
+
+#+name: diff3-stats
+#+begin_src shell
+  find all-repos/*-*-*-* -type f|sed 's/^.*\.//'|sort|uniq -c|sort -n
+#+end_src
+
+#+RESULTS: diff3-stats
+:  23982 2
+:  72235 no-base
+: 149249 0
+
+* Notes
+** Diff3 run time
+After about a day we're more than half way through running the diff3
+conflict collection.
+
+This is the latest line processed after ~1 day of runtime.
+: 13:12 mistletoe:merge-experiment grep -n bc5c4e99480320250 all-merges.stdout
+: 18244:net-snmp  conflict        7bc5c4e99480320250e4de314c36d82a86372ae6        42b96ac c55f86f
+: 13:13 mistletoe:merge-experiment wc -l all-merges.stdout
+: 27864 all-merges.stdout
+
+Which is 18244/27864 \approx 65.5% of the way through.
