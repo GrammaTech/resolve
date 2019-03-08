@@ -1,7 +1,8 @@
 #+Title: Merge Experiment Results
 #+Options: ^:{}
 
-Evaluated 5295 merge conflicts from 27864 total merges across 26 programs.
+Evaluated 5295 merge conflicts from 27864 total merges across 26
+popular open-source programs.
 
 | program       | commits | merge commits | merge line conflicts | merge diff3 conflicts | % merge/commits | % conflict/merge |
 |---------------+---------+---------------+----------------------+-----------------------+-----------------+------------------|
@@ -110,23 +111,93 @@ grep -Pc "\tconflict" all-merges.stdout
 #+RESULTS: total-line-conflicts
 : 5295
 
-** Diff3 statistics
+** TODO Diff3 statistics
 Ran =diff3= with the following.
 #+begin_src shell :eval never
   cat all-merges.stdout|grep -v "no-conflict"|cut -f 1,3,4,5|try-all-merges -l -w all-repos ../benchmark -- -m 2>try-diff3.stderr |tee try-diff3.stdout
 #+end_src
 
-How good is diff3 at resolving merge conflicts.
+*TODO*: Pick this all up after the runs populating all-repos are finished.
 
-#+name: diff3-stats
-#+begin_src shell
-  find all-repos/*-*-*-* -type f|sed 's/^.*\.//'|sort|uniq -c|sort -n
+Build the try-stats.txt file with the following.
+#+begin_src shell :eval never
+  ./bin/try-stats all-repos/*-*-*-*/ |tee try-stats.txt
 #+end_src
 
-#+RESULTS: diff3-stats
-:  23982 2
-:  72235 no-base
-: 149249 0
+*** How good is diff3 at resolving merge conflicts
+
+#+begin_src shell
+cat try-diff3.stats|cla mean median min max
+#+end_src
+
+#+RESULTS:
+|        | Success | Conflict |     Error | No-base | No-left | No-right |
+|--------+---------+----------+-----------+---------+---------+----------|
+| mean   | 796.797 |  12.4598 | 0.0440945 | 548.808 | 84.1559 |   1.1622 |
+| median |     198 |        1 |         0 |      48 |       8 |        0 |
+| min    |       0 |        0 |         0 |       0 |       0 |        0 |
+| max    |    3763 |      461 |         7 |    3040 |     682 |      443 |
+
+*** Types of files that have conflicts
+First, how many total files have conflicts?
+#+begin_src shell :eval never
+  find all-repos/*-*-*-* -name "*.1"|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|wc -l
+#+end_src
+
+: 7943
+
+Next, what types are they?
+#+begin_src shell :eval never
+  find all-repos/*-*-*-* -name "*.1"|xargs -I{} basename {}|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|uniq -c|sort -n
+#+end_src
+
+They are predominantly C/C++.
+5350/7943 (67.35%) Just with c, h, and cpp.
+
+| Count | Extension |
+|-------+-----------|
+|  3863 | c         |
+|  1148 | h         |
+|   361 | cpp       |
+|   322 | in        |
+|   171 | def       |
+|   166 | html      |
+|   135 | pm        |
+|   120 | configure |
+|   120 | depend    |
+|   119 | 3         |
+|    89 | 1         |
+|    84 | dsp       |
+|    79 | cc        |
+|    76 | 8         |
+|    73 | conf      |
+|    65 | sgml      |
+|    56 | xs        |
+|    54 | txt       |
+|    40 | po        |
+|    38 | mk        |
+|    32 | sh        |
+|    31 | props     |
+|    29 | Makefile  |
+|    28 | PL        |
+|    27 | README    |
+|    25 | am        |
+|    22 | ac        |
+|    20 | FAQ       |
+|    20 | spec      |
+|    18 | 5         |
+|    15 | m2c       |
+|    15 | pl        |
+|    15 | win32     |
+|    14 | NEWS      |
+|    14 | top       |
+|    14 | xml       |
+|    13 | ChangeLog |
+|    13 | gitignore |
+|    13 | pdf       |
+|    13 | RUNTESTS  |
+|    12 | CHANGES   |
+|    10 | m4        |
 
 * Notes
 ** Diff3 run time
