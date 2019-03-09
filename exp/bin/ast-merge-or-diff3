@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# Usage: ast-diff-or-diff3 BASE OURS THEIRS
+#  Run ast-diff on AST-files, otherwise run diff3
+#
+SCRIPT="$0"
+help(){
+  local HELP_TEXT=$(cat "$SCRIPT" \
+                      |sed '/^[^#]/q' \
+                      |head -n -1 \
+                      |tail -n +3 \
+                      |sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+                      |cut -c3-)
+  echo "$HELP_TEXT"
+  exit 1
+}
+
+# Get the first argument that doesn't look like an option.
+for opt in $@;do
+  if $(echo $opt|grep -q "^-");then
+    shift
+    continue
+  fi
+  # Check if the first real argument looks like a source file.
+  if $(echo $1|grep -q "\.\(c\|cc\|cpp\|h\|hpp\|cxx\|hxx\)$");then
+    exec ast-diff $@
+  else
+    exec diff3 -m $@
+  fi
+done
