@@ -84,7 +84,7 @@ for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
     # echo "${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
     OUT="$(${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file})"
     ERR=$?
-    rm -f ${RESULT_DIR}/${NAME}-base/${file}*
+    rm -f ${RESULT_DIR}/${NAME}-base/${file}.${DIFFNAME}-patch.*
     case $ERR in
       # Delete file if no conflict.
       0) echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.0;;
