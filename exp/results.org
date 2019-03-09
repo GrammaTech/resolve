@@ -110,7 +110,6 @@ grep -Pc "\tconflict" all-merges.stdout
 
 #+RESULTS: total-line-conflicts
 : 5295
-
 ** TODO Diff3 statistics
 Ran =diff3= with the following.
 #+begin_src shell :eval never
@@ -198,6 +197,25 @@ They are predominantly C/C++.
 |    13 | RUNTESTS  |
 |    12 | CHANGES   |
 |    10 | m4        |
+
+** TODO ast-merge statistics
+Run with:
+: try-merge -l -w all-repos/ -d ast-merge-or-diff3 ../benchmark/sqlite c0a327bf861f968b49fb68bffd79101973513809 8ebb3ba a0866cb
+
+Looks like it found many fewer resolutions than your standard diff3
+(or at least it returned ERRNO 1 very frequently).
+: [root@a64464f26618 merge-experiment]# find /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/ -name "*ast-merge-or-diff3-patch*"
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbe.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeaux.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/sqlite.h.in.ast-merge-or-diff3-patch.0
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/fkey.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/test_malloc.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/pragma.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/status.c.ast-merge-or-diff3-patch.1                                                               /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/sqliteInt.h.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeInt.h.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/main.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeapi.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/test/fkey1.test.ast-merge-or-diff3-patch.0
 
 * Notes
 ** Diff3 run time
