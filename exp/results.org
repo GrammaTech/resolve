@@ -2,16 +2,8 @@
 #+Options: ^:{}
 
 Evaluated 5295 merge conflicts from 27864 total merges across 26
-popular open-source programs.
-
-| program       | commits | merge commits | merge line conflicts | merge diff3 conflicts | % merge/commits | % conflict/merge |
-|---------------+---------+---------------+----------------------+-----------------------+-----------------+------------------|
-| ...
-|---------------+---------+---------------+----------------------+-----------------------+-----------------+------------------|
-| total/average |  826495 |         27864 |                 5295 |                       |       3.3713453 |        19.003015 |
-| max           |  239048 |          9187 |                 4755 |                       |       33.047545 |        51.757919 |
-| min           |    1319 |             1 |                    0 |                       |    1.3204458e-3 |                0 |
-#+TBLFM: $5=($3/$2)*100::$6=($4/$3)*100::@28$2=vsum(@2..@-1)::@28$3=vsum(@2..@-1)::@28$4=vsum(@2..@-1)::@29$2=vmax(@2..@-2)::@29$3=vmax(@2..@-2)::@29$4=vmax(@2..@-2)::@29$5=vmax(@2..@-2)::@29$6=vmax(@2..@-2)::@30$2=vmin(@2..@-3)::@30$3=vmin(@2..@-3)::@30$4=vmin(@2..@-3)::@30$5=vmin(@2..@-3)::@30$6=vmin(@2..@-3)
+popular open-source programs.  In a, currently, 174G directory
+(=all-repos=).
 
 #+begin_src shell
   total_commits(){
@@ -33,7 +25,7 @@ popular open-source programs.
 
   merge_diff3_commits(){
     local prog=$1;
-    echo 0
+    grep $prog try-stats.txt|awk 'BEGIN{count=0}{if($2 != 0){count++}}END{print count}'
   }
 
   for prog in $(cat all-merges.stdout|awk '{print $1}'|sort|uniq);do
@@ -41,44 +33,80 @@ popular open-source programs.
     echo -ne "\t$(total_commits $prog)"
     echo -ne "\t$(merge_commits $prog)"
     echo -ne "\t$(merge_line_conflicts $prog)"
+    echo -ne "\t$(merge_diff3_commits $prog)"
     echo ""
   done
 #+end_src
 
-#+RESULTS:
-| program             | commits | merge commits | merge line conflicts | % merge/commits | % conflict/merge |
-|---------------------+---------+---------------+----------------------+-----------------+------------------|
-| anope               |    6313 |           242 |                   26 |       3.8333597 |        10.743802 |
-| apache              |   47090 |            19 |                    2 |     0.040348269 |        10.526316 |
-| asterisk            |   62711 |          1715 |                    0 |       2.7347674 |                0 |
-| bind                |   52521 |           167 |                    2 |      0.31796805 |        1.1976048 |
-| bitcoin             |   17671 |          5528 |                   34 |       31.282893 |       0.61505065 |
-| busybox             |   15793 |            14 |                    0 |     0.088646869 |                0 |
-| curl                |   23184 |            23 |                    0 |     0.099206349 |                0 |
-| dnsmasq             |    1319 |            29 |                    2 |       2.1986353 |        6.8965517 |
-| ffmpeg              |  109209 |          9187 |                 4755 |       8.4123103 |        51.757919 |
-| ImageMagick         |   14366 |            33 |                    0 |      0.22970904 |                0 |
-| libzmq              |    6123 |          1955 |                   21 |       31.928793 |        1.0741688 |
-| lighttpd            |    3947 |             9 |                    0 |      0.22802128 |                0 |
-| memcached           |    1888 |            11 |                    2 |      0.58262712 |        18.181818 |
-| monero              |    5132 |          1696 |                   12 |       33.047545 |       0.70754717 |
-| mosh                |    1372 |             6 |                    0 |      0.43731778 |                0 |
-| net-snmp            |   62719 |          2761 |                  244 |       4.4021748 |        8.8373778 |
-| nginx               |    7317 |             5 |                    0 |     0.068334017 |                0 |
-| openssh             |    9111 |             1 |                    0 |     0.010975744 |                0 |
-| openvpn             |    2979 |            18 |                    7 |      0.60422961 |        38.888889 |
-| proftpd             |   11283 |           535 |                    4 |       4.7416467 |       0.74766355 |
-| samba               |  239048 |          1282 |                   53 |      0.53629397 |        4.1341654 |
-| sqlite              |   18304 |          1215 |                   71 |       6.6378934 |        5.8436214 |
-| squid               |   22977 |           900 |                   52 |       3.9169604 |        5.7777778 |
-| the_silver_searcher |    2010 |           433 |                    7 |       21.542289 |        1.6166282 |
-| unrealircd          |    6376 |            79 |                    1 |       1.2390213 |        1.2658228 |
-| wireshark           |   75732 |             1 |                    0 |    1.3204458e-3 |                0 |
-|---------------------+---------+---------------+----------------------+-----------------+------------------|
-| total/average       |  826495 |         27864 |                 5295 |       3.3713453 |        19.003015 |
-| max                 |  239048 |          9187 |                 4755 |       33.047545 |        51.757919 |
-| min                 |    1319 |             1 |                    0 |    1.3204458e-3 |                0 |
-#+TBLFM: $5=($3/$2)*100::$6=($4/$3)*100::@28$2=vsum(@2..@-1)::@28$3=vsum(@2..@-1)::@28$4=vsum(@2..@-1)::@29$2=vmax(@2..@-2)::@29$3=vmax(@2..@-2)::@29$4=vmax(@2..@-2)::@29$5=vmax(@2..@-2)::@29$6=vmax(@2..@-2)::@30$2=vmin(@2..@-3)::@30$3=vmin(@2..@-3)::@30$4=vmin(@2..@-3)::@30$5=vmin(@2..@-3)::@30$6=vmin(@2..@-3)
+| program             | commits | merge commits | merge line conflicts | merge line diff3 conflicts | % merge/commits | % conflict/merge | diff3/diff |
+|---------------------+---------+---------------+----------------------+----------------------------+-----------------+------------------+------------|
+| anope               |    6313 |           242 |                   26 |                         26 |       3.8333597 |        10.743802 |        100 |
+| apache              |   47090 |            19 |                    2 |                          2 |     0.040348269 |        10.526316 |        100 |
+| asterisk            |   62711 |          1715 |                    0 |                          0 |       2.7347674 |                0 |  (0/0) 100 |
+| bind                |   52521 |           167 |                    2 |                          2 |      0.31796805 |        1.1976048 |        100 |
+| bitcoin             |   17671 |          5528 |                   34 |                         32 |       31.282893 |       0.57887120 |  94.117647 |
+| busybox             |   15793 |            14 |                    0 |                          0 |     0.088646869 |                0 |  (0/0) 100 |
+| curl                |   23184 |            23 |                    0 |                          0 |     0.099206349 |                0 |  (0/0) 100 |
+| dnsmasq             |    1319 |            29 |                    2 |                          2 |       2.1986353 |        6.8965517 |        100 |
+| ffmpeg              |  109209 |          9187 |                 4755 |                       4755 |       8.4123103 |        51.757919 |        100 |
+| ImageMagick         |   14366 |            33 |                    0 |                          0 |      0.22970904 |                0 |  (0/0) 100 |
+| libzmq              |    6123 |          1955 |                   21 |                         20 |       31.928793 |        1.0230179 |  95.238095 |
+| lighttpd            |    3947 |             9 |                    0 |                          0 |      0.22802128 |                0 |  (0/0) 100 |
+| memcached           |    1888 |            11 |                    2 |                          2 |      0.58262712 |        18.181818 |        100 |
+| monero              |    5132 |          1696 |                   12 |                         12 |       33.047545 |       0.70754717 |        100 |
+| mosh                |    1372 |             6 |                    0 |                          0 |      0.43731778 |                0 |  (0/0) 100 |
+| net-snmp            |   62719 |          2761 |                  244 |                        237 |       4.4021748 |        8.5838464 |  97.131148 |
+| nginx               |    7317 |             5 |                    0 |                          0 |     0.068334017 |                0 |  (0/0) 100 |
+| openssh             |    9111 |             1 |                    0 |                          0 |     0.010975744 |                0 |  (0/0) 100 |
+| openvpn             |    2979 |            18 |                    7 |                          7 |      0.60422961 |        38.888889 |        100 |
+| proftpd             |   11283 |           535 |                    4 |                          4 |       4.7416467 |       0.74766355 |        100 |
+| samba               |  239048 |          1282 |                   53 |                         52 |      0.53629397 |        4.0561622 |  98.113208 |
+| sqlite              |   18304 |          1215 |                   71 |                         70 |       6.6378934 |        5.7613169 |  98.591549 |
+| squid               |   22977 |           900 |                   52 |                         52 |       3.9169604 |        5.7777778 |        100 |
+| the_silver_searcher |    2010 |           433 |                    7 |                          7 |       21.542289 |        1.6166282 |        100 |
+| unrealircd          |    6376 |            79 |                    1 |                          1 |       1.2390213 |        1.2658228 |        100 |
+| wireshark           |   75732 |             1 |                    0 |                          0 |    1.3204458e-3 |                0 |  (0/0) 100 |
+|---------------------+---------+---------------+----------------------+----------------------------+-----------------+------------------+------------|
+| total/average       |  826495 |         27864 |                 5295 |                       5283 |       3.3713453 |        18.959948 |  99.773371 |
+| max                 |  239048 |          9187 |                 4755 |                       4755 |       33.047545 |        51.757919 |        100 |
+| min                 |    1319 |             1 |                    0 |                          0 |    1.3204458e-3 |                0 |  (0/0) 100 |
+#+TBLFM: $6=($3/$2)*100::$7=($5/$3)*100::$8=($5/$4)*100::@28$2=vsum(@2..@-1)::@28$3=vsum(@2..@-1)::@28$5=vsum(@2..@-1)::@29$2=vmax(@2..@-2)::@29$3=vmax(@2..@-2)::@29$5=vmax(@2..@-2)::@29$6=vmax(@2..@-2)::@29$7=vmax(@2..@-2)::@30$2=vmin(@2..@-3)::@30$3=vmin(@2..@-3)::@30$5=vmin(@2..@-3)::@30$6=vmin(@2..@-3)::@30$7=vmin(@2..@-3)
+
+The types of files with conflicts are predominantly C/C++.  5485/7943
+(69.05%) Just with c, h, and cpp.  (From [[#type-of-files-w-conflicts][Types of files that have
+conflicts]].)
+
+| Count | Extension | What is this?                              |
+|-------+-----------+--------------------------------------------|
+|  3863 | c         | C/C++ source                               |
+|  1148 | h         | C/C++ source                               |
+|   361 | cpp       | C/C++ source                               |
+|   322 | in        | autoconf                                   |
+|   171 | def       | library descriptions and man pages (groff) |
+|   166 | html      | html, docs                                 |
+|   135 | pm        | perl, often under t/lib for tests          |
+|   120 | configure | shell                                      |
+|   120 | depend    | lines of dependency info, 'make depend'    |
+|   119 | 3         |                                            |
+|    89 | 1         |                                            |
+|    84 | dsp       | MS developer studio generated build file   |
+|    79 | cc        | C/C++ source                               |
+|    76 | 8         |                                            |
+|    73 | conf      | conf source *or* C/C++ source              |
+|    65 | sgml      | standard generalized markup language, docs |
+|    56 | xs        | C/C++                                      |
+|    54 | txt       | Text                                       |
+|    40 | po        | locale/language/i18n                       |
+|    38 | mk        | Makefile                                   |
+|    32 | sh        | shell                                      |
+|    31 | props     | (couldn't find any)                        |
+|    29 | Makefile  | Makefile                                   |
+|    28 | PL        | Perl                                       |
+|    27 | README    | Text                                       |
+|    25 | am        | automake                                   |
+|    22 | ac        | autoconf                                   |
+|    20 | FAQ       | Text                                       |
+|    20 | spec      | Linux package info, e.g. module deps       |
 
 * Calculations
 ** Total programs
@@ -110,13 +138,12 @@ grep -Pc "\tconflict" all-merges.stdout
 
 #+RESULTS: total-line-conflicts
 : 5295
-** TODO Diff3 statistics
+** DONE Diff3 statistics
+   CLOSED: [2019-03-11 Mon 11:43]
 Ran =diff3= with the following.
 #+begin_src shell :eval never
   cat all-merges.stdout|grep -v "no-conflict"|cut -f 1,3,4,5|try-all-merges -l -w all-repos ../benchmark -- -m 2>try-diff3.stderr |tee try-diff3.stdout
 #+end_src
-
-*TODO*: Pick this all up after the runs populating all-repos are finished.
 
 Build the try-stats.txt file with the following.
 #+begin_src shell :eval never
@@ -138,6 +165,9 @@ cat try-diff3.stats|cla mean median min max
 | max    |    3763 |      461 |         7 |    3040 |     682 |      443 |
 
 *** Types of files that have conflicts
+    :PROPERTIES:
+    :CUSTOM_ID: type-of-files-w-conflicts
+    :END:
 First, how many total files have conflicts?
 #+begin_src shell :eval never
   find all-repos/*-*-*-* -name "*.1"|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|wc -l
@@ -153,50 +183,87 @@ Next, what types are they?
 They are predominantly C/C++.
 5350/7943 (67.35%) Just with c, h, and cpp.
 
-| Count | Extension |
-|-------+-----------|
-|  3863 | c         |
-|  1148 | h         |
-|   361 | cpp       |
-|   322 | in        |
-|   171 | def       |
-|   166 | html      |
-|   135 | pm        |
-|   120 | configure |
-|   120 | depend    |
-|   119 | 3         |
-|    89 | 1         |
-|    84 | dsp       |
-|    79 | cc        |
-|    76 | 8         |
-|    73 | conf      |
-|    65 | sgml      |
-|    56 | xs        |
-|    54 | txt       |
-|    40 | po        |
-|    38 | mk        |
-|    32 | sh        |
-|    31 | props     |
-|    29 | Makefile  |
-|    28 | PL        |
-|    27 | README    |
-|    25 | am        |
-|    22 | ac        |
-|    20 | FAQ       |
-|    20 | spec      |
-|    18 | 5         |
-|    15 | m2c       |
-|    15 | pl        |
-|    15 | win32     |
-|    14 | NEWS      |
-|    14 | top       |
-|    14 | xml       |
-|    13 | ChangeLog |
-|    13 | gitignore |
-|    13 | pdf       |
-|    13 | RUNTESTS  |
-|    12 | CHANGES   |
-|    10 | m4        |
+| Count | Extension | What is this?                              |
+|-------+-----------+--------------------------------------------|
+|  3863 | c         | C/C++ source                               |
+|  1148 | h         | C/C++ source                               |
+|   361 | cpp       | C/C++ source                               |
+|   322 | in        | autoconf                                   |
+|   171 | def       | library descriptions and man pages (groff) |
+|   166 | html      | html, docs                                 |
+|   135 | pm        | perl, often under t/lib for tests          |
+|   120 | configure | shell                                      |
+|   120 | depend    | lines of dependency info, 'make depend'    |
+|   119 | 3         |                                            |
+|    89 | 1         |                                            |
+|    84 | dsp       | MS developer studio generated build file   |
+|    79 | cc        | C/C++ source                               |
+|    76 | 8         |                                            |
+|    73 | conf      | conf source *or* C/C++ source              |
+|    65 | sgml      | standard generalized markup language, docs |
+|    56 | xs        | C/C++                                      |
+|    54 | txt       | Text                                       |
+|    40 | po        | locale/language/i18n                       |
+|    38 | mk        | Makefile                                   |
+|    32 | sh        | shell                                      |
+|    31 | props     | (couldn't find any)                        |
+|    29 | Makefile  | Makefile                                   |
+|    28 | PL        | Perl                                       |
+|    27 | README    | Text                                       |
+|    25 | am        | automake                                   |
+|    22 | ac        | autoconf                                   |
+|    20 | FAQ       | Text                                       |
+|    20 | spec      | Linux package info, e.g. module deps       |
+|    18 | 5         |                                            |
+|    15 | m2c       |                                            |
+|    15 | pl        |                                            |
+|    15 | win32     |                                            |
+|    14 | NEWS      |                                            |
+|    14 | top       |                                            |
+|    14 | xml       |                                            |
+|    13 | ChangeLog |                                            |
+|    13 | gitignore |                                            |
+|    13 | pdf       |                                            |
+|    13 | RUNTESTS  |                                            |
+|    12 | CHANGES   |                                            |
+|    10 | m4        |                                            |
+
+More popular filename with =.in=.  For a useful introduction/review of
+automake and these =.in= files see:
+- https://stackoverflow.com/questions/26832264/confused-about-configure-script-and-makefile-in/26832773#26832773
+- https://thoughtbot.com/blog/the-magic-behind-configure-make-make-install
+| count | filename                     |
+|-------+------------------------------|
+|   805 | Makefile.in                  |
+|    60 | configure.in                 |
+|    34 | root.db.in                   |
+|    33 | example.db.in                |
+|    26 | config.h.in                  |
+|    15 | prereq.sh.in                 |
+|    13 | stamp-h.in                   |
+|    12 | named.conf.in                |
+|     9 | platform.h.in                |
+|     6 | autodefs.h.in                |
+|     6 | child.db.in                  |
+|     6 | conf.sh.in                   |
+|     6 | dlv.db.in                    |
+|     6 | dst.example.db.in            |
+|     6 | netdb.h.in                   |
+|     6 | nsec3.example.db.in          |
+|     6 | nsec3.nsec3.example.db.in    |
+|     6 | nsec3.optout.example.db.in   |
+|     6 | optout.example.db.in         |
+|     6 | optout.nsec3.example.db.in   |
+|     6 | optout.optout.example.db.in  |
+|     6 | private.secure.example.db.in |
+|     6 | rsasha256.example.db.in      |
+|     6 | rsasha512.example.db.in      |
+|     6 | rules.in                     |
+|     6 | secure.example.db.in         |
+|     6 | secure.nsec3.example.db.in   |
+|     6 | secure.optout.example.db.in  |
+|     6 | settings.in                  |
+|     6 | signed.db.in                 |
 
 ** TODO ast-merge statistics
 Run with:
