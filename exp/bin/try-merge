@@ -84,16 +84,16 @@ for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
     # echo "${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
     OUT="$(${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file})"
     ERR=$?
-    rm -f ${RESULT_DIR}/${NAME}-base/${file}.${DIFFNAME}-patch.*
+    rm -f ${RESULT_DIR}/${NAME}-base/${file}.${DIFFNAME}.*
     case $ERR in
       # Delete file if no conflict.
-      0) echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.0;;
+      0) echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}.0;;
       # Name file if conflict.
       1) echo "${RESULT_DIR}/${file}"
-         echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.1;;
+         echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}.1;;
       # Report an error if exit 2 or greater.
       *) echo "${RESULT_DIR}/${file}*$ERR"
-         echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}-patch.$ERR;;
+         echo "${OUT}" > ${RESULT_DIR}/${file}.${DIFFNAME}.$ERR;;
     esac
   fi
 done
