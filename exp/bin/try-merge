@@ -83,9 +83,9 @@ if [ -n ${BEAR} ]; then
     echo "Running bear in right"
     (cd $WORKDIR/${NAME}-right; bear ./gt-harness.sh build)
     CD=compile_commands.json
-    DIFF=${DIFF} --old-compilation-database=${BASE}/$CD
-    DIFF=${DIFF} --my-compilation-database=${LEFT}/$CD
-    DIFF=${DIFF} --your-compilation-database=${RIGHT}/$CD
+    DIFF="${DIFF} --old-compilation-database=${NAME}-base/$CD"
+    DIFF="${DIFF} --my-compilation-database=${NAME}-left/$CD"
+    DIFF="${DIFF} --your-compilation-database=${NAME}-right/$CD"
 fi
 
 echo DIFF=${DIFF}
