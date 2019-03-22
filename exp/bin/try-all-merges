@@ -36,7 +36,7 @@ while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
-        -b|--bear) BEAR=--bear; shift;;
+        -b|--bear) BEAR=--bear;;
         -w|--workdir) WORKDIR="--workdir $2"; shift;;
         -d|--diff) DIFF=$2; shift;;
         (--) shift; break;;
