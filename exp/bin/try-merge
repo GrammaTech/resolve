@@ -31,14 +31,14 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hlw:d: -l help,local,workdir:,diff: -- "$@" || help;)
+eval set -- $(getopt -o hlbw:d: -l help,local,bear,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
+        -b|--bear) BEAR=--bear;;
         -w|--workdir) WORKDIR=$(readlink -f $2); shift;;
         -d|--diff) DIFF=$2; shift;;
-        -b|--bear) BEAR=--bear;;
         (--) shift; break;;
         (-*) error "unrecognized option $1";;
         (*)  break;;
@@ -76,11 +76,19 @@ done
 (cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null; git checkout origin/master -- gt-harness.sh)
 
 if [ -n ${BEAR} ]; then
+    echo "Running bear in base"
     (cd $WORKDIR/${NAME}-base; bear ./gt-harness.sh build)
+    echo "Running bear in left"
     (cd $WORKDIR/${NAME}-left; bear ./gt-harness.sh build)
+    echo "Running bear in right"
     (cd $WORKDIR/${NAME}-right; bear ./gt-harness.sh build)
+    CD=compile_commands.json
+    DIFF=${DIFF} --old-compilation-database=${BASE}/$CD
+    DIFF=${DIFF} --my-compilation-database=${LEFT}/$CD
+    DIFF=${DIFF} --your-compilation-database=${RIGHT}/$CD
 fi
 
+echo DIFF=${DIFF}
 
 for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
   mkdir -p ${RESULT_DIR}/$(dirname $file)
