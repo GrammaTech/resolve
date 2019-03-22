@@ -75,7 +75,8 @@ done
 (cd $WORKDIR/${NAME}-left;  git reset --hard ${LEFT} >/dev/null; git checkout origin/master -- gt-harness.sh)
 (cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null; git checkout origin/master -- gt-harness.sh)
 
-if [ -n ${BEAR} ]; then
+echo BEAR=${BEAR}
+if [ ${BEAR}"1" != "1" ]; then
     echo "Running bear in base"
     (cd $WORKDIR/${NAME}-base; bear ./gt-harness.sh build)
     echo "Running bear in left"
@@ -91,6 +92,7 @@ fi
 echo DIFF=${DIFF}
 
 for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
+  echo $file
   mkdir -p ${RESULT_DIR}/$(dirname $file)
   if [ ! -f ${NAME}-base/${file} ];then
     touch ${RESULT_DIR}/${file}.no-base;
@@ -100,7 +102,7 @@ for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
     touch ${RESULT_DIR}/${file}.no-right;
   else
       CMD="${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
-      # echo ${CMD}
+      echo ${CMD}
       OUT="$(${CMD})"
     ERR=$?
     rm -f ${RESULT_DIR}/${NAME}-base/${file}.${DIFFNAME}.*
