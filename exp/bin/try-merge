@@ -13,11 +13,13 @@
 #   -l,--local --------- pass the 'local' option to git clone
 #   -w,--workdir ------- set the working directory
 #                        defaults to the current directory
+#   --bear, -b --------- Use bear to make compilation databases
 #
 LOCAL=
 WORKDIR=$(pwd)
 DIFF=diff3
 SCRIPT="$0"
+BEAR=
 help(){
     local HELP_TEXT=$(cat "$SCRIPT" \
         |sed '/^[^#]/q' \
@@ -36,6 +38,7 @@ while [ $# -gt 0 ];do
         -l|--local) LOCAL=--local;;
         -w|--workdir) WORKDIR=$(readlink -f $2); shift;;
         -d|--diff) DIFF=$2; shift;;
+        -b|--bear) BEAR=--bear;;
         (--) shift; break;;
         (-*) error "unrecognized option $1";;
         (*)  break;;
@@ -68,9 +71,16 @@ for dir in base left right;do
     git clone ${LOCAL} ${REPO} ${NAME}-${dir} -q >/dev/null
   fi
 done
-(cd $WORKDIR/${NAME}-base; git reset --hard ${BASE} >/dev/null)
-(cd $WORKDIR/${NAME}-left; git reset --hard ${LEFT} >/dev/null)
-(cd $WORKDIR/${NAME}-right; git reset --hard ${RIGHT} >/dev/null)
+(cd $WORKDIR/${NAME}-base; git reset --hard ${BASE} >/dev/null; git checkout origin/master -- gt-harness.sh)
+(cd $WORKDIR/${NAME}-left;  git reset --hard ${LEFT} >/dev/null; git checkout origin/master -- gt-harness.sh)
+(cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null; git checkout origin/master -- gt-harness.sh)
+
+if [ -n ${BEAR} ]; then
+    (cd $WORKDIR/${NAME}-base; bear ./gt-harness.sh build)
+    (cd $WORKDIR/${NAME}-left; bear ./gt-harness.sh build)
+    (cd $WORKDIR/${NAME}-right; bear ./gt-harness.sh build)
+fi
+
 
 for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
   mkdir -p ${RESULT_DIR}/$(dirname $file)
@@ -81,8 +91,9 @@ for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
   elif [ ! -f ${NAME}-right/${file} ];then
     touch ${RESULT_DIR}/${file}.no-right;
   else
-    # echo "${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
-    OUT="$(${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file})"
+      CMD="${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
+      # echo ${CMD}
+      OUT="$(${CMD})"
     ERR=$?
     rm -f ${RESULT_DIR}/${NAME}-base/${file}.${DIFFNAME}.*
     case $ERR in

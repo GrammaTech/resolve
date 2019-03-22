@@ -13,6 +13,7 @@
 #   -l,--local --------- pass the 'local' option to git clone
 #   -w,--workdir ------- set the working directory
 #                        defaults to the current directory
+#   -b, --bear --------- Use bear to make compilation database
 #
 LOCAL=
 WORKDIR=
@@ -50,7 +51,7 @@ else
 fi
 
 while IFS=" " read name base left right;do
-  try-merge --diff ${DIFF} ${LOCAL} ${WORKDIR} \
+  try-merge ${BEAR} --diff ${DIFF} ${LOCAL} ${WORKDIR} \
             ${BENCHMARKDIR}/${name} ${base} ${left} ${right} \
             -- $@
 done
