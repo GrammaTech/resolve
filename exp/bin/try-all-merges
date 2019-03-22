@@ -31,12 +31,13 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hlbw:d: -l help,local,bear,workdir:,diff: -- "$@" || help;)
+# eval set -- $(getopt -o hlbw:d: -l help,local,bear,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
+    echo "1"=$1
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
-        -b|--bear) BEAR=--bear;;
+        -b|--bear) BEAR="--bear $2"; shift;;
         -w|--workdir) WORKDIR="--workdir $2"; shift;;
         -d|--diff) DIFF=$2; shift;;
         (--) shift; break;;
@@ -45,6 +46,12 @@ while [ $# -gt 0 ];do
     esac
     shift
 done
+
+echo "Parsed options:"
+echo "LOCAL="${LOCAL}
+echo "BEAR="${BEAR}
+echo "WORKDIR="${WORKDIR}
+echo "DIFF="${DIFF}
 if [ -z $1 ];then
   help
 else

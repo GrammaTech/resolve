@@ -31,12 +31,12 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hlbw:d: -l help,local,bear,workdir:,diff: -- "$@" || help;)
+# eval set -- $(getopt -o hlbw:d: -l help,local,bear,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
-        -b|--bear) BEAR=--bear;;
+        -b|--bear) BEAR=$2; shift;;
         -w|--workdir) WORKDIR=$(readlink -f $2); shift;;
         -d|--diff) DIFF=$2; shift;;
         (--) shift; break;;
@@ -45,6 +45,12 @@ while [ $# -gt 0 ];do
     esac
     shift
 done
+echo "Parsed options:"
+echo "LOCAL="${LOCAL}
+echo "BEAR="${BEAR}
+echo "WORKDIR="${WORKDIR}
+echo "DIFF="${DIFF}
+
 if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ];then
     help
 else
@@ -67,6 +73,7 @@ cd $WORKDIR;
 
 # TODO: Should expand REPO with readlink -f, relative to the starting dir.
 for dir in base left right;do
+  rm -f ${NAME}-${DIR}
   if [ ! -d ${NAME}-${dir} ];then
     git clone ${LOCAL} ${REPO} ${NAME}-${dir} -q >/dev/null
   fi
@@ -78,11 +85,11 @@ done
 echo BEAR=${BEAR}
 if [ ${BEAR}"1" != "1" ]; then
     echo "Running bear in base"
-    (cd $WORKDIR/${NAME}-base; bear ./gt-harness.sh build)
+    (cd $WORKDIR/${NAME}-base; bear ${BEAR})
     echo "Running bear in left"
-    (cd $WORKDIR/${NAME}-left; bear ./gt-harness.sh build)
+    (cd $WORKDIR/${NAME}-left; bear ${BEAR})
     echo "Running bear in right"
-    (cd $WORKDIR/${NAME}-right; bear ./gt-harness.sh build)
+    (cd $WORKDIR/${NAME}-right; bear ${BEAR})
     CD=compile_commands.json
     DIFF="${DIFF} --old-compilation-database=${NAME}-base/$CD"
     DIFF="${DIFF} --my-compilation-database=${NAME}-left/$CD"
