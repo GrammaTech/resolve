@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# Usage: try-all-cdbs [OPTION]... REPOSITORY...
+#  Try to build every CDB in every REPOSITORY
+#
+# OPTIONS:
+#   -h,--help ---------- print this help information
+#   -l,--local FILE ---- copy in a local file
+#                        e.g., a local gt-harness-common.sh
+#   -o,--outdir DIR ---- Save results to outdir
+#                        defaults to the current directory
+#   -b, --bear BEAR ---- Use bear to make compilation database
+#
+OUTDIR=$(pwd)
+SCRIPT="$0"
+LOCAL=
+BEAR=bear
+help(){
+    local HELP_TEXT=$(cat "$SCRIPT" \
+        |sed '/^[^#]/q' \
+        |head -n -1 \
+        |tail -n +3 \
+        |sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+        |cut -c3-)
+    echo "$HELP_TEXT"
+    exit 1
+}
+
+eval set -- $(getopt -o hl:b:o: -l help,local:,bear:,outdir: -- "$@" || help;)
+while [ $# -gt 0 ];do
+    case $1 in
+        -h|--help) help;;
+        -l|--local) LOCAL=$2; shift;;
+        -b|--bear) BEAR=$2; shift;;
+        -o|--outdir) OUTDIR=$(readlink -f $2); shift;;
+        (--) shift; break;;
+        (-*) error "unrecognized option $1";;
+        (*)  break;;
+    esac
+    shift
+done
+
+if [ -z $1 ];then
+    help
+fi
+
+for REPO in $@;do
+  pushd $REPO
+  TOTAL=$(git rev-list --all --count)
+  COUNT=0
+  FAIL=0
+  for COMMIT in $(git rev-list --all);do
+    ((COUNT++))
+    printf "\r%6d/%d\t%s" $COUNT $TOTAL $COMMIT
+    git reset --hard $COMMIT
+    git clean -fdx
+    if [ ! -z ${LOCAL} ];then
+      cp ${LOCAL} ./
+    fi
+    git checkout origin/master -- gt-harness.sh
+    ./gt-harness.sh prep && ${BEAR} ./gt-harness.sh build
+    if [ $? -eq 0 ];then
+      mv compile_commands.json ${OUTDIR}/${COMMIT}.json
+    else
+      ((FAIL++))
+    fi
+  done
+  printf "\n%6d/%d\tFAILED\n" $FAIL $TOTAL
+  popd
+done

@@ -138,6 +138,23 @@ grep -Pc "\tconflict" all-merges.stdout
 
 #+RESULTS: total-line-conflicts
 : 5295
+** Builds in every version
+Try to build a compilation database for every version of every program.
+Using this docker image docker.grammatech.com/synthesis/sel/ubuntu-sbcl:master.
+
+Launch the docker image with this directory mounted.
+#+begin_src sh :eval never
+  docker run -it \
+         -v $(pwd)/../benchmark:benchmark \
+         -v $(pwd)/merge-experiment \
+         docker.grammatech.com/synthesis/sel/ubuntu-sbcl:master
+#+end_src
+
+Inside the image run try-cdbs to collect all compilation databases
+that build.
+
+
+
 ** DONE Diff3 statistics
    CLOSED: [2019-03-11 Mon 11:43]
 Ran =diff3= with the following.
