@@ -8,12 +8,12 @@
 #
 # OPTIONS:
 #   -h,--help ---------- print this help information
-#   -d,--diff ---------- diff tool to use to compute patches
+#   -d,--diff DIFF ----- diff tool to use to compute patches
 #                        default to diff3
 #   -l,--local --------- pass the 'local' option to git clone
-#   -w,--workdir ------- set the working directory
+#   -w,--workdir DIR --- set the working directory
 #                        defaults to the current directory
-#   --bear, -b --------- Use bear to make compilation databases
+#   -b, --bear BEAR ---- Use bear to make compilation database
 #
 LOCAL=
 WORKDIR=$(pwd)
@@ -31,7 +31,7 @@ help(){
     exit 1
 }
 
-# eval set -- $(getopt -o hlbw:d: -l help,local,bear,workdir:,diff: -- "$@" || help;)
+eval set -- $(getopt -o hlb:w:d: -l help,local,bear:,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
@@ -45,11 +45,6 @@ while [ $# -gt 0 ];do
     esac
     shift
 done
-echo "Parsed options:"
-echo "LOCAL="${LOCAL}
-echo "BEAR="${BEAR}
-echo "WORKDIR="${WORKDIR}
-echo "DIFF="${DIFF}
 
 if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ];then
     help
@@ -82,8 +77,7 @@ done
 (cd $WORKDIR/${NAME}-left;  git reset --hard ${LEFT} >/dev/null; git checkout origin/master -- gt-harness.sh)
 (cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null; git checkout origin/master -- gt-harness.sh)
 
-echo BEAR=${BEAR}
-if [ ${BEAR}"1" != "1" ]; then
+if [ ! -z ${BEAR} ]; then
     echo "Running bear in base"
     (cd $WORKDIR/${NAME}-base; bear ${BEAR})
     echo "Running bear in left"
@@ -95,11 +89,10 @@ if [ ${BEAR}"1" != "1" ]; then
     DIFF="${DIFF} --my-compilation-database=${NAME}-left/$CD"
     DIFF="${DIFF} --your-compilation-database=${NAME}-right/$CD"
 fi
-
 echo DIFF=${DIFF}
 
 for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
-  echo $file
+  # echo $file
   mkdir -p ${RESULT_DIR}/$(dirname $file)
   if [ ! -f ${NAME}-base/${file} ];then
     touch ${RESULT_DIR}/${file}.no-base;
@@ -109,7 +102,7 @@ for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
     touch ${RESULT_DIR}/${file}.no-right;
   else
       CMD="${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
-      echo ${CMD}
+      # echo ${CMD}
       OUT="$(${CMD})"
     ERR=$?
     rm -f ${RESULT_DIR}/${NAME}-base/${file}.${DIFFNAME}.*
