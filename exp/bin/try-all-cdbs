@@ -5,15 +5,12 @@
 #
 # OPTIONS:
 #   -h,--help ---------- print this help information
-#   -l,--local FILE ---- copy in a local file
-#                        e.g., a local gt-harness-common.sh
 #   -o,--outdir DIR ---- Save results to outdir
 #                        defaults to the current directory
 #   -d, --docker DOCK -- Base docker images off of DOCK
 #
 OUTDIR=$(pwd)
 SCRIPT="$0"
-LOCAL=
 DOCK=
 help(){
     local HELP_TEXT=$(cat "$SCRIPT" \
@@ -26,11 +23,10 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hl:o:d: -l help,local:,outdir:,docker: -- "$@" || help;)
+eval set -- $(getopt -o ho:d: -l help,outdir:,docker: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
-        -l|--local) LOCAL=$2; shift;;
         -o|--outdir) OUTDIR=$(readlink -f $2); shift;;
         -d|--docker) DOCK=$2; shift;;
         (--) shift; break;;
@@ -47,9 +43,6 @@ fi
 for REPO in $@;do
   pushd $REPO
   IMAGE="$REPO-cdb"
-  if [ ! -z ${LOCAL} ];then
-    cp ${LOCAL} ./
-  fi
   git checkout origin/master -- gt-harness.sh
   ./gt-harness.sh docker ${IMAGE} ${DOCK}
   docker run -v $(dirname $(readlink -f ${SCRIPT}))/try-all-cdbs-in-image-loop.sh:/try-all-cdbs-in-image-loop.sh ${OUTDIR}:/cdbs ${IMAGE} /try-all-cdbs-in-image-loop.sh
