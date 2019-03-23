@@ -8,10 +8,13 @@
 #   -o,--outdir DIR ---- Save results to outdir
 #                        defaults to the current directory
 #   -d, --docker DOCK -- Base docker images off of DOCK
+#   -c, --clean -------- clean up docker images
 #
 OUTDIR=$(pwd)
 SCRIPT="$0"
+INNER_SCRIPT="$(dirname $(readlink -f ${SCRIPT}))/try-all-cdbs-in-image-loop.sh"
 DOCK=
+CLEAN=
 help(){
     local HELP_TEXT=$(cat "$SCRIPT" \
         |sed '/^[^#]/q' \
@@ -23,12 +26,13 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o ho:d: -l help,outdir:,docker: -- "$@" || help;)
+eval set -- $(getopt -o ho:d:c -l help,outdir:,docker:,clean -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
         -o|--outdir) OUTDIR=$(readlink -f $2); shift;;
         -d|--docker) DOCK=$2; shift;;
+        -c|--clean) CLEAN=yes;;
         (--) shift; break;;
         (-*) error "unrecognized option $1";;
         (*)  break;;
@@ -45,7 +49,9 @@ for REPO in $@;do
   IMAGE="$(basename $REPO)-cdb"
   git checkout origin/master -- gt-harness.sh
   ./gt-harness.sh docker ${IMAGE} ${DOCK}
-  docker run -v $(dirname $(readlink -f ${SCRIPT}))/try-all-cdbs-in-image-loop.sh:/try-all-cdbs-in-image-loop.sh ${OUTDIR}:/cdbs ${IMAGE} /try-all-cdbs-in-image-loop.sh
-  docker rmi -f ${IMAGE}
+  docker run -v ${INNER_SCRIPT}:/try-all-cdbs-in-image-loop.sh -v ${OUTDIR}:/cdbs ${IMAGE} /try-all-cdbs-in-image-loop.sh
+  if [ ! -z ${CLEAN} ];then
+    docker rmi -f ${IMAGE}
+  fi
   popd
 done
