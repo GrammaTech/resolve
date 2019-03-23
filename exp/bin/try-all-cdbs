@@ -42,7 +42,7 @@ fi
 
 for REPO in $@;do
   pushd $REPO
-  IMAGE="$REPO-cdb"
+  IMAGE="$(basename $REPO)-cdb"
   git checkout origin/master -- gt-harness.sh
   ./gt-harness.sh docker ${IMAGE} ${DOCK}
   docker run -v $(dirname $(readlink -f ${SCRIPT}))/try-all-cdbs-in-image-loop.sh:/try-all-cdbs-in-image-loop.sh ${OUTDIR}:/cdbs ${IMAGE} /try-all-cdbs-in-image-loop.sh
