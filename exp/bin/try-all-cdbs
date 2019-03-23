@@ -9,12 +9,12 @@
 #                        e.g., a local gt-harness-common.sh
 #   -o,--outdir DIR ---- Save results to outdir
 #                        defaults to the current directory
-#   -b, --bear BEAR ---- Use bear to make compilation database
+#   -b, --build BUILD -- Use build to make compilation database
 #
 OUTDIR=$(pwd)
 SCRIPT="$0"
 LOCAL=
-BEAR=bear
+BUILD="./gt-harness.sh prep && bear ./gt-harness.sh build"
 help(){
     local HELP_TEXT=$(cat "$SCRIPT" \
         |sed '/^[^#]/q' \
@@ -26,12 +26,12 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hl:b:o: -l help,local:,bear:,outdir: -- "$@" || help;)
+eval set -- $(getopt -o hl:b:o: -l help,local:,build:,outdir: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=$2; shift;;
-        -b|--bear) BEAR=$2; shift;;
+        -b|--build) BUILD="$2"; shift;;
         -o|--outdir) OUTDIR=$(readlink -f $2); shift;;
         (--) shift; break;;
         (-*) error "unrecognized option $1";;
@@ -58,7 +58,7 @@ for REPO in $@;do
       cp ${LOCAL} ./
     fi
     git checkout origin/master -- gt-harness.sh
-    ./gt-harness.sh prep && ${BEAR} ./gt-harness.sh build
+    ${BUILD}
     if [ $? -eq 0 ];then
       mv compile_commands.json ${OUTDIR}/${COMMIT}.json
     else

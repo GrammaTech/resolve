@@ -13,13 +13,14 @@
 #   -l,--local --------- pass the 'local' option to git clone
 #   -w,--workdir DIR --- set the working directory
 #                        defaults to the current directory
-#   -b, --bear BEAR ---- Use bear to make compilation database
+#   -b, --build BUILD -- Use bear to make compilation database
+#                        (e.g., "bear ./gt-harness.sh")
 #
 LOCAL=
 WORKDIR=$(pwd)
 DIFF=diff3
 SCRIPT="$0"
-BEAR=
+BUILD=
 help(){
     local HELP_TEXT=$(cat "$SCRIPT" \
         |sed '/^[^#]/q' \
@@ -31,12 +32,12 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hlb:w:d: -l help,local,bear:,workdir:,diff: -- "$@" || help;)
+eval set -- $(getopt -o hlb:w:d: -l help,local,build:,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
-        -b|--bear) BEAR=$2; shift;;
+        -b|--build) BUILD="$2"; shift;;
         -w|--workdir) WORKDIR=$(readlink -f $2); shift;;
         -d|--diff) DIFF=$2; shift;;
         (--) shift; break;;
@@ -77,13 +78,13 @@ done
 (cd $WORKDIR/${NAME}-left;  git reset --hard ${LEFT} >/dev/null; git checkout origin/master -- gt-harness.sh)
 (cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null; git checkout origin/master -- gt-harness.sh)
 
-if [ ! -z ${BEAR} ]; then
-    echo "Running bear in base"
-    (cd $WORKDIR/${NAME}-base; bear ${BEAR})
-    echo "Running bear in left"
-    (cd $WORKDIR/${NAME}-left; bear ${BEAR})
-    echo "Running bear in right"
-    (cd $WORKDIR/${NAME}-right; bear ${BEAR})
+if [ ! -z ${BUILD} ]; then
+    echo "Running build in base"
+    (cd $WORKDIR/${NAME}-base; ${BUILD})
+    echo "Running build in left"
+    (cd $WORKDIR/${NAME}-left; ${BUILD})
+    echo "Running build in right"
+    (cd $WORKDIR/${NAME}-right; ${BUILD})
     CD=compile_commands.json
     DIFF="${DIFF} --old-compilation-database=${NAME}-base/$CD"
     DIFF="${DIFF} --my-compilation-database=${NAME}-left/$CD"

@@ -13,13 +13,13 @@
 #   -l,--local --------- pass the 'local' option to git clone
 #   -w,--workdir DIR --- set the working directory
 #                        defaults to the current directory
-#   -b, --bear BEAR ---- Use bear to make compilation database
+#   -b, --build BUILD -- Use BUILD to make compilation database
 #
 LOCAL=
 WORKDIR=
 DIFF=diff3
 SCRIPT="$0"
-BEAR=
+BUILD=
 help(){
     local HELP_TEXT=$(cat "$SCRIPT" \
         |sed '/^[^#]/q' \
@@ -31,13 +31,13 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hlb:w:d: -l help,local,bear:,workdir:,diff: -- "$@" || help;)
+eval set -- $(getopt -o hlb:w:d: -l help,local,build:,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
     echo "1"=$1
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
-        -b|--bear) BEAR="--bear $2"; shift;;
+        -b|--build) BUILD="--build \"$2\""; shift;;
         -w|--workdir) WORKDIR="--workdir $2"; shift;;
         -d|--diff) DIFF=$2; shift;;
         (--) shift; break;;
@@ -55,7 +55,7 @@ else
 fi
 
 while IFS=" " read name base left right;do
-  try-merge ${BEAR} --diff ${DIFF} ${LOCAL} ${WORKDIR} ${BEAR} \
+  try-merge --diff ${DIFF} ${LOCAL} ${WORKDIR} ${BUILD} \
             ${BENCHMARKDIR}/${name} ${base} ${left} ${right} \
             -- $@
 done
