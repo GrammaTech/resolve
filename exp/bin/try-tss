@@ -1,0 +1,4 @@
+#!/bin/bash
+PROG=the_silver_searcher
+rm -rf ${PROG}-base ${PROG}-left ${PROG}-right
+try-all-merges --bear ./build.sh -d ast-merge /pdietz/ < ${PROG}-conflicts
