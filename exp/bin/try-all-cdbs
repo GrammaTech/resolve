@@ -46,8 +46,9 @@ fi
 
 for REPO in $@;do
   pushd $REPO
-  IMAGE="$(basename $REPO)-cdb"
+  IMAGE="$(basename $REPO|tr '[A-Z]' '[a-z]')-cdb"
   git checkout master -- gt-harness.sh
+  sed -i '/^.git/d' .dockerignore
   ./gt-harness.sh docker ${IMAGE} ${DOCK}
   docker run -v ${INNER_SCRIPT}:/try-all-cdbs-in-image-loop.sh -v ${OUTDIR}:/cdbs ${IMAGE} /try-all-cdbs-in-image-loop.sh
   if [ ! -z ${CLEAN} ];then
