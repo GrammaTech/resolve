@@ -142,18 +142,25 @@ grep -Pc "\tconflict" all-merges.stdout
 Try to build a compilation database for every version of every program.
 Using this docker image docker.grammatech.com/synthesis/sel/ubuntu-sbcl:master.
 
-Launch the docker image with this directory mounted.
+Launch the docker image (so we have =bear= available) with needed directories.
 #+begin_src sh :eval never
   docker run -it \
-         -v $(pwd)/../benchmark:benchmark \
-         -v $(pwd)/merge-experiment \
+         -v $(pwd)/../benchmark:/benchmark \
+         -v $(pwd):/merge-experiment \
          docker.grammatech.com/synthesis/sel/ubuntu-sbcl:master
 #+end_src
 
 Inside the image run try-cdbs to collect all compilation databases
 that build.
 
-
+*** Failed
+| Repository | failed | total |
+|------------+--------+-------|
+| filezilla  |     29 |    29 |
+| pks        |      0 |     5 |
+| netqmail   |      0 |    10 |
+| sipswitch  |     16 |    16 |
+|            |        |       |
 
 ** DONE Diff3 statistics
    CLOSED: [2019-03-11 Mon 11:43]
