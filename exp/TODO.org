@@ -1,0 +1,29 @@
+#+Title: Merge Experiment Notes and Tasks
+#+Options: ^:{}
+
+* Notes
+** Language coverage
+We could run on JavaScript and Common Lisp (and possibly Java)
+currently.
+
+Lets look at running on JS for now.
+
+* Tasks [0/4]
+** TODO We should run on JavaScript programs as well [/]
+- [ ] Ping Jason for info
+- [ ] Collect and find conflicts in JS programs
+
+Grabbing the whole first page of the most depended upon NPM packages.
+Every single one has it's source code hosted on GitHub.  All but two
+had their own github repository.  Those two were:
+- https://www.npmjs.com/package/babel-core
+- https://www.npmjs.com/package/babel-runtime
+which are each sub-directories of the same repository.
+
+** TODO Ping Shin Wei and Sergey to see if they're on board
+** STARTED Collect CDBs for every version of every project [0/2]
+- [ ] Should these be using older versions of dependencies for older
+  commits.  Do we want to do something like checkout the contemporary
+  version of every dependency?
+- [ ] Address all of those with 100% failure.  Something is certainly
+  wrong there.
