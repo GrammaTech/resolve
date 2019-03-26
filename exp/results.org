@@ -194,6 +194,9 @@ that build.
 | snort               |      0 |    16 |         0 |
 | the_silver_searcher |   2010 |  2010 |       100 |
 | zlib                |     49 |   424 | 11.556604 |
+| file                |   1433 |  4750 | 30.168421 |
+| nginx               |   4585 |  7317 | 62.662293 |
+| lighttpd            |   3007 |  3947 | 76.184444 |
 #+TBLFM: $4=($2/$3)*100
 
 ** DONE Diff3 statistics
