@@ -33,7 +33,6 @@ help(){
 
 eval set -- $(getopt -o hlb:w:d: -l help,local,build:,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
-    echo "1"=$1
     case $1 in
         -h|--help) help;;
         -l|--local) LOCAL=--local;;
