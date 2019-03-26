@@ -74,11 +74,14 @@ for dir in base left right;do
     git clone ${LOCAL} ${REPO} ${NAME}-${dir} -q >/dev/null
   fi
 done
-(cd $WORKDIR/${NAME}-base; git reset --hard ${BASE} >/dev/null; git checkout origin/master -- gt-harness.sh)
-(cd $WORKDIR/${NAME}-left;  git reset --hard ${LEFT} >/dev/null; git checkout origin/master -- gt-harness.sh)
-(cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null; git checkout origin/master -- gt-harness.sh)
+(cd $WORKDIR/${NAME}-base; git reset --hard ${BASE} >/dev/null)
+(cd $WORKDIR/${NAME}-left;  git reset --hard ${LEFT} >/dev/null)
+(cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null)
 
 if [ ! -z ${BUILD} ]; then
+    (cd $WORKDIR/${NAME}-base; git checkout origin/master -- gt-harness.sh)
+    (cd $WORKDIR/${NAME}-left; git checkout origin/master -- gt-harness.sh)
+    (cd $WORKDIR/${NAME}-right; git checkout origin/master -- gt-harness.sh)
     echo "Running build in base"
     (cd $WORKDIR/${NAME}-base; ${BUILD})
     echo "Running build in left"
@@ -94,13 +97,32 @@ echo DIFF=${DIFF}
 
 for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
   # echo $file
+  NLEFT=${NAME}-left/${file}
+  NRIGHT=${NAME}-right/${file}
+  NBASE=${NAME}-base/${file}
   mkdir -p ${RESULT_DIR}/$(dirname $file)
-  if [ ! -f ${NAME}-base/${file} ];then
-    touch ${RESULT_DIR}/${file}.no-base;
-  elif [ ! -f ${NAME}-left/${file} ];then
-    touch ${RESULT_DIR}/${file}.no-left;
-  elif [ ! -f ${NAME}-right/${file} ];then
-    touch ${RESULT_DIR}/${file}.no-right;
+  if [ ! -f ${NBASE} ];then
+      if [ -f ${NLEFT} ];then
+          if [ -f ${NRIGHT} ];then
+              touch ${RESULT_DIR}/${file}.no-base;
+          else
+              touch ${RESULT_DIR}/$file.just-left;
+          fi
+      else
+          if [ -f ${NRIGHT} ];then
+              touch ${RESULT_DIR}/$file.just-right;
+          else
+              echo "Not found in any version (should not happen): " $file 1>&2
+          fi
+      fi
+  elif [ ! -f ${NLEFT} ];then
+      if [ -f ${NRIGHT} ];then
+          touch ${RESULT_DIR}/$file.no-left;
+      else
+          touch ${RESULT_DIR}/$file.just-base;
+      fi
+  elif [ ! -f ${NRIGHT} ];then
+      touch ${RESULT_DIR}/${file}.no-right;
   else
       CMD="${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
       # echo ${CMD}
