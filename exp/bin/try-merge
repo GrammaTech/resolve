@@ -83,11 +83,11 @@ if [ ! -z ${BUILD} ]; then
     (cd $WORKDIR/${NAME}-left; git checkout origin/master -- gt-harness.sh)
     (cd $WORKDIR/${NAME}-right; git checkout origin/master -- gt-harness.sh)
     echo "Running build in base"
-    (cd $WORKDIR/${NAME}-base; ${BUILD})
+    (cd $WORKDIR/${NAME}-base; pwd; echo $PATH; bear bash -c ${BUILD})
     echo "Running build in left"
-    (cd $WORKDIR/${NAME}-left; ${BUILD})
+    (cd $WORKDIR/${NAME}-left; pwd; echo $PATH; bear bash -c ${BUILD})
     echo "Running build in right"
-    (cd $WORKDIR/${NAME}-right; ${BUILD})
+    (cd $WORKDIR/${NAME}-right; pwd; echo $PATH; bear bash -c ${BUILD})
     CD=compile_commands.json
     DIFF="${DIFF} --old-compilation-database=${NAME}-base/$CD"
     DIFF="${DIFF} --my-compilation-database=${NAME}-left/$CD"
