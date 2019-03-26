@@ -39,20 +39,20 @@ popular open-source programs.  In a, currently, 174G directory
 
   merge_commits(){
     local prog=$1;
-    grep $prog merges/cc-merges.txt|wc -l
+    grep $prog results/cc-merges.txt|wc -l
   }
 
   merge_line_conflicts(){
     local prog=$1;
-    grep $prog merges/cc-merges.txt|grep -Pc "\tconflict"
+    grep $prog results/cc-merges.txt|grep -Pc "\tconflict"
   }
 
   merge_diff3_commits(){
     local prog=$1;
-    grep $prog try-stats.txt|awk 'BEGIN{count=0}{if($2 != 0){count++}}END{print count}'
+    grep $prog results/js-stats.txt|awk 'BEGIN{count=0}{if($2 != 0){count++}}END{print count}'
   }
 
-  for prog in $(cat merges/cc-merges.txt|awk '{print $1}'|sort|uniq);do
+  for prog in $(cat results/cc-merges.txt|awk '{print $1}'|sort|uniq);do
     echo -ne "$prog"
     echo -ne "\t$(total_commits $prog)"
     echo -ne "\t$(merge_commits $prog)"
@@ -168,7 +168,7 @@ conflicts]].)
 ** Total programs
 #+name: total-programs
 #+begin_src shell
-cat merges/cc-merges.txt|awk '{print $1}'|sort|uniq|wc -l
+cat results/cc-merges.txt|awk '{print $1}'|sort|uniq|wc -l
 #+end_src
 
 #+RESULTS: total-programs
@@ -180,7 +180,7 @@ cat merges/cc-merges.txt|awk '{print $1}'|sort|uniq|wc -l
 ** Total merges
 #+name: total-merges
 #+begin_src shell
-cat merges/cc-merges.txt|wc -l
+cat results/cc-merges.txt|wc -l
 #+end_src
 
 #+RESULTS: total-merges
@@ -189,7 +189,7 @@ cat merges/cc-merges.txt|wc -l
 ** Total line conflicts
 #+name: total-line-conflicts
 #+begin_src shell
-grep -Pc "\tconflict" merges/cc-merges.txt
+grep -Pc "\tconflict" results/cc-merges.txt
 #+end_src
 
 #+RESULTS: total-line-conflicts
@@ -235,12 +235,12 @@ that build.
    CLOSED: [2019-03-11 Mon 11:43]
 Ran =diff3= with the following.
 #+begin_src shell :eval never
-  cat merges/cc-merges.txt|grep -v "no-conflict"|cut -f 1,3,4,5|try-all-merges -l -w all-repos ../benchmark -- -m 2>try-diff3.stderr |tee try-diff3.stdout
+  cat results/cc-merges.txt|grep -v "no-conflict"|cut -f 1,3,4,5|try-all-merges -l -w all-repos ../benchmark -- -m 2>try-diff3.stderr |tee try-diff3.stdout
 #+end_src
 
-Build the try-stats.txt file with the following.
+Build the cc-stats.txt file with the following.
 #+begin_src shell :eval never
-  ./bin/try-stats all-repos/*-*-*-*/ |tee try-stats.txt
+  ./bin/cc-stats all-repos/*-*-*-*/ |tee cc-stats.txt
 #+end_src
 
 *** How good is diff3 at resolving merge conflicts
@@ -383,9 +383,9 @@ After about a day we're more than half way through running the diff3
 conflict collection.
 
 This is the latest line processed after ~1 day of runtime.
-: 13:12 mistletoe:merge-experiment grep -n bc5c4e99480320250 merges/cc-merges.txt
+: 13:12 mistletoe:merge-experiment grep -n bc5c4e99480320250 results/cc-merges.txt
 : 18244:net-snmp  conflict        7bc5c4e99480320250e4de314c36d82a86372ae6        42b96ac c55f86f
-: 13:13 mistletoe:merge-experiment wc -l merges/cc-merges.txt
-: 27864 merges/cc-merges.txt
+: 13:13 mistletoe:merge-experiment wc -l results/cc-merges.txt
+: 27864 results/cc-merges.txt
 
 Which is 18244/27864 \approx 65.5% of the way through.
