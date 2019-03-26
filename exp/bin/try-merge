@@ -93,7 +93,6 @@ if [ ! -z ${BUILD} ]; then
     DIFF="${DIFF} --my-compilation-database=${NAME}-left/$CD"
     DIFF="${DIFF} --your-compilation-database=${NAME}-right/$CD"
 fi
-echo DIFF=${DIFF}
 
 for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
   # echo $file
