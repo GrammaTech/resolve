@@ -39,25 +39,25 @@ popular open-source programs.  In a, currently, 174G directory
 
   merge_commits(){
     local prog=$1;
-    grep $prog results/cc-merges.txt|wc -l
+    grep $prog results/js-merges.txt|wc -l
   }
 
   merge_line_conflicts(){
     local prog=$1;
-    grep $prog results/cc-merges.txt|grep -Pc "\tconflict"
+    grep $prog results/js-merges.txt|grep -Pc "\tconflict"
   }
 
-  merge_diff3_commits(){
+  merge_diff3_conflicts(){
     local prog=$1;
-    grep $prog results/js-stats.txt|awk 'BEGIN{count=0}{if($2 != 0){count++}}END{print count}'
+    grep $prog results/js-stats.txt|awk 'BEGIN{count=0}{if($3 != 0){count++}}END{print count}'
   }
 
-  for prog in $(cat results/cc-merges.txt|awk '{print $1}'|sort|uniq);do
+  for prog in $(cat results/js-merges.txt|awk '{print $1}'|sort|uniq);do
     echo -ne "$prog"
     echo -ne "\t$(total_commits $prog)"
     echo -ne "\t$(merge_commits $prog)"
     echo -ne "\t$(merge_line_conflicts $prog)"
-    echo -ne "\t$(merge_diff3_commits $prog)"
+    echo -ne "\t$(merge_diff3_conflicts $prog)"
     echo ""
   done
 #+end_src
@@ -100,31 +100,31 @@ C/C++ results
 JavaScript results
 | program       | commits | merge commits | merge line conflicts | merge line diff3 conflicts | % merge/commits | % conflict/merge | diff3/diff |
 |---------------+---------+---------------+----------------------+----------------------------+-----------------+------------------+------------|
-| async         |    1745 |           385 |                   11 |                          0 |       22.063037 |                0 |          0 |
-| axios         |     881 |           186 |                    7 |                          0 |       21.112372 |                0 |          0 |
-| bluebird      |    2493 |           217 |                    7 |                          0 |       8.7043722 |                0 |          0 |
+| async         |    1745 |           385 |                   11 |                         11 |       22.063037 |        2.8571429 |        100 |
+| axios         |     881 |           186 |                    7 |                          7 |       21.112372 |        3.7634409 |        100 |
+| bluebird      |    2493 |           217 |                    7 |                          7 |       8.7043722 |        3.2258065 |        100 |
 | body-parser   |     453 |             1 |                    0 |                          0 |      0.22075055 |                0 |  (0/0) 100 |
 | chalk         |     267 |            21 |                    0 |                          0 |       7.8651685 |                0 |  (0/0) 100 |
-| classnames    |     244 |            51 |                    1 |                          0 |       20.901639 |                0 |          0 |
-| colors.js     |     249 |            44 |                    2 |                          0 |       17.670683 |                0 |          0 |
-| commander.js  |     658 |           176 |                    2 |                          0 |       26.747720 |                0 |          0 |
-| express       |    5783 |           458 |                   18 |                          0 |       7.9197648 |                0 |          0 |
-| generator     |    1222 |           250 |                    1 |                          0 |       20.458265 |                0 |          0 |
+| classnames    |     244 |            51 |                    1 |                          1 |       20.901639 |        1.9607843 |        100 |
+| colors.js     |     249 |            44 |                    2 |                          2 |       17.670683 |        4.5454545 |        100 |
+| commander.js  |     658 |           176 |                    2 |                          2 |       26.747720 |        1.1363636 |        100 |
+| express       |    5783 |           458 |                   18 |                         17 |       7.9197648 |        3.7117904 |  94.444444 |
+| generator     |    1222 |           250 |                    1 |                          1 |       20.458265 |              0.4 |        100 |
 | minimist      |      73 |             1 |                    0 |                          0 |       1.3698630 |                0 |  (0/0) 100 |
-| moment        |    3781 |           963 |                   35 |                          0 |       25.469453 |                0 |          0 |
+| moment        |    3781 |           963 |                   35 |                         33 |       25.469453 |        3.4267913 |  94.285714 |
 | node-fs-extra |    1028 |           143 |                    0 |                          0 |       13.910506 |                0 |  (0/0) 100 |
 | node-glob     |     479 |             5 |                    0 |                          0 |       1.0438413 |                0 |  (0/0) 100 |
-| node-uuid     |     362 |            51 |                    1 |                          0 |       14.088398 |                0 |          0 |
-| prop-types    |     139 |            17 |                    1 |                          0 |       12.230216 |                0 |          0 |
-| request       |    2285 |           680 |                   13 |                          0 |       29.759300 |                0 |          0 |
-| rxjs          |    4059 |           378 |                    9 |                          0 |       9.3126386 |                0 |          0 |
-| through2      |     122 |            15 |                    1 |                          0 |       12.295082 |                0 |          0 |
-| tslib         |     123 |            28 |                    4 |                          0 |       22.764228 |                0 |          0 |
-| underscore    |    2516 |           745 |                   10 |                          0 |       29.610493 |                0 |          0 |
-| yargs         |    1490 |           234 |                    3 |                          0 |       15.704698 |                0 |          0 |
+| node-uuid     |     362 |            51 |                    1 |                          1 |       14.088398 |        1.9607843 |        100 |
+| prop-types    |     139 |            17 |                    1 |                          1 |       12.230216 |        5.8823529 |        100 |
+| request       |    2285 |           680 |                   13 |                         13 |       29.759300 |        1.9117647 |        100 |
+| rxjs          |    4059 |           378 |                    9 |                          8 |       9.3126386 |        2.1164021 |  88.888889 |
+| through2      |     122 |            15 |                    1 |                          1 |       12.295082 |        6.6666667 |        100 |
+| tslib         |     123 |            28 |                    4 |                          4 |       22.764228 |        14.285714 |        100 |
+| underscore    |    2516 |           745 |                   10 |                          9 |       29.610493 |        1.2080537 |        90. |
+| yargs         |    1490 |           234 |                    3 |                          3 |       15.704698 |        1.2820513 |        100 |
 |---------------+---------+---------------+----------------------+----------------------------+-----------------+------------------+------------|
-| total/average |   30452 |          5049 |                  126 |                          0 |       16.580192 |                0 |          0 |
-| max           |    5783 |           963 |                 4755 |                          0 |         29.7593 |                0 |          0 |
+| total/average |   30452 |          5049 |                  126 |                        121 |       16.580192 |                0 |          0 |
+| max           |    5783 |           963 |                 4755 |                         33 |         29.7593 |        14.285714 |          0 |
 | min           |      73 |             1 |                    0 |                          0 |      0.22075055 |                0 |  (0/0) 100 |
 #+TBLFM: $6=($3/$2)*100::$7=($5/$3)*100::$8=($5/$4)*100::@24$2=vsum(@2..@-1)::@24$3=vsum(@2..@-1)::@24$4=vsum(@2..@-1)::@24$5=vsum(@2..@-1)::@25$2=vmax(@2..@-2)::@25$3=vmax(@2..@-2)::@25$5=vmax(@2..@-2)::@25$6=vmax(@2..@-2)::@25$7=vmax(@2..@-2)::@26$2=vmin(@2..@-3)::@26$3=vmin(@2..@-3)::@26$5=vmin(@2..@-3)::@26$6=vmin(@2..@-3)::@26$7=vmin(@2..@-3)
 
