@@ -14,12 +14,15 @@
 #   -w,--workdir DIR --- set the working directory
 #                        defaults to the current directory
 #   -b, --build BUILD -- Use BUILD to make compilation database
+#   -i ----------------- Copy workdir into a separate numbered
+#                        directory for each merge
 #
 LOCAL=
 WORKDIR=
 DIFF=diff3
 SCRIPT="$0"
 BUILD=
+WORKCOPY=
 help(){
     local HELP_TEXT=$(cat "$SCRIPT" \
         |sed '/^[^#]/q' \
@@ -31,13 +34,14 @@ help(){
     exit 1
 }
 
-eval set -- $(getopt -o hlb:w:d: -l help,local,build:,workdir:,diff: -- "$@" || help;)
+eval set -- $(getopt -o ihlb:w:d: -l help,local,build:,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
+        -i) WORKCOPY=y;;
         -l|--local) LOCAL=--local;;
-        -b|--build) BUILD="--build \"$2\""; shift;;
-        -w|--workdir) WORKDIR="--workdir $2"; shift;;
+        -b|--build) BUILD=$2; shift;;
+        -w|--workdir) WORKD=$2; WORKDIR="--workdir $2"; shift;;
         -d|--diff) DIFF=$2; shift;;
         (--) shift; break;;
         (-*) error "unrecognized option $1";;
@@ -45,6 +49,7 @@ while [ $# -gt 0 ];do
     esac
     shift
 done
+echo "BUILD="${BUILD}
 
 if [ -z $1 ];then
   help
@@ -53,8 +58,13 @@ else
   shift
 fi
 
+COUNT=1
 while IFS=" " read name base left right;do
-  try-merge --diff ${DIFF} ${LOCAL} ${WORKDIR} ${BUILD} \
+  if [ ${WORKCOPY} = "y" ]; then
+      WORKDIR="--workdir ${WORKD}-${COUNT}"
+      COUNT=$((COUNT+1))
+  fi
+  try-merge --diff ${DIFF} ${LOCAL} ${WORKDIR} --build "${BUILD}" \
             ${BENCHMARKDIR}/${name} ${base} ${left} ${right} \
             -- $@
 done
