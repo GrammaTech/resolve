@@ -32,6 +32,9 @@ help(){
     exit 1
 }
 
+echo "Enter try-merge.  \$\@="$@
+echo "\$\#="$#
+
 eval set -- $(getopt -o hlb:w:d: -l help,local,build:,workdir:,diff: -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
@@ -62,6 +65,10 @@ fi
 DIFFNAME=$(basename ${DIFF})
 RESULT_DIR=${WORKDIR}/${NAME}-${BASE}-${LEFT}-${RIGHT}
 
+echo "BUILD="${BUILD}
+echo "WORKDIR="${WORKDIR}
+echo "DIFF="${DIFF}
+
 if [ ! -d  ${RESULT_DIR} ];then
   mkdir -p ${RESULT_DIR}
 fi
@@ -78,13 +85,13 @@ done
 (cd $WORKDIR/${NAME}-left;  git reset --hard ${LEFT} >/dev/null)
 (cd $WORKDIR/${NAME}-right;  git reset --hard ${RIGHT} >/dev/null)
 
-if [ ! -z ${BUILD} ]; then
+if [ "${BUILD}1" != "1" ]; then
     (cd $WORKDIR/${NAME}-base; git checkout origin/master -- gt-harness.sh)
     (cd $WORKDIR/${NAME}-left; git checkout origin/master -- gt-harness.sh)
     (cd $WORKDIR/${NAME}-right; git checkout origin/master -- gt-harness.sh)
-    (cd $WORKDIR/${NAME}-base; pwd; echo $PATH; bear bash -c ${BUILD})
-    (cd $WORKDIR/${NAME}-left; pwd; echo $PATH; bear bash -c ${BUILD})
-    (cd $WORKDIR/${NAME}-right; pwd; echo $PATH; bear bash -c ${BUILD})
+    (cd $WORKDIR/${NAME}-base; pwd; echo $PATH; bear bash -c "${BUILD}")
+    (cd $WORKDIR/${NAME}-left; pwd; echo $PATH; bear bash -c "${BUILD}")
+    (cd $WORKDIR/${NAME}-right; pwd; echo $PATH; bear bash -c "${BUILD}")
     CD=compile_commands.json
     DIFF="${DIFF} --old-compilation-database=${NAME}-base/$CD"
     DIFF="${DIFF} --my-compilation-database=${NAME}-left/$CD"
@@ -121,7 +128,7 @@ for file in $(cd $WORKDIR/${NAME}-base;git diff --name-only $LEFT $RIGHT --); do
       touch ${RESULT_DIR}/${file}.no-right;
   else
       CMD="${DIFF} $@ ${NAME}-left/${file} ${NAME}-base/${file} ${NAME}-right/${file}"
-      # echo ${CMD}
+      echo ${CMD}
       OUT="$(${CMD})"
     ERR=$?
     rm -f ${RESULT_DIR}/${NAME}-base/${file}.${DIFFNAME}.*
