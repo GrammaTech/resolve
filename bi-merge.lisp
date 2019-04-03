@@ -27,16 +27,15 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter +bi-merge-command-line-options+
     (append '((("language" #\L) :type string :initial-value "c"
-               :documentation "language of input files (e.g. c, c++, or java)")
-              )
-            +common-command-line-options+
-            )
+               :documentation "language of input files (e.g. c, c++, or java)"))
+            +common-command-line-options+)
     "Command line options for bi-merge"))
 
-(define-bi-command bi-merge (original version1 version2
-                              &spec +bi-merge-command-line-options+
-                              &aux original-soft version1-soft version2-soft project-name
-                              software-store)
+(define-bi-command bi-merge
+    (original version1 version2
+              &spec +bi-merge-command-line-options+
+              &aux original-soft version1-soft version2-soft project-name
+              software-store)
   "Merge two variants of an original software"
   (declare (ignorable help num-threads interactive manual swank profile
                       load eval save-original read-seed save-seed quiet
