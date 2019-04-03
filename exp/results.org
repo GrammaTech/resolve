@@ -27,7 +27,7 @@ operations.
 * Top-level Results
 Evaluated 5295 merge conflicts from 27864 total merges across 26
 popular open-source programs.  In a, currently, 174G directory
-(=all-repos=).
+(=cc-repos=).
 
 #+begin_src shell
   total_commits(){
@@ -273,12 +273,12 @@ that build.
    CLOSED: [2019-03-11 Mon 11:43]
 Ran =diff3= with the following.
 #+begin_src shell :eval never
-  cat results/cc-merges.txt|grep -v "no-conflict"|cut -f 1,3,4,5|try-all-merges -l -w all-repos ../benchmark -- -m 2>try-diff3.stderr |tee try-diff3.stdout
+  cat results/cc-merges.txt|grep -v "no-conflict"|cut -f 1,3,4,5|try-all-merges -l -w cc-repos ../benchmark -- -m 2>try-diff3.stderr |tee try-diff3.stdout
 #+end_src
 
 Build the cc-stats.txt file with the following.
 #+begin_src shell :eval never
-  ./bin/cc-stats all-repos/*-*-*-*/ |tee cc-stats.txt
+  ./bin/cc-stats cc-repos/*-*-*-*/ |tee cc-stats.txt
 #+end_src
 
 *** How good is diff3 at resolving merge conflicts
@@ -329,14 +329,14 @@ Next, what types are they?
 **** C/C++
 First, how many total files have conflicts?
 #+begin_src shell :eval never
-  find all-repos/*-*-*-* -name "*.1"|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|wc -l
+  find cc-repos/*-*-*-* -name "*.1"|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|wc -l
 #+end_src
 
 : 7943
 
 Next, what types are they?
 #+begin_src shell :eval never
-  find all-repos/*-*-*-* -name "*.1"|xargs -I{} basename {}|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|uniq -c|sort -n
+  find cc-repos/*-*-*-* -name "*.1"|xargs -I{} basename {}|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|uniq -c|sort -n
 #+end_src
 
 They are predominantly C/C++.
@@ -426,22 +426,22 @@ automake and these =.in= files see:
 
 ** TODO ast-merge statistics
 Run with:
-: try-merge -l -w all-repos/ -d ast-merge-or-diff3 ../benchmark/sqlite c0a327bf861f968b49fb68bffd79101973513809 8ebb3ba a0866cb
+: try-merge -l -w cc-repos/ -d ast-merge-or-diff3 ../benchmark/sqlite c0a327bf861f968b49fb68bffd79101973513809 8ebb3ba a0866cb
 
 Looks like it found many fewer resolutions than your standard diff3
 (or at least it returned ERRNO 1 very frequently).
-: [root@a64464f26618 merge-experiment]# find /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/ -name "*ast-merge-or-diff3-patch*"
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbe.c.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeaux.c.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/sqlite.h.in.ast-merge-or-diff3-patch.0
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/fkey.c.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/test_malloc.c.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/pragma.c.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/status.c.ast-merge-or-diff3-patch.1                                                               /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/sqliteInt.h.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeInt.h.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/main.c.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeapi.c.ast-merge-or-diff3-patch.1
-: /merge-experiment/all-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/test/fkey1.test.ast-merge-or-diff3-patch.0
+: [root@a64464f26618 merge-experiment]# find /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/ -name "*ast-merge-or-diff3-patch*"
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbe.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeaux.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/sqlite.h.in.ast-merge-or-diff3-patch.0
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/fkey.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/test_malloc.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/pragma.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/status.c.ast-merge-or-diff3-patch.1                                                               /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/sqliteInt.h.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeInt.h.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/main.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeapi.c.ast-merge-or-diff3-patch.1
+: /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/test/fkey1.test.ast-merge-or-diff3-patch.0
 
 * Notes
 ** Diff3 run time
