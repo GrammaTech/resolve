@@ -1,4 +1,4 @@
-;;;; bi-merge.lsip -- command line interface for three way merging
+;;;; bi-merge.lisp -- command line interface for three way merging
 (defpackage :bug-injector/bi-merge
   (:nicknames :bi/bi-merge)
   (:documentation "Command line interface for three way merging of software")
