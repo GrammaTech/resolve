@@ -1,3 +1,5 @@
-all-repos/
+js-repos/
+cc-repos/
 *.stdout
 *.stderr
+*.tar.xz

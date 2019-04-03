@@ -176,6 +176,22 @@ conflicts]].)
 |    20 | FAQ       | Text                                       |
 |    20 | spec      | Linux package info, e.g. module deps       |
 
+Most common types for JavaScript.
+
+| Count | Extension | What is this?      |
+|-------+-----------+--------------------|
+|   262 | js        | JavaScript         |
+|   125 | ts        | TypeScript         |
+|    32 | json      | JSON               |
+|    18 | md        | Markdown           |
+|     4 | gitignore | a git ignore file  |
+|     4 | yml       | YAML               |
+|     2 | html      | HTML               |
+|     2 | Makefile  | make               |
+|     1 | deploy    | ??                 |
+|     1 | map       | ??                 |
+|     1 | npmignore | an npm ignore file |
+
 * Calculations
 ** Total programs
 #+name: total-programs
@@ -283,6 +299,34 @@ cat try-diff3.stats|cla mean median min max
     :PROPERTIES:
     :CUSTOM_ID: type-of-files-w-conflicts
     :END:
+**** JavaScript
+First, how many total files have conflicts?
+#+begin_src shell
+  find js-repos/*-*-*-* -name "*.1"|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|wc -l
+#+end_src
+
+#+RESULTS:
+: 452
+
+Next, what types are they?
+#+begin_src shell
+  find js-repos/*-*-*-* -name "*.1"|xargs -I{} basename {}|sed 's/\.diff3\.1//;s/^.*\.//'|sort|uniq -c|sort -n
+#+end_src
+
+#+RESULTS:
+| 262 | js        |
+| 125 | ts        |
+|  32 | json      |
+|  18 | md        |
+|   4 | gitignore |
+|   4 | yml       |
+|   2 | html      |
+|   2 | Makefile  |
+|   1 | deploy    |
+|   1 | map       |
+|   1 | npmignore |
+
+**** C/C++
 First, how many total files have conflicts?
 #+begin_src shell :eval never
   find all-repos/*-*-*-* -name "*.1"|sed 's/\.diff3-patch\.1//;s/^.*\.//'|sort|wc -l
