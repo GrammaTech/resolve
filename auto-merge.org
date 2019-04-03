@@ -1,0 +1,31 @@
+#+Title: Auto Merge
+#+Options: ^:{} toc:3
+#+STARTUP: hideblocks
+#+HTML_HEAD: <style>@media all and (min-width: 1000px){ body { max-width: 80%; margin: auto; } } @media all and (max-width: 1000px){ body { margin: 1em; } } a { text-decoration: none; color: #4a708b; } #postamble{ font-size: small; } pre.src{ background-color: #2e3436; color: #eeeeec;} .code-highlighted{background-color: #555753; }</style>
+
+* Plan
+1. Finish collecting conflicts from our JavaScript projects.
+2. Focus on polishing this tool =ast-diff= for JavaScript first.
+3. Build a (private) Web REST-API for the differencing and merging.
+4. Build in the ability to collect some analytics.
+5. Read about minimum users before we move to the marketplace.
+   (Figure out if maybe we should try the marketplace as another)
+6. Build a web front end with some analytics.
+
+* Tasks [0/1]
+** TODO Finish the JavaScript experiment using ast-merge
+* Notes and Ideas
+* Meetings
+** Product Council <2019-04-03 Wed>
+- Focus on JavaScript first.  It avoids the complication of having to
+  use compilation databases, worry about flags, etc...
+- GitHub's Market place could be a good place to
+  - Get some validation that it is working reliably
+  - Build a user community
+- It might be that we could share this with Mozilla (Vineeth has
+  contacts) if we want people to try out the JavaScript.
+- Pay for this under Bug-Injector
+- MVPs
+  1. ast-diff (REST Web access with front end.)
+  2. ast-merge
+  3. github
