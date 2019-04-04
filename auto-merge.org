@@ -11,6 +11,19 @@
 5. Read about minimum users before we move to the marketplace.
    (Figure out if maybe we should try the marketplace as another)
 6. Build a web front end with some analytics.
+* Competitors
+There are unused research prototypes and there are very simple
+commercial tools.  There are no tools like this in the GitHub
+marketplace that returns against searches for "merge" or "diff."
+
+The most sophisticated commercial tool named "semantic merge" (note:
+semantic merge has a distinct meaning in the research community and
+that is not what this tool does).  Semantic merge is developed by a
+version control company (plastic VC).  It looks to target MS Windows
+and doesn't support JavaScript.  I think it is in another section of
+the market.
+
+https://www.semanticmerge.com
 
 * Tasks [0/1]
 ** TODO Finish the JavaScript experiment using ast-merge
