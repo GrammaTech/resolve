@@ -11,6 +11,7 @@
 5. Read about minimum users before we move to the marketplace.
    (Figure out if maybe we should try the marketplace as another)
 6. Build a web front end with some analytics.
+
 * Competitors
 There are unused research prototypes and there are very simple
 commercial tools.  There are no tools like this in the GitHub
@@ -42,3 +43,37 @@ https://www.semanticmerge.com
   1. ast-diff (REST Web access with front end.)
   2. ast-merge
   3. github
+
+** Synthesis productization meeting <2019-02-15 Fri>
+From https://git.grammatech.com/synthesis/meta/wikis/meetings/2019-02-15-productization.
+
+- Potential customers
+  - Github could incorporate our tools as a distinguishing feature.
+    E.g., our automated merge conflict resolution.  There is a
+    spectrum here from the Marketplace up to incorporation into an
+    existing dominant Marketplace service all the way up to
+    incorporation into GitHub itself.
+  - Development shops.  Large development companies are rolling many
+    similar tools themselves.  Perhaps they would purchase them from
+    us instead.
+
+- We should start dogfooding these tools as soon as they're
+  sufficiently mature.
+
+- Potential customers (thinking e.g. GitHub here but also applies to
+  development shops) will be facing a "Buy or Build" question.  We
+  should have good arguments in this respect... what distinguishes our
+  tools?  What is the value we bring?
+  - time to market
+  - our total investment KLOC
+  - monies and expertise which we have applied
+
+- Need to collect a table of potential *show stoppers* along the
+  following lines.
+  | Issue               | GitHub | GitLab | Other |
+  |---------------------|--------|--------|-------|
+  | CL support          |        |        |       |
+  | compiler            |        |        |       |
+  | languages           |        |        |       |
+  | our support/backing |        |        |       |
+  | etc...              |        |        |       |
