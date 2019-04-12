@@ -26,10 +26,37 @@ the market.
 
 https://www.semanticmerge.com
 
-* Tasks [0/1]
+* Tasks [0/2]
+** TODO Lookup "state based merging"
 ** TODO Finish the JavaScript experiment using ast-merge
 * Notes and Ideas
 * Meetings
+** Shin Hwei <2019-04-11 Thu>
+Top level:
+- Maybe target the ICSE deadline instead
+- Maybe talk at ICSE
+
+Classes of related work
+- state based merging
+- syntactic
+- structured
+- semantic
+- temporal (editor support)
+
+Shin Hwei's Student
+- using Gumtree to mine edit scripts from Java
+- Using Gin to search combinations of edit scripts
+  - random mutations only
+  - single file only
+- Looking at what to use beyond test cases
+  - Test cases are not sufficient, too easy to pass
+  - LOC or complexity maximization (heuristic of keeping everything new)
+
+Compare between source languages?
+- Maybe the languages are too different to be worth comparing
+- How does Java stack up?  (More like C or more like JavaScript)
+  - Android is more like C, lots of extra stuff, xml files
+  - Pure Java is more like JavaScript
 ** Product Council <2019-04-03 Wed>
 - Focus on JavaScript first.  It avoids the complication of having to
   use compilation databases, worry about flags, etc...
