@@ -4,17 +4,15 @@
 ;; the standard lisp diff would apply, which we
 ;; do not want.
 
-(defpackage :software-evolution-library/ast-diff/alist
-  (:nicknames :sel/ast-diff/alist)
+(defpackage :resolve/alist
   (:use :common-lisp
 	:iterate
 	:software-evolution-library
-	:software-evolution-library/ast-diff/ast-diff)
+	:resolve/ast-diff)
   (:export :alist-for-diff
-	   :alist-of-alist-for-diff
-	   ))
+	   :alist-of-alist-for-diff))
 
-(in-package :software-evolution-library/ast-diff/alist)
+(in-package :resolve/alist)
 
 (defclass alist-for-diff ()
   ((alist-of-alist-for-diff

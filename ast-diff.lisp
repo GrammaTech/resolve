@@ -14,16 +14,14 @@
 ;;; during software development.
 ;;;
 ;;; @texi{ast-diff}
-(defpackage :software-evolution-library/ast-diff/ast-diff
-  (:nicknames :sel/ast-diff :sel/ast-diff/ast-diff
-	      :software-evolution-library/ast-diff)
+(defpackage :resolve/ast-diff
   (:use
    :common-lisp
    :software-evolution-library
    :software-evolution-library/utility
    :software-evolution-library/software/ast
    :software-evolution-library/software/simple
-   :software-evolution-library/ast-diff/string
+   :resolve/string
    :alexandria
    :arrow-macros
    :named-readtables
@@ -54,7 +52,7 @@
    :record-unstable
    :merge-diffs2
    :merge3))
-(in-package :software-evolution-library/ast-diff/ast-diff)
+(in-package :resolve/ast-diff)
 (in-readtable :curry-compose-reader-macros)
 ;;; Comments on further algorithm improvements
 ;;;

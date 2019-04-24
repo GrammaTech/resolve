@@ -1,5 +1,5 @@
 include/
-software-evolution/
+resolve/
 *.html
 *.info
 *.pdf
@@ -7,16 +7,8 @@ software-evolution/
 *.1.gz
 
 # Automatically generated package texi files
-bi-bi-api.texi
-bi-bi-evolve-api.texi
-bi-bi-mut-api.texi
-bi-juliet-scion-creator-api.texi
-bi-scion-api.texi
-bi-utility-api.texi
-bi-weakening-mutators-api.texi
-bi-scions-clang-api.texi
-bi-scions-java-api.texi
-bi-scions-javascript-api.texi
-bug-injector-bug-injector-api.texi
-scion-index.texi
-weakening-mutation-index.texi
+resolve-alist-api.texi
+resolve-ast-diff-api.texi
+resolve-commands-api.texi
+resolve-html-api.texi
+resolve-string-api.texi

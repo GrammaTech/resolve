@@ -1,13 +1,12 @@
 ;;; ast-diff-html.lisp --- render ast diffs to html
-(defpackage :software-evolution-library/ast-diff/html
-  (:nicknames :sel/ast-diff/html)
+(defpackage :resolve/html
   (:use :common-lisp
         :software-evolution-library/utility
-        :software-evolution-library/ast-diff/ast-diff
+        :resolve/ast-diff
         :cl-who)
   (:shadow :escape-string)
   (:export :diff-to-html))
-(in-package :software-evolution-library/ast-diff/html)
+(in-package :resolve/html)
 
 (defun diff-to-html (orig-asts edit-script &optional (stream t))
   "Generate HTML which shows side-by-side diff.

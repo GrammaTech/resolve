@@ -1,9 +1,9 @@
-PROJECT=software-evolution-library
+PROJECT=resolve
 DESTDIR?=/usr
 DATAROOTDIR?=/share
 INFODIR?=$(DATAROOTDIR)/info
 
-all: info html clang-instrument.1.gz
+all: info html
 
 info: $(PROJECT).info
 

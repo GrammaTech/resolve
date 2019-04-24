@@ -1,0 +1,98 @@
+\input texinfo
+
+@documentencoding utf-8
+@settitle Resolve
+
+@copying
+This file documents Resolve
+
+Copyright (C) 2019 GrammaTech
+@end copying
+
+@dircategory Utilities
+@direntry
+* Resolve: (resolve). Software difference display and resolution
+@end direntry
+
+@titlepage
+@title Resolve
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@c Output the table of the contents at the beginning.
+@contents
+
+
+
+@ifnottex
+@node Top, Introduction, (dir), (dir)
+@top Resolve
+
+@insertcopying
+@end ifnottex
+
+
+Resolve is a library and a number of tools for software difference
+display and conflict resolution.
+
+@menu
+* Introduction::                What is Resolve?
+* Implementation::              How Resolve is implemented.
+* Components::                  Components provided by Resolve.
+* Utilities::                   Utilities provided by Resolve.
+* Usage::                       Using Resolve, including examples.
+
+Appendices
+* ChangeLog::                   Chronological log of notable changes by version
+* Index::                       Complete index.
+
+@end menu
+
+
+@node Introduction, Implementation, Top, Top
+@chapter Introduction
+@cindex introduction
+
+
+@node Implementation, Components, Introduction, Top
+@chapter Implementation
+@cindex implementation
+
+
+@node Components, AST Differencing, Implementation, Top
+@chapter Components
+@cindex components
+
+@node AST Differencing, Utilities, Components, Components
+@section AST Differencing
+@cindex ast-differencing
+@include include/ast-diff.texi
+
+@node Utilities, Usage, Components, Top
+@chapter Utilities
+@cindex utilities
+
+
+@node Usage, ChangeLog, Utilities, Top
+@chapter Usage
+@cindex usage
+
+
+@node ChangeLog, Index, Usage, Top
+@appendix ChangeLog
+@include changelog.texi
+
+
+@node Index,  , ChangeLog, Top
+@unnumbered Index
+
+@c Combine all index (function variable type and concept) types into a
+@c single index.
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex tp cp
+@printindex cp
+
+@bye

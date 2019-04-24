@@ -6,13 +6,16 @@ include local.mk
 endif
 
 PACKAGE_NAME = resolve
-DOC_PACKAGES =			\
-		resolve/core	\
-		resolve/resolve
+DOC_PACKAGES =				\
+		resolve/alist		\
+		resolve/ast-diff	\
+		resolve/commands	\
+		resolve/html		\
+		resolve/string
 
 LISP_DEPS =				\
 	$(wildcard *.lisp)
 
-BINS = resolve
+BINS = ast-diff ast-merge
 
 include cl.mk

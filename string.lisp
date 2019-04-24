@@ -1,10 +1,9 @@
-(defpackage :software-evolution-library/ast-diff/string
-  (:nicknames :sel/ast-diff/string)
+(defpackage :resolve/string
   (:use :common-lisp
 	:iterate)
   (:export :string-diff))
 
-(in-package :software-evolution-library/ast-diff/string)
+(in-package :resolve/string)
 
 ;;; String diff algorithms
 

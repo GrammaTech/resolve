@@ -28,9 +28,7 @@
 ;;;     	cmd = "ast-diff -I .,src $LOCAL $REMOTE"
 ;;;
 ;;; @texi{ast-diff-commands}
-(defpackage :software-evolution-library/ast-diff/commands
-  (:nicknames :sel/ast-diff/commands
-              :software-evolution-library/ast-diff/commands)
+(defpackage :resolve/commands
   (:use :common-lisp
         :alexandria
         :named-readtables
@@ -39,7 +37,7 @@
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/command-line
-        :software-evolution-library/ast-diff/ast-diff
+        :resolve/ast-diff
         :software-evolution-library/software/ast
         :software-evolution-library/software/simple
         :software-evolution-library/software/project
@@ -54,7 +52,7 @@
   (:import-from :uiop :writeln :truenamize :nest)
   (:shadow :merge :ast-diff)
   (:export :ast-diff :ast-merge))
-(in-package :software-evolution-library/ast-diff/commands)
+(in-package :resolve/commands)
 (in-readtable :curry-compose-reader-macros)
 ;;; TODO: Work on clang-diff tool's git configuration (or maybe this
 ;;;       has to be implemented in clang-diff itself) to limit
