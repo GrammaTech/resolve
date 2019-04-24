@@ -3,6 +3,6 @@
 *.fasl
 *.lx64fsl
 
-wiki
+system-index.txt
 
-pub/
+wiki/
