@@ -431,6 +431,7 @@ automake and these =.in= files see:
 |     6 | signed.db.in                 |
 
 ** TODO ast-merge statistics
+*** CC Sqlite Example
 Run with:
 : try-merge -l -w cc-repos/ -d ast-merge-or-diff3 ../benchmark/sqlite c0a327bf861f968b49fb68bffd79101973513809 8ebb3ba a0866cb
 
@@ -448,6 +449,39 @@ Looks like it found many fewer resolutions than your standard diff3
 : /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/main.c.ast-merge-or-diff3-patch.1
 : /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/src/vdbeapi.c.ast-merge-or-diff3-patch.1
 : /merge-experiment/cc-repos/sqlite-c0a327bf861f968b49fb68bffd79101973513809-8ebb3ba-a0866cb/test/fkey1.test.ast-merge-or-diff3-patch.0
+
+** JS YArgs example
+: try-merge -l -w js-repos/ -d ast-merge $BENCHMARK_DIR/yargs d5da5eb9c73c433ce7ed3ffda10a4a612184514d ea14630 6655688
+
+No errors and it successfully finds a resolution of the merge file
+that diff3 failed upon.
+
+#+begin_src shell :results scalar
+diff -U3 js-repos/yargs-d5da5eb9c73c433ce7ed3ffda10a4a612184514d-ea14630-6655688/index.js.{ast-merge.0,diff3.1} 2>&1
+echo ""
+#+end_src
+
+#+RESULTS:
+: --- js-repos/yargs-d5da5eb9c73c433ce7ed3ffda10a4a612184514d-ea14630-6655688/index.js.ast-merge.0	2019-04-17 19:14:14.389953448 -0400
+: +++ js-repos/yargs-d5da5eb9c73c433ce7ed3ffda10a4a612184514d-ea14630-6655688/index.js.diff3.1	2019-03-26 10:39:53.000000000 -0400
+: @@ -1,6 +1,12 @@
+:  var path = require('path');
+: +<<<<<<< yargs-left/index.js
+:  var minimist = require('minimist');
+: +var wordwrap = require('wordwrap');
+: +||||||| yargs-base/index.js
+: +var wordwrap = require('wordwrap');
+: +=======
+:  var wordwrap = require('./lib/wordwrap');
+: +>>>>>>> yargs-right/index.js
+:  
+:  /*  Hack an instance of Argv with process.argv into Argv
+:      so people can do
+: 
+
+*** Still needs to be taught how to handle JSON.
+It looks like new enough versions of =acorn= *should* parse JSON, but
+that isn't the case yet (at least for my Arch Linux install).
 
 * Notes
 ** Diff3 run time
