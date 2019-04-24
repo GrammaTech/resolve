@@ -1,3 +1,14 @@
+(defpackage :resolve/software/project
+  (:use :common-lisp
+        :alexandria
+        :iterate
+        :named-readtables
+        :curry-compose-reader-macros
+        :resolve/ast-diff
+        :software-evolution-library
+        :software-evolution-library/software/project))
+(in-package :resolve/software/project)
+(in-readtable :curry-compose-reader-macros)
 
 (defun confirm-files-are-same (alist1 alist2)
   (let ((files1 (mapcar #'car alist1))
@@ -24,18 +35,18 @@
   (let ((ntab (make-table-for-alist files2 :test #'equal)))
     (remove-if-not (lambda (p) (gethash (car p) ntab)) files1)))
 
-(defmethod ast-patch ((project project) (diff t) &rest args &key &allow-other-keys)
+(defmethod ast-patch ((project project) (diff t)
+                      &rest args &key &allow-other-keys)
   (let* ((files-obj (make-instance 'alist-for-diff
-				  :alist (all-files project)))
+		      :alist (all-files project)))
 	 (new-files-obj (apply #'ast-patch files-obj diff args))
 	 (new-project (copy project))
-	 (evolve-files-table (make-table-for-alist (evolve-files new-project) :test #'equal))
-	 (result-alist (alist-of-alist-for-diff new-files-obj)))
+	 (evolve-files-table (make-table-for-alist (evolve-files new-project)
+                                                   :test #'equal))
+	 (result-alist (sel/sw/project::alist-of-alist-for-diff new-files-obj)))
     (flet ((evolve? (p) (gethash (car p) evolve-files-table)))
       (let ((new-evolve-files (remove-if-not #'evolve? result-alist))
 	    (new-other-files (remove-if #'evolve? result-alist)))
 	(setf (evolve-files new-project) new-evolve-files
 	      (other-files new-project) new-other-files)))
     new-project))
-
-

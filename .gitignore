@@ -1,2 +1,7 @@
+# Compiled files
+*.fas
+*.fasl
+*.lx64fsl
+
 wiki
 system-index.txt

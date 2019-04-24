@@ -18,4 +18,16 @@ LISP_DEPS =				\
 
 BINS = ast-diff ast-merge
 
+BIN_TEST_DIR = test/bin
+BIN_TESTS =				\
+	ast-diff-on-json-has-lines	\
+	clang-diff-on-gcd		\
+	java-diff-on-gcd		\
+	javascript-diff-on-gcd		\
+	lisp-diff-on-gcd		\
+	lisp-diff-on-gcd-raw
+
+# TODO: Fix this failing test.
+# ast-diff-on-simple-has-lines
+
 include cl.mk
