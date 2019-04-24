@@ -55,7 +55,7 @@ build-arch-sbcl:
     # up a new "latest" image, otherwise, run locally.
     - if [ "$CI_BUILD_REF_NAME" = "master" ];
       then
-          docker run -e LOCAL_USER=root -e GT=yes -e REPORT=yes ${LOCAL_IMAGE_NAME}-${OS}-${LISP} /bin/bash -c "cd /root/quicklisp/local-projects/auto-merge && make check bin-check doc";
+          docker run -e LOCAL_USER=root -e GT=yes -e REPORT=yes ${LOCAL_IMAGE_NAME}-${OS}-${LISP} /bin/bash -c "cd /root/quicklisp/local-projects/resolve && make check bin-check doc";
           if [ "$LISP" = "ccl" ];
           then
               docker tag ${LOCAL_IMAGE_NAME}-${OS}-${LISP} $DOCKER_REGISTRY/$CI_PROJECT_PATH/${OS};
@@ -63,7 +63,7 @@ build-arch-sbcl:
               docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH/${OS};
           fi
       else
-          docker run -e LOCAL_USER=root -e GT=yes ${LOCAL_IMAGE_NAME}-${OS}-${LISP} /bin/bash -c "cd /root/quicklisp/local-projects/auto-merge && unbuffer make check doc";
+          docker run -e LOCAL_USER=root -e GT=yes ${LOCAL_IMAGE_NAME}-${OS}-${LISP} /bin/bash -c "cd /root/quicklisp/local-projects/resolve && unbuffer make check doc";
       fi
 
 run-ubuntu-ccl:
@@ -99,7 +99,7 @@ pages:
   script:
     - export CONTAINER_FILE=${LOCAL_IMAGE_NAME}-arch-sbcl.container
     - mkdir -p $(dirname ${CONTAINER_FILE})
-    - docker run -e LOCAL_USER=root -e GT=yes --cidfile=${CONTAINER_FILE} ${LOCAL_IMAGE_NAME}-arch-sbcl /bin/bash -c "mkdir -p /public && cd /root/quicklisp/local-projects/auto-merge && make doc && cp -R doc/auto-merge/* /public/"
+    - docker run -e LOCAL_USER=root -e GT=yes --cidfile=${CONTAINER_FILE} ${LOCAL_IMAGE_NAME}-arch-sbcl /bin/bash -c "mkdir -p /public && cd /root/quicklisp/local-projects/resolve && make doc && cp -R doc/resolve/* /public/"
     - docker cp $(cat ${CONTAINER_FILE}):/public ./
     - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-ccl
     - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-sbcl

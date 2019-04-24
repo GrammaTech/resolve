@@ -5,14 +5,14 @@ ifneq ("$(wildcard local.mk)","")
 include local.mk
 endif
 
-PACKAGE_NAME = auto-merge
+PACKAGE_NAME = resolve
 DOC_PACKAGES =			\
-		auto-merge/core	\
-		auto-merge/auto-merge
+		resolve/core	\
+		resolve/resolve
 
 LISP_DEPS =				\
 	$(wildcard *.lisp)
 
-BINS = auto-merge
+BINS = resolve
 
 include cl.mk

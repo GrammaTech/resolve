@@ -1,6 +1,6 @@
-;;;; auto-merge.lisp -- Main auto-merge command-line driver
-(defpackage :auto-merge/auto-merge
-  (:documentation "Main auto-merge command-line driver")
+;;;; resolve.lisp -- Main automatic merge command-line driver
+(defpackage :resolve/resolve
+  (:documentation "Main resolve command-line driver")
   (:use :common-lisp
         :alexandria
         :command-line-arguments
@@ -11,8 +11,9 @@
         :uiop/image
         :software-evolution-library/utility
         :software-evolution-library/command-line
-        :auto-merge/core
+        :resolve/core
         :swank)
-  (:export :auto-merge :run-auto-merge))
-(in-package :auto-merge/auto-merge)
+  (:export :resolve :run-resolve))
+(in-package :resolve/resolve)
 (in-readtable :curry-compose-reader-macros)
+

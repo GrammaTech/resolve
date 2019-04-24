@@ -1,5 +1,5 @@
 ;;;; core.lisp -- Core software search replace implementation.
-(defpackage :auto-merge/core
+(defpackage :resolve/core
   (:use :common-lisp
         :alexandria
         :named-readtables
@@ -8,33 +8,33 @@
         :split-sequence
         :software-evolution-library/utility
         :software-evolution-library/software-evolution-library)
-  (:export :+auto-merge-dir+
-           :+auto-merge-version+
-           :+auto-merge-branch+
+  (:export :+resolve-dir+
+           :+resolve-version+
+           :+resolve-branch+
            :define-pattern-matching-weakening-mutation))
-(in-package :auto-merge/core)
+(in-package :resolve/core)
 (in-readtable :curry-compose-reader-macros)
 
 
-;;;; AUTO-MERGE Constants.
-(defvar +auto-merge-dir+
+;;;; RESOLVE Constants.
+(defvar +resolve-dir+
   (pathname-directory
    #.(or *compile-file-truename*
          *load-truename*
          *default-pathname-defaults*))
-  "Path to directory holding AUTO-MERGE.")
+  "Path to directory holding RESOLVE.")
 
 (defvar +limit-program-path+
   (make-pathname :name "limit"
-                 :directory (append +auto-merge-dir+ (list "bin")))
+                 :directory (append +resolve-dir+ (list "bin")))
   "Path to a program used to limit resources of subsequent commands.")
 
-(defvar +auto-merge-version+
+(defvar +resolve-version+
   (eval-when (:compile-toplevel :load-toplevel :execute)
-    (current-git-commit +auto-merge-dir+))
-  "Current version of the AUTO-MERGE library.")
+    (current-git-commit +resolve-dir+))
+  "Current version of the RESOLVE library.")
 
-(defvar +auto-merge-branch+
+(defvar +resolve-branch+
   (eval-when (:compile-toplevel :load-toplevel :execute)
-    (current-git-branch +auto-merge-dir+))
-  "Current branch of the AUTO-MERGE library.")
+    (current-git-branch +resolve-dir+))
+  "Current branch of the RESOLVE library.")

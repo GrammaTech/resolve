@@ -1,8 +1,8 @@
 ;;;; test.lisp --- Tests for software search and replace.
-(defpackage :auto-merge/test
+(defpackage :resolve/test
   (:use :common-lisp
         :alexandria
-        :metabang-auto-mergend
+        :metabang-resolvend
         :iterate
         :arrow-macros
         :named-readtables
@@ -11,12 +11,12 @@
         :trivia
         :software-evolution-library/utility
         :software-evolution-library/stefil-plus
-        :auto-merge/core
-        :auto-merge/auto-merge)
+        :resolve/core
+        :resolve/resolve)
   (:shadowing-import-from :arrow-macros :<>)
   (:shadowing-import-from :trivia :match :guard)
   (:export :test :batch-test))
-(in-package :auto-merge/test)
+(in-package :resolve/test)
 (in-readtable :curry-compose-reader-macros)
 
 #-gt
@@ -44,6 +44,6 @@
 
 (defun run-batch (&rest a)
   (declare (ignorable a))
-  (batch-test #'test "AUTO-MERGE" +auto-merge-branch+))
+  (batch-test #'test "RESOLVE" +resolve-branch+))
 
 (defroot test)
