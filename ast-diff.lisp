@@ -23,7 +23,6 @@
    :software-evolution-library/software/simple
    :resolve/string
    :alexandria
-   :arrow-macros
    :named-readtables
    :curry-compose-reader-macros
    :metabang-bind
@@ -1101,17 +1100,17 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
 ;;; Merge algorithms
 
 
-(defgeneric converge (original branch-a branch-b &key &allow-other-keys)
-  (:documentation "Compute a version of ORIGINAL that is the result of
-trying to apply to ORIGINAL both the changes from ORIGINAL -> BRANCH-A
-and the changes from ORIGINAL -> BRANCH-B.  Returns this object, and a
-second argument that describes problems that were encountered, or NIL
-if no problems were found."))
+(defgeneric converge (my old your &key &allow-other-keys)
+  (:documentation
+   "Merge changes in MY and YOUR when both are descended from OLD.
+Compute a version of OLD that is the result of trying to apply to OLD
+both the changes from OLD -> MY and the changes from OLD -> YOUR.
+Returns this object, and a second argument that describes problems
+that were encountered, or NIL if no problems were found."))
 
-(defmethod converge ((original t) (branch-a t) (branch-b t)
+(defmethod converge ((branch-a t) (original t) (branch-b t)
                      &key &allow-other-keys)
-  "Default method, assumes the arguments are things that can be treated as ASTs
-or SEXPRs."
+  "Assumes the arguments are things that can be treated as ASTs or SEXPRs."
   (multiple-value-bind (diff problems)
       (merge3 original branch-a branch-b)
     (values (ast-patch original diff :meld? t)

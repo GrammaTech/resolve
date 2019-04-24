@@ -13,6 +13,8 @@
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
         :software-evolution-library/software/clang
+        :software-evolution-library/software/javascript
+        :software-evolution-library/software/json
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
@@ -61,18 +63,6 @@
   (declare (ignorable a))
   (batch-test #'test "RESOLVE" +resolve-branch+))
 
-(defvar *binary-search* nil "Holds the binary_search software object.")
-(defvar *forms* nil "Forms used in tests.")
-
-(defixture resolve-asd-file-forms
-  (:setup (setf *forms* (read-file-forms
-                         (make-pathname
-                          :name "resolve"
-                          :type "asd"
-                          :directory
-                          (pathname-directory *this-file*)))))
-  (:teardown (setf *forms* nil)))
-
 (define-constant +etc-dir+
     (append (pathname-directory
              #.(or *compile-file-truename*
@@ -82,10 +72,24 @@
   :test #'equalp
   :documentation "Path to directory holding testing artifacts.")
 
-(deftest sexp-diff-on-ast-file ()
-  (with-fixture resolve-asd-file-forms
-    (is (zerop (nth-value 1 (ast-diff *forms* *forms*)))
-        "Handles forms from a lisp source file.")))
+(define-constant +javascript-dir+ (append +etc-dir+ (list "javascript"))
+  :test #'equalp
+  :documentation "Path to directory holding Javascript test programs.")
+
+(defvar *binary-search* nil "Holds the binary_search software object.")
+(defvar *forms*         nil "Forms used in tests.")
+(defvar *old*          nil "Software used in diff/merge tests.")
+(defvar *my*            nil "Software used in diff/merge tests.")
+(defvar *your*         nil "Software used in diff/merge tests.")
+
+(defixture resolve-asd-file-forms
+  (:setup (setf *forms* (read-file-forms
+                         (make-pathname
+                          :name "resolve"
+                          :type "asd"
+                          :directory
+                          (pathname-directory *this-file*)))))
+  (:teardown (setf *forms* nil)))
 
 (defixture binary-search-clang
   (:setup
@@ -101,6 +105,21 @@
            :directory +etc-dir+))))
   (:teardown
    (setf *binary-search* nil)))
+
+(defixture json-conflict-yargs
+  (:setup
+   (destructuring-bind (base left right)
+       (mapcar
+        (lambda (name)
+          (from-file
+           (make-instance 'json)
+           (make-pathname :directory (append +javascript-dir+ '("package-json"))
+                          :type "json"
+                          :name name)))
+        '("d5da5eb" "ea14630" "6655688"))
+     (setf *old* base *my* left *your* right)))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil)))
 
 (defroot test)
 
@@ -285,6 +304,11 @@
 		(print-diff (ast-diff '(()) '()) :no-color t :stream s))
               "[-()-]")
       "Print diff of deletion of empty list"))
+
+(deftest sexp-diff-on-ast-file ()
+  (with-fixture resolve-asd-file-forms
+    (is (zerop (nth-value 1 (ast-diff *forms* *forms*)))
+        "Handles forms from a lisp source file.")))
 
 
 ;;;; Clang AST Diff tests
@@ -692,3 +716,14 @@
                   (:same . "foo") (:same . 2)))
 		(((:insert . 3) (:insert . 4)))))
       "Special handling of strings following insertions"))
+
+(deftest json-merge3 ()
+  (with-fixture json-conflict-yargs
+    (multiple-value-bind (merged unstable)
+        (converge *my* *old* *your*)
+      (is (null unstable))                     ; No conflicts.
+      (is (search "minimist" (genome merged))) ; Something from my.
+      (is (search "3\"," (genome merged))))))  ; Something from your.
+
+
+;;; Automatic merge tests

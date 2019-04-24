@@ -37,6 +37,7 @@
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/command-line
+        :resolve/core
         :resolve/ast-diff
         :software-evolution-library/software/ast
         :software-evolution-library/software/simple
@@ -77,8 +78,9 @@
 (define-command ast-diff (source1 source2 &spec +command-line-options+)
   "Compare source code in SOURCE1 and SOURCE2 by AST."
   #.(format nil
-            "~%Built from SEL ~a, and ~a ~a.~%"
+            "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
             +software-evolution-library-version+
+            +resolve-version+
             (lisp-implementation-type) (lisp-implementation-version))
   (declare (ignorable quiet verbose))
   (when help (show-help-for-ast-diff))
@@ -140,8 +142,9 @@
                                    &spec +ast-merge-command-line-options+)
   "Merge changes from old-file->my-file and old-file->your-file."
   #.(format nil
-            "~%Built from SEL ~a, and ~a ~a.~%"
+            "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
             +software-evolution-library-version+
+            +resolve-version+
             (lisp-implementation-type) (lisp-implementation-version))
   (declare (ignorable quiet verbose raw no-color))
   (when help (show-help-for-ast-merge))
@@ -178,8 +181,8 @@
 
     (multiple-value-bind (new-merged unstable)
         (converge
-         (expand-options-for-which-files language "OLD")
          (expand-options-for-which-files language "MY")
+         (expand-options-for-which-files language "OLD")
          (expand-options-for-which-files language "YOUR"))
       ;; Write the result, either to out-dir or to STDOUT.
       (if out-dir

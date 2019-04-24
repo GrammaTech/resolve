@@ -6,7 +6,6 @@
         :alexandria
         :command-line-arguments
         :metabang-bind
-        :arrow-macros
         :named-readtables
         :curry-compose-reader-macros
         :iterate
@@ -79,7 +78,7 @@
     ;; Perform merge
 
     (multiple-value-bind (new-merged unstable)
-        (sel/ast-diff:converge original-soft version1-soft version2-soft)
+        (resolve/ast-diff:converge version1-soft original-soft version2-soft)
       (save-styled-to new-merged out-dir "merged")
       (if (not unstable)
           (format t "No merge conflicts~%")
