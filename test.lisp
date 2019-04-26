@@ -76,12 +76,19 @@
   :test #'equalp
   :documentation "Path to directory holding Javascript test programs.")
 
+(define-constant +gcd-dir+ (append +etc-dir+ (list "gcd"))
+  :test #'equalp
+  :documentation "Path to directory holding GCD test programs.")
+
 (defvar *binary-search* nil "Holds the binary_search software object.")
 (defvar *forms*         nil "Forms used in tests.")
-(defvar *old*          nil "Software used in diff/merge tests.")
+(defvar *old*           nil "Software used in diff/merge tests.")
 (defvar *my*            nil "Software used in diff/merge tests.")
-(defvar *your*         nil "Software used in diff/merge tests.")
+(defvar *your*          nil "Software used in diff/merge tests.")
+(defvar *variants*      nil "List of software variants.")
 
+
+;;; Fixtures
 (defixture resolve-asd-file-forms
   (:setup (setf *forms* (read-file-forms
                          (make-pathname
@@ -120,6 +127,51 @@
      (setf *old* base *my* left *your* right)))
   (:teardown
    (setf *old* nil *my* nil *your* nil)))
+
+(defixture gcd-conflict-clang
+  (:setup
+   (destructuring-bind (my old your)
+       (mapcar
+        (lambda (name)
+          (from-file
+           (make-instance 'clang)
+           (make-pathname :directory +gcd-dir+
+                          :type "c"
+                          :name name)))
+        '("gcd-wo-curlies-fix" "gcd-wo-curlies" "gcd-wo-curlies-prose"))
+     (setf *my* my *old* old *your* your)))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil)))
+
+(defixture gcd-conflict-javascript
+  (:setup
+   (destructuring-bind (my old your)
+       (mapcar
+        (lambda (name)
+          (from-file
+           (make-instance 'javascript)
+           (make-pathname :directory +gcd-dir+
+                          :type "js"
+                          :name name)))
+        '("gcd-fix" "gcd" "gcd-prose"))
+     (setf *my* my *old* old *your* your)))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil)))
+
+(defixture javascript-abacus-variants
+  (:setup
+   (setf *variants*
+         (mapcar
+          (lambda (name)
+            (cons (make-keyword (string-upcase name))
+                  (from-file
+                   (make-instance 'javascript)
+                   (make-pathname :directory (append +javascript-dir+ '("abacus"))
+                                  :type "js"
+                                  :name (concatenate 'string "abacus-" name)))))
+          '("orig" "calc-line" "borders" "space" "bead" "animate" "min-lines"))))
+  (:teardown
+   (setf *variants* nil)))
 
 (defroot test)
 
@@ -725,5 +777,41 @@
       (is (search "minimist" (genome merged))) ; Something from my.
       (is (search "3\"," (genome merged))))))  ; Something from your.
 
+(deftest gcd-conflict-merge3 ()
+  (with-fixture gcd-conflict-clang
+    (multiple-value-bind (merged unstable)
+        (converge *my* *old* *your*)
+      (declare (ignorable merged unstable))
+      ;; TODO: This *should* be the case but it isn't.
+      #+regression (is unstable))))
+
+(deftest gcd-conflict-merge3-js ()
+  (with-fixture gcd-conflict-javascript
+    (multiple-value-bind (merged unstable)
+        (converge *my* *old* *your*)
+      (declare (ignorable merged unstable))
+      ;; TODO: Possibly another place where our merge is too eager.
+      #+regression (is unstable))))
+
 
 ;;; Automatic merge tests
+(deftest merges-of-abacus-variants ()
+  (with-fixture javascript-abacus-variants
+    (let ((orig (aget :orig *variants*)))
+      (mapcar
+       (lambda (pair)
+         (nest
+          (destructuring-bind ((my-name . my-obj) . (your-name . your-obj))
+              pair)
+          (multiple-value-bind (merged unstable)
+              (converge my-obj orig your-obj)
+            #+debug
+            (format t "~12a~12a~12a~%" my-name your-name (length unstable)))
+          (to-file merged)
+          (make-pathname :directory (append +javascript-dir+ '("abacus"))
+                         :type "js" :name)
+          (mapconcat #'identity
+                     (cons "merged"
+                           (mapcar #'symbol-name (list my-name your-name)))
+                     "-")))
+       (pairs (remove-if [{eql :orig} #'car] *variants*))))))
