@@ -94,22 +94,22 @@ run-arch-sbcl:
     LISP: 'sbcl'
   <<: *run
 
-pages:
-  stage: deploy-and-cleanup
-  script:
-    - export CONTAINER_FILE=${LOCAL_IMAGE_NAME}-arch-sbcl.container
-    - mkdir -p $(dirname ${CONTAINER_FILE})
-    - docker run -e LOCAL_USER=root -e GT=yes --cidfile=${CONTAINER_FILE} ${LOCAL_IMAGE_NAME}-arch-sbcl /bin/bash -c "mkdir -p /public && cd /root/quicklisp/local-projects/resolve && make doc && cp -R doc/resolve/* /public/"
-    - docker cp $(cat ${CONTAINER_FILE}):/public ./
-    - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-ccl
-    - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-sbcl
-    - docker rmi -f ${LOCAL_IMAGE_NAME}-ubuntu-ccl
-    - docker rmi -f ${LOCAL_IMAGE_NAME}-ubuntu-sbcl
-  artifacts:
-    paths:
-      - public
-  only:
-    - master
+# pages:
+#   stage: deploy-and-cleanup
+#   script:
+#     - export CONTAINER_FILE=${LOCAL_IMAGE_NAME}-arch-sbcl.container
+#     - mkdir -p $(dirname ${CONTAINER_FILE})
+#     - docker run -e LOCAL_USER=root -e GT=yes --cidfile=${CONTAINER_FILE} ${LOCAL_IMAGE_NAME}-arch-sbcl /bin/bash -c "mkdir -p /public && cd /root/quicklisp/local-projects/resolve && make doc && cp -R doc/resolve/* /public/"
+#     - docker cp $(cat ${CONTAINER_FILE}):/public ./
+#     - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-ccl
+#     - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-sbcl
+#     - docker rmi -f ${LOCAL_IMAGE_NAME}-ubuntu-ccl
+#     - docker rmi -f ${LOCAL_IMAGE_NAME}-ubuntu-sbcl
+#   artifacts:
+#     paths:
+#       - public
+#   only:
+#     - master
 
 cleanup:
   stage: deploy-and-cleanup
