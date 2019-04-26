@@ -91,7 +91,7 @@
     (setf language (guess-language source1 source2)))
   ;; Create the diff.
   (let ((diff
-         (apply #'sel/ast-diff/ast-diff:ast-diff
+         (apply #'resolve/ast-diff:ast-diff
                 (mapcar
                  {create-software _
                                   :language language

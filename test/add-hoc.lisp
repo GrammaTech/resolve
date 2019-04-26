@@ -150,21 +150,21 @@ a valid patch.  Return :FAIL (and other values) if not."
 
 (defun lisp-patch-test (f1 f2 out)
   ;; After this, the contents of OUT should be the same as the contents of F2
-  (let ((sel/ast-diff/lisp::*lisp-forms1*)
-	(sel/ast-diff/lisp::*lisp-forms2*))
-    (let* ((diff (sel/ast-diff/lisp::lisp-diff f1 f2))
-	   (new-forms (ast-patch sel/ast-diff/lisp::*lisp-forms1* diff)))
+  (let ((resolve/lisp::*lisp-forms1*)
+	(resolve/lisp::*lisp-forms2*))
+    (let* ((diff (resolve/lisp::lisp-diff f1 f2))
+	   (new-forms (ast-patch resolve/lisp::*lisp-forms1* diff)))
       (with-open-file (s out :direction :output :if-exists :supersede
 			 :if-does-not-exist :create)
-	(mapcar (lambda (x) (let ((str (sel/ast-diff/lisp::source x))) (princ str s) str)) new-forms)))))
+	(mapcar (lambda (x) (let ((str (resolve/lisp::source x))) (princ str s) str)) new-forms)))))
 
 (defun lisp-merge3-test (f1 f2 f3 out)
   ;; Testing merge algorithm on Lisp
-  (let ((forms1 (sel/ast-diff/lisp::read-file-forms+ f1))
-	(forms2 (sel/ast-diff/lisp::read-file-forms+ f2))
-	(forms3 (sel/ast-diff/lisp::read-file-forms+ f3)))
+  (let ((forms1 (resolve/lisp::read-file-forms+ f1))
+	(forms2 (resolve/lisp::read-file-forms+ f2))
+	(forms3 (resolve/lisp::read-file-forms+ f3)))
     (let ((result (merge3 forms1 forms2 forms3)))
       (with-open-file (s out :direction :output :if-exists :supersede
 			 :if-does-not-exist :create)
-	(mapcar (lambda (x) (let ((str (sel/ast-diff/lisp::source x))) (princ str s) str))
+	(mapcar (lambda (x) (let ((str (resolve/lisp::source x))) (princ str s) str))
 		result)))))
