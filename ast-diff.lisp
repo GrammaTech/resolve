@@ -172,6 +172,9 @@
 (defmethod ast-un-recurse ((ast ast) sub-asts)
   (copy ast :children sub-asts))
 
+(defmethod ast-equal-op ((s1 simple) (s2 simple))
+  "Useful to treat simple objects as ASTs when calculating differences."
+  (ast-equal-p (genome s1) (genome s2)))
 
 (defmethod ast-text ((ast t))
   (format nil "~A" ast))
