@@ -116,28 +116,6 @@
 
 
 ;;; Interface functions.
-
-(defgeneric ast-equal-p (ast-a ast-b)
-  (:documentation "Return T AST-A and AST-B are equal for diffing."))
-
-(defmethod ast-equal-p ((ast-a ast) (ast-b ast))
-  (and (eq (ast-class ast-a) (ast-class ast-b))
-       (eq (length (ast-children ast-a))
-           (length (ast-children ast-b)))
-       (every #'ast-equal-p (ast-children ast-a) (ast-children ast-b))))
-
-(defmethod ast-equal-op ((s1 simple) (s2 simple))
-  (ast-equal-p (genome s1) (genome s2)))
-
-(defmethod ast-equal-p ((ast-a t) (ast-b t))
-  (equalp ast-a ast-b))
-
-(defmethod ast-equal-p ((ast-a cons) (ast-b cons))
-  (and (iter (while (consp ast-a))
-             (while (consp ast-b))
-             (always (ast-equal-p (pop ast-a) (pop ast-b))))
-       (ast-equal-p ast-a ast-b)))
-
 (defgeneric ast-cost (ast)
   (:documentation "Return cost of AST."))
 
