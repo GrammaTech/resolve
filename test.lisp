@@ -7,6 +7,7 @@
         :curry-compose-reader-macros
         :split-sequence
         :uiop
+        #+gt :testbot
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/stefil-plus
