@@ -21,6 +21,7 @@
 
 (defmethod ast-diff ((project1 project) (project2 project) &rest args
                      &key &allow-other-keys)
+  #+debug (format t "ast-diff[PROJECT]~%")
   (flet ((%obj (proj) (make-instance 'alist-for-diff :alist (all-files proj))))
     (apply #'ast-diff (%obj project1) (%obj project2) args)))
 

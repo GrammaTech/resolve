@@ -317,6 +317,7 @@ differencing of specialized AST structures.; `ast-equal-p',
 `ast-cost', `ast-can-recurse', and `ast-on-recurse'."))
 
 (defmethod ast-diff ((ast-a ast) (ast-b ast) &rest args &key &allow-other-keys)
+  #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%" (ast-can-recurse ast-a ast-b))
   (if (ast-can-recurse ast-a ast-b)
       (apply #'ast-diff (ast-children ast-a) (ast-children ast-b) args)
       (call-next-method)))
@@ -621,6 +622,10 @@ value that is used instead."
     hash))
 
 (defmethod ast-diff (ast-a ast-b &key &allow-other-keys)
+  #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
+  #+debug (format t "ast-diff[T] subtypep of parseable: ~S~%"
+                  (mapcar [{subtypep _ 'sel/sw/parseable:parseable}
+                           #'class-of] (list ast-a ast-b)))
   (if (equal ast-a ast-b)
       (values `((:same . ,ast-a)) 0)
       (values `((:delete . ,ast-a) (:insert . ,ast-b))
@@ -628,6 +633,7 @@ value that is used instead."
 
 (defmethod ast-diff ((ast-a list) (ast-b list) &rest args &key &allow-other-keys
                      &aux tail-a tail-b)
+  #+debug (format t "ast-diff[LIST]~%")
   (let* ((new-ast-a (ast-on-recurse ast-a))
 	 (new-ast-b (ast-on-recurse ast-b)))
     (setf (values ast-a tail-a) (properize new-ast-a))
@@ -689,6 +695,7 @@ value that is used instead."
 
 (defmethod ast-diff ((s1 string) (s2 string) &key (strings t) &allow-other-keys)
   "special diff method for strings"
+  #+debug (format t "ast-diff[STRING]~%")
   (cond
     ;; if STRINGS is true, descend into the strings for a fine-grained diff
     (strings
@@ -723,6 +730,7 @@ value that is used instead."
 	  g))
 
 (defmethod ast-diff ((soft1 simple) (soft2 simple) &rest args &key &allow-other-keys)
+  #+debug (format t "ast-diff[SIMPLE]~%")
   (apply #'ast-diff
          (simple-genome-unpack (genome soft1))
          (simple-genome-unpack (genome soft2))

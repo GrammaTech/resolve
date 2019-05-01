@@ -12,6 +12,7 @@
 
 (defmethod ast-diff ((parseable-a parseable) (parseable-b parseable) &rest args
                      &key &allow-other-keys)
+  #+debug (format t "ast-diff[PARSEABLE]~%")
   (apply #'ast-diff (ast-root parseable-a) (ast-root parseable-b) args))
 
 (defmethod create-edit-tree ((source parseable) (target parseable) script

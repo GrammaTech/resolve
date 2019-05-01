@@ -32,6 +32,7 @@ elements of the alist."
 
 (defmethod ast-diff ((al1-obj alist-for-diff) (al2-obj alist-for-diff) &rest args
                      &key &allow-other-keys)
+  #+debug (format t "ast-diff[ALIST]~%")
   (let* ((test #'equal)
 	 (table1 (make-hash-table :test test))
 	 (table2 (make-hash-table :test test))

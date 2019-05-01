@@ -39,6 +39,9 @@
         :software-evolution-library/command-line
         :resolve/core
         :resolve/ast-diff
+        :resolve/software/parseable
+        :resolve/software/project
+        :resolve/software/lisp
         :software-evolution-library/software/ast
         :software-evolution-library/software/simple
         :software-evolution-library/software/project
