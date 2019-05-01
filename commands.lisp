@@ -73,7 +73,9 @@
               (("raw" #\r) :type boolean :optional t
                :documentation "output diff as raw ASTs (default is as text)")
               (("no-color" #\C) :type boolean :optional t
-               :documentation "inhibit color printing")))))
+               :documentation "inhibit color printing")
+              (("edit-tree" #\T) :type boolean :optional t
+               :documentation "Print edit tree")))))
 
 (define-command ast-diff (source1 source2 &spec +command-line-options+)
   "Compare source code in SOURCE1 and SOURCE2 by AST."
@@ -90,21 +92,22 @@
   (unless language
     (setf language (guess-language source1 source2)))
   ;; Create the diff.
-  (let ((diff
-         (apply #'resolve/ast-diff:ast-diff
-                (mapcar
-                 {create-software _
-                                  :language language
-                                  :compiler compiler
-                                  :flags flags
-                                  :build-command build-command
-                                  :artifacts artifacts
-                                  :compilation-database compilation-database}
-                 (list source1 source2)))))
+  (let* ((softwares
+          (mapcar
+           {create-software _
+                            :language language
+                            :compiler compiler
+                            :flags flags
+                            :build-command build-command
+                            :artifacts artifacts
+                            :compilation-database compilation-database}
+           (list source1 source2)))
+         (diff (apply #'resolve/ast-diff:ast-diff softwares)))
     ;; Print according to the RAW option.
-    (if raw
-        (writeln (ast-diff-elide-same diff) :readably t)
-        (print-diff diff :no-color no-color))
+    (cond
+      (raw (writeln (ast-diff-elide-same diff) :readably t))
+      (edit-tree (create-and-print-edit-tree softwares diff))
+      (t (print-diff diff :no-color no-color)))
     ;; Only exit with 0 if the two inputs match.
     (wait-on-manual manual)
     (exit-command ast-diff
@@ -146,7 +149,7 @@
             +software-evolution-library-version+
             +resolve-version+
             (lisp-implementation-type) (lisp-implementation-version))
-  (declare (ignorable quiet verbose raw no-color))
+  (declare (ignorable quiet verbose raw no-color edit-tree))
   (when help (show-help-for-ast-merge))
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file my-file your-file))

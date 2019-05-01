@@ -570,6 +570,38 @@
       "Print diff of insertion of a character in a string"))
 
 
+;;;; AST edit tree tests
+(deftest edit-tree.1 ()
+  (let* ((obj1 (from-string (make-instance 'clang) "int a,b,c,d,e;"))
+         (obj2 (from-string (make-instance 'clang) "int a,c,e;"))
+         (edit-tree (create-edit-tree obj1 obj2 (ast-diff obj1 obj2))))
+    (let ((count 0))
+      (map-edit-tree edit-tree (lambda (x) (declare (ignore x)) (incf count)))
+      (is (= 4 count)
+          "Edit tree with two differences expect 4 nodes. (~a)"
+          count))))
+
+(deftest edit-tree.2 ()
+  (let* ((obj1 (from-string (make-instance 'clang) "int a;"))
+         (obj2 (from-string (make-instance 'clang) "int a;"))
+         (edit-tree (create-edit-tree obj1 obj2 (ast-diff obj1 obj2))))
+    (is (null edit-tree)
+        "Empty diffs produce the null edit tree")))
+
+(deftest edit-tree.3 ()
+  (let* ((obj1 (from-string (make-instance 'clang) "char *a = \"abcde\";"))
+         (obj2 (from-string (make-instance 'clang) "char *a = \"ace\";"))
+         ;; :STRINGS nil means the diff does not descend into the
+         ;; string constant.
+         (edit-tree
+          (create-edit-tree obj1 obj2 (ast-diff obj1 obj2 :strings nil))))
+    (let ((count 0))
+      (map-edit-tree edit-tree (lambda (x) (declare (ignore x)) (incf count)))
+      (is (= 1 count)
+          "Edit tree with two differences expect 1 node. (~a)"
+          count))))
+
+
 ;;;; AST merge3 tests
 (defun clang-mutate-available-p ()
   (zerop (nth-value 2 (shell "which clang-mutate"))))

@@ -14,6 +14,10 @@
                      &key &allow-other-keys)
   (apply #'ast-diff (ast-root parseable-a) (ast-root parseable-b) args))
 
+(defmethod create-edit-tree ((source parseable) (target parseable) script
+                             &rest args &key &allow-other-keys)
+  (apply #'create-edit-tree (ast-root source) (ast-root target) script args))
+
 (defmethod ast-patch ((obj parseable) (diff list)
                       &rest keys &key &allow-other-keys)
   (setf obj (copy obj))

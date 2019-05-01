@@ -10,7 +10,8 @@
 	:software-evolution-library
 	:resolve/ast-diff)
   (:export :alist-for-diff
-	   :alist-of-alist-for-diff))
+           :alist-of-alist-for-diff
+           :edit-tree-alist-node))
 
 (in-package :resolve/alist)
 
@@ -175,3 +176,73 @@ elements of the alist."
 				   (merge-diffs2 (cddr e1) (cddr e2)))))))))))
        (cdr o-a)
        (cdr o-b)))))
+
+(defclass edit-tree-alist-node (edit-tree-node-base)
+  ((key :accessor edit-tree-alist-node-key
+        :initarg :key
+        :initarg :pathname
+        :documentation "Key (usually a pathname) of an alist")
+   (children :accessor edit-tree-node-children))
+  (:documentation "Edit tree node for an edit in an alist"))
+
+(defclass edit-tree-alist-insert-node (edit-tree-alist-node)
+  ((target :accessor edit-tree-alist-node-target
+           :initarg :target
+           :documentation "Object inserted by an :INSERT-ALIST action"))
+  (:documentation "Object for an :INSERT-ALIST script action"))
+
+(defclass edit-tree-alist-delete-node (edit-tree-alist-node)
+  ((source :accessor edit-tree-alist-node-source
+           :initarg :source
+           :documentation "Object deleted by an :DELETE-ALIST action"))
+  (:documentation "Object for an :DELETE-ALIST script action"))
+
+(defclass edit-tree-alist-recurse-node (edit-tree-alist-node)
+  ((source :accessor edit-tree-alist-node-source
+           :initarg :source
+           :documentation "Object deleted by a :RECURSE-ALIST action")
+   (target :accessor edit-tree-alist-node-target
+           :initarg :target
+           :documentation "Object inserted by a :RECURSE-ALIST action"))
+  (:documentation "Object for a :RECURSE-ALIST action"))
+
+(defmethod create-edit-tree ((ad1 alist-for-diff) (ad2 alist-for-diff) script
+                             &rest args &key &allow-other-keys)
+  (let ((al1 (alist-of-alist-for-diff al1))
+        (al2 (alist-of-alist-for-diff al2))
+        (table1 (make-hash-table :test #'equal))
+        (table2 (make-hash-table :test #'equal)))\
+    (alist-to-table al1 table1)
+    (alist-to-table al2 table2)
+    (assert (typep script '(cons (eql :alist) (cons list nil))))
+    ;; Build an edit
+    (iter
+      (for (action . rest) in (cadr script))
+      (ecase action
+        (:same-alist) ;; do nothing
+        (:insert-alist
+         (collect
+             (make-instance 'edit-tree-alist-insert-node
+                            :pathname (car rest)
+                            :target (cdar rest))))
+        (:delete-alist
+         (collect
+             (make-instance 'edit-tree-alist-delete-node
+                            :pathname (car rest)
+                            :source (cdar rest))))
+        (:recurse-alist
+         (collect
+             (let* ((key (car rest))
+                    (source (gethash key table1))
+                    (target (gethash key table2)))
+               (assert source)
+               (assert target)
+               (make-instance 'edit-tree-alist-recurse-node
+                              :pathname key
+                              :source source
+                              :target target
+                              :children (apply #'create-edit-tree
+                                               source
+                                               target
+                                               (cdr rest)
+                                               args)))))))))
