@@ -13,6 +13,15 @@
 ;;; replacement for common line- or word-based differencing tools
 ;;; during software development.
 ;;;
+;;; MERGE-DIFF-2 should hold the language-specific logic.
+;;;
+;;; MELD take conflicts and moves them up to higher levels.
+;;;
+;;; MERGE-DIFFS-ON-SYMS generic function which dispatches off of
+;;; combinations of edit operations.  This should fail more frequently
+;;; (generate more :CONFLICT nodes).  Could write new methods to
+;;; override existing methods.
+;;;
 ;;; @texi{ast-diff}
 (defpackage :resolve/ast-diff
   (:use
