@@ -65,6 +65,10 @@ Appendices
 @chapter Components
 @cindex components
 
+@menu
+* AST Differencing::            Calculate differences between ASTs
+@end menu
+
 @node AST Differencing, Utilities, Components, Components
 @section AST Differencing
 @cindex ast-differencing
