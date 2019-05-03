@@ -71,7 +71,9 @@
    :print-edit-tree
    :describe-edit-tree-node
    :describe-edit-tree
-   :map-edit-tree))
+   :map-edit-tree
+   :ast-size
+   :ast-to-list-form))
 (in-package :resolve/ast-diff)
 (in-readtable :curry-compose-reader-macros)
 ;;; Comments on further algorithm improvements
@@ -219,6 +221,15 @@
 	    (setf (subseq result i (+ i l)) s)
 	    (incf i l)))
     result))
+
+(defgeneric ast-to-list-form (ast)
+  (:documentation "Convert ast into a more readable list form"))
+
+(defmethod ast-to-list-form ((ast ast))
+  (cons (ast-class ast)
+	(mapcar #'ast-to-list-form (ast-children ast))))
+
+(defmethod ast-to-list-form (ast) ast)
 
 ;;; Classes for "edit trees"
 ;;;
@@ -231,7 +242,13 @@
 ;;; represents a piece of the tree that is being changed by the
 ;;; a part of the edit script.
 
-(defclass edit-segment-common ()
+(defclass size-mixin ()
+  ((size :reader ast-size
+         :documentation "Cache slot for AST-SIZE function"))
+  (:documentation "Mixin to give a class a slot for caching
+the AST-SIZE value"))
+
+(defclass edit-segment-common (size-mixin)
   ((node ;; :type (or ast-node list) ;; Need LIST because we don't just do ASTs
          :initarg :node
          :accessor edit-segment-node
@@ -275,8 +292,8 @@ of the substring inside the string."))
         (len (edit-segment-length segment))
         (ast-node (edit-segment-node segment)))
     (apply #'concatenate 'string
-           (loop for i from start below (+ start len)
-              collect (ast-text (elt (ast-children ast-node) i))))))
+           (mapcar #'ast-text
+                   (subseq (ast-children ast-node) start (+ start len))))))
 
 (defmethod ast-text ((segment string-edit-segment))
   (with-slots (node start string-start string-length)
@@ -285,7 +302,21 @@ of the substring inside the string."))
     (subseq (elt (ast-children node) start)
             string-start (+ string-start string-length))))
 
-(defclass edit-tree-node-base ()
+(defmethod ast-to-list-form ((segment string-edit-segment))
+  (ast-text segment))
+          
+(defmethod ast-to-list-form ((segment edit-segment))
+  (let ((start (edit-segment-start segment))
+        (len (edit-segment-length segment))
+        (ast-node (edit-segment-node segment)))
+    `(,(ast-class ast-node)
+       ,@(unless (eql start 0) '(|...|))
+       ,@(mapcar #'ast-to-list-form (subseq (ast-children ast-node)
+                                            start (+ start len)))
+       ,@(unless (eql (+ start len) (length (ast-children ast-node)))
+           '(|...|)))))
+
+(defclass edit-tree-node-base (size-mixin)
   ((script :type list
            :initarg :script
            :accessor edit-tree-node-script
@@ -311,6 +342,36 @@ rewritten by part of the edit script")
            :documentation "Segment in the target tree being
 rewritten TO by part of the edit script"))
   (:documentation " "))
+
+(defmethod print-object ((node edit-tree-node) stream)
+  (let ((s (ast-text (edit-tree-node-source node)))
+        (bound 30))
+    (when (> (length s) bound)
+      (setf s (concatenate 'string (subseq s 0 (- bound 3)) "...")))
+    (format stream "#<EDIT-TREE-NODE ~s>" s)))
+
+(defgeneric ast-size (node)
+  (:documentation "Number of nodes and leaves in an AST or ast-like thing"))
+
+(defmethod ast-size (node) 1)
+(defmethod ast-size ((ast ast))
+  (reduce #'+ (ast-children ast) :key #'ast-size :initial-value 1))
+
+(defmethod slot-unbound (class (node edit-tree-node) (slot (eql 'size)))
+  (let ((value (reduce #'+ (edit-tree-node-children node) :key #'ast-size :initial-value 1)))
+    (setf (slot-value node slot) value)
+    value))
+
+(defmethod ast-size ((segment string-edit-segment)) 1)
+
+;; Cache for SIZE slot, accessed by ast-size
+(defmethod slot-unbound (class (segment edit-segment) (slot (eql 'size)))
+  (let* ((node (edit-segment-node segment))
+         (length (edit-segment-length segment))
+         (start (edit-segment-start segment))
+         (children (subseq (ast-children node) start (+ start length)))
+         (value (reduce #'+ children :key #'ast-size :initial-value 1)))
+    (setf (slot-value segment slot) value)))
 
 
 ;;; Main interface to calculating ast differences.
@@ -941,38 +1002,61 @@ during calls to MAP-EDIT-TREE.")
     (map-edit-tree c fn))
   edit-trees)
 
-(defun create-and-print-edit-tree (softwares script)
+(defun create-and-print-edit-tree (softwares script &key print-asts coherence)
   (assert (typep softwares '(cons t (cons t null))))
   (destructuring-bind (source target)
       softwares
-    (print-edit-tree (create-edit-tree source target script))))
+    (print-edit-tree (create-edit-tree source target script)
+                     :print-asts print-asts
+                     :coherence coherence)))
 
-(defun print-edit-tree (edit-tree)
+(defun print-edit-tree (edit-tree &key print-asts coherence)
   (let ((*map-edit-tree-ancestors* nil))
-    (map-edit-tree edit-tree #'print-edit-tree-node)))
+    (map-edit-tree edit-tree
+                   (lambda (node) (print-edit-tree-node
+                                   node :print-asts print-asts
+                                   :coherence coherence)))))
+                   
 
-(defgeneric print-edit-tree-node (node)
+(defgeneric print-edit-tree-node (node &key &allow-other-keys)
   (:documentation "Print fragment of an edit tree, properly indented"))
 
-(defmethod print-edit-tree-node ((node edit-tree-node))
+(defun coherence (node)
+  (let ((c1 (ast-size (edit-tree-node-source node)))
+        (c2 (ast-size (ast-size node))))
+    (/ (float c2) (float c1))))
+
+(defmethod print-edit-tree-node ((node edit-tree-node) &key print-asts coherence)
   (assert (typep node 'edit-tree-node))
-  (let ((source-text (ast-text (edit-tree-node-source node)))
-        (target-text (ast-text (edit-tree-node-target node)))
-        (per-line-prefix (coerce (loop for x in *map-edit-tree-ancestors* collect #\> collect #\>) 'string)))
-    (format t "~%------------------------------------------------------------~%")
-    (if (and (not (position #\Newline source-text))
-             (not (position #\Newline target-text)))
-        (format t "~a ~s => ~s~%" per-line-prefix source-text target-text)
-        (pprint-logical-block (*standard-output*
-                               nil ; node
-                               :per-line-prefix per-line-prefix)
-          (princ source-text)
-          (terpri)
-          (princ "---------------")
-          (terpri)
-          (princ target-text)
-          (fresh-line)
-          ))))
+  ;; If COHERENCE is specified, print only the highest edit tree
+  ;; nodes whose coherence is >= this limit
+  (let ((node-coherence (coherence node))
+        (parent (car *map-edit-tree-ancestors*)))
+    (when (or (not coherence)
+              (and (>= node-coherence coherence)
+                   (or (null parent)
+                       (< (coherence parent) coherence))))
+      (let ((source-text (ast-text (edit-tree-node-source node)))
+            (target-text (ast-text (edit-tree-node-target node)))
+            (per-line-prefix (coerce (loop for x in *map-edit-tree-ancestors* collect #\> collect #\>) 'string)))
+        (format t "~%------------------------------------------------------------~%")
+        (format t "Coherence: ~a~%" node-coherence)
+        (if (and (not (position #\Newline source-text))
+                 (not (position #\Newline target-text)))
+            ;; No newlines, so print in a compact form on a single line
+            (format t "~a ~s => ~s~%" per-line-prefix source-text target-text)
+            ;; Otherwise, print as a text block, with indentation
+            (pprint-logical-block (*standard-output*
+                                   nil ; node
+                                   :per-line-prefix per-line-prefix)
+              (format t "~a~%---------------~%~a~&" source-text target-text)
+              ))
+        (when print-asts
+          (format t "---------------~%")
+          (format t "~s~%==>~%~s~%"
+                  (ast-to-list-form (edit-tree-node-source node))
+                  (ast-to-list-form (edit-tree-node-target node))))
+        ))))
 
 (defun describe-edit-tree (edit-tree)
   (let ((*map-edit-tree-ancestors* nil))
@@ -1141,8 +1225,7 @@ A diff is a sequence of actions as returned by `ast-diff' including:
                   keys
                   original (cdar script))
 	  (cdadr script))
-         ;; This looks wrong -- PFD
-	 (:conflict
+	 ((member :conflict keys)
 	  (values-list (iter (for s in (cdr script))
 			     (collect (ast-patch original s)))))
 	 (t (error "Invalid diff on atom: ~a" script)))))))

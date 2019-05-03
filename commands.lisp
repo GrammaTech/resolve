@@ -78,10 +78,57 @@
               (("no-color" #\C) :type boolean :optional t
                :documentation "inhibit color printing")
               (("edit-tree" #\T) :type boolean :optional t
-               :documentation "Print edit tree")))))
+               :documentation "Print edit tree")
+              (("print-asts") :type boolean :optional t
+               :documentation "When printing edit trees, also print a representation of the ASTs")
+              (("coherence") :type float :optional t
+               :documentation "Bound used to find relevant nodes in the edit tree")
+              ))))
 
-(define-command ast-diff (source1 source2 &spec +command-line-options+)
-  "Compare source code in SOURCE1 and SOURCE2 by AST."
+;; Some code duplication -- refactor this
+
+(nest
+ (eval-when (:compile-toplevel :load-toplevel :execute))
+ (defparameter +ast-diff-command-line-options+)
+ (append +command-line-options+)
+ (mappend
+  (lambda (arg-spec)
+    (destructuring-bind
+          ((long short) &key type optional initial-value action documentation)
+        arg-spec
+      (declare (ignorable short))
+      (mapcar (lambda (which)
+                (append
+                 (list (list (concatenate 'string which "-" long)))
+                 (when type (list :type type))
+                 (when optional (list :optional optional))
+                 (when action (list :action action))
+                 (when initial-value (list :initial-value initial-value))
+                 (nest
+                  (when documentation)
+                  (list :documentation)
+                  (concatenate 'string documentation " for " which " file"))))
+              '("old" "new")))))
+ (append +clang-command-line-options+
+         +project-command-line-options+
+         +clang-project-command-line-options+))
+
+(defmacro expand-options-for-which-files (language which)
+  "Expand the options for WHICH calling `create-software' appropriately."
+  `(create-software
+    ,@(let ((pairs (mapcar
+                    «list [#'intern {concatenate 'string which "-"}
+                                    #'symbol-name]
+                          #'identity»
+                    '(file compiler flags build-command
+                      artifacts compilation-database))))
+        (list* (caar pairs)
+               :language language
+               (mappend «list [#'make-keyword #'second] {cons 'or}»
+                        (cdr pairs))))))
+
+(define-command ast-diff (old-file new-file &spec +ast-diff-command-line-options+)
+  "Compare source code in OLD-FILE and NEW-FILE by AST."
   #.(format nil
             "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
             +software-evolution-library-version+
@@ -90,26 +137,23 @@
   (declare (ignorable quiet verbose))
   (when help (show-help-for-ast-diff))
   (setf *note-out* (list *error-output*))
-  (unless (every #'resolve-file (list source1 source2))
+  (unless (every #'resolve-file (list old-file new-file))
     (exit-command ast-diff 2 (error "Missing source.")))
   (unless language
-    (setf language (guess-language source1 source2)))
+    (setf language (guess-language old-file new-file)))
   ;; Create the diff.
+  
   (let* ((softwares
-          (mapcar
-           {create-software _
-                            :language language
-                            :compiler compiler
-                            :flags flags
-                            :build-command build-command
-                            :artifacts artifacts
-                            :compilation-database compilation-database}
-           (list source1 source2)))
+          (list (expand-options-for-which-files language "OLD")
+                (expand-options-for-which-files language "NEW")))
          (diff (apply #'resolve/ast-diff:ast-diff softwares)))
     ;; Print according to the RAW option.
     (cond
       (raw (writeln (ast-diff-elide-same diff) :readably t))
-      (edit-tree (create-and-print-edit-tree softwares diff))
+      (edit-tree (create-and-print-edit-tree
+                  softwares diff
+                  :print-asts print-asts
+                  :coherence coherence))
       (t (print-diff diff :no-color no-color)))
     ;; Only exit with 0 if the two inputs match.
     (wait-on-manual manual)
@@ -152,7 +196,7 @@
             +software-evolution-library-version+
             +resolve-version+
             (lisp-implementation-type) (lisp-implementation-version))
-  (declare (ignorable quiet verbose raw no-color edit-tree))
+  (declare (ignorable quiet verbose raw no-color edit-tree print-asts coherence))
   (when help (show-help-for-ast-merge))
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file my-file your-file))
@@ -161,46 +205,32 @@
 	my-file (truenamize my-file)
 	your-file (truenamize your-file)
         language (or language (guess-language old-file my-file your-file)))
-  (macrolet
-      ((expand-options-for-which-files (language which)
-         "Expand the options for WHICH calling `create-software' appropriately."
-         `(create-software
-           ,@(let ((pairs (mapcar
-                           «list [#'intern {concatenate 'string which "-"}
-                                           #'symbol-name]
-                                 #'identity»
-                           '(file compiler flags build-command
-                             artifacts compilation-database))))
-               (list* (caar pairs)
-                      :language language
-                      (mappend «list [#'make-keyword #'second] {cons 'or}»
-                               (cdr pairs)))))))
-    ;; Force OUT-DIR when running as a command line utility and merging
-    ;; whole directories.  We can't write multiple files to STDOUT.
-    (when (and (not uiop/image:*lisp-interaction*)
-               (not out-dir)
-               (directory-p old-file))
-      (setf out-dir (resolve-out-dir-from-source old-file))
-      (note 0 "Merging directories, out-dir set to ~a." out-dir))
-    ;; Don't write notes when we're writing merge results to STDOUT.
-    (unless out-dir (setf *note-level* 0))
-
-    (multiple-value-bind (new-merged unstable)
-        (converge
-         (expand-options-for-which-files language "MY")
-         (expand-options-for-which-files language "OLD")
-         (expand-options-for-which-files language "YOUR"))
-      ;; Write the result, either to out-dir or to STDOUT.
-      (if out-dir
-          (if (directory-p old-file)
-              (to-file new-merged
-                       (make-pathname :directory (append out-dir (list "merged"))))
-	      (to-file new-merged
-                       (resolve-store-path-from-out-dir-and-name
-                        out-dir
-                        (pathname-name old-file) "merged"
-                        (pathname-type old-file))))
-          (genome-string new-merged *standard-output*))
-
-      (wait-on-manual manual)
-      (exit-command ast-merge (if unstable 1 0) new-merged))))
+  ;; Force OUT-DIR when running as a command line utility and merging
+  ;; whole directories.  We can't write multiple files to STDOUT.
+  (when (and (not uiop/image:*lisp-interaction*)
+             (not out-dir)
+             (directory-p old-file))
+    (setf out-dir (resolve-out-dir-from-source old-file))
+    (note 0 "Merging directories, out-dir set to ~a." out-dir))
+  ;; Don't write notes when we're writing merge results to STDOUT.
+  (unless out-dir (setf *note-level* 0))
+  
+  (multiple-value-bind (new-merged unstable)
+      (converge
+       (expand-options-for-which-files language "MY")
+       (expand-options-for-which-files language "OLD")
+       (expand-options-for-which-files language "YOUR"))
+    ;; Write the result, either to out-dir or to STDOUT.
+    (if out-dir
+        (if (directory-p old-file)
+            (to-file new-merged
+                     (make-pathname :directory (append out-dir (list "merged"))))
+            (to-file new-merged
+                     (resolve-store-path-from-out-dir-and-name
+                      out-dir
+                      (pathname-name old-file) "merged"
+                      (pathname-type old-file))))
+        (genome-string new-merged *standard-output*))
+    
+    (wait-on-manual manual)
+    (exit-command ast-merge (if unstable 1 0) new-merged)))
