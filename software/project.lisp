@@ -5,6 +5,7 @@
         :named-readtables
         :curry-compose-reader-macros
         :resolve/ast-diff
+        :resolve/alist
         :software-evolution-library
         :software-evolution-library/software/project))
 (in-package :resolve/software/project)
@@ -44,7 +45,7 @@
 	 (new-project (copy project))
 	 (evolve-files-table (make-table-for-alist (evolve-files new-project)
                                                    :test #'equal))
-	 (result-alist (sel/sw/project::alist-of-alist-for-diff new-files-obj)))
+	 (result-alist (alist-of-alist-for-diff new-files-obj)))
     (flet ((evolve? (p) (gethash (car p) evolve-files-table)))
       (let ((new-evolve-files (remove-if-not #'evolve? result-alist))
 	    (new-other-files (remove-if #'evolve? result-alist)))

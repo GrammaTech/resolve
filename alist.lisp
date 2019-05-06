@@ -209,10 +209,10 @@ elements of the alist."
 
 (defmethod create-edit-tree ((ad1 alist-for-diff) (ad2 alist-for-diff) script
                              &rest args &key &allow-other-keys)
-  (let ((al1 (alist-of-alist-for-diff al1))
-        (al2 (alist-of-alist-for-diff al2))
+  (let ((al1 (alist-of-alist-for-diff ad1))
+        (al2 (alist-of-alist-for-diff ad2))
         (table1 (make-hash-table :test #'equal))
-        (table2 (make-hash-table :test #'equal)))\
+        (table2 (make-hash-table :test #'equal)))
     (alist-to-table al1 table1)
     (alist-to-table al2 table2)
     (assert (typep script '(cons (eql :alist) (cons list nil))))
