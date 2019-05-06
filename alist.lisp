@@ -215,7 +215,7 @@ elements of the alist."
         (table2 (make-hash-table :test #'equal)))
     (alist-to-table al1 table1)
     (alist-to-table al2 table2)
-    (assert (typep script '(cons (eql :alist) (cons list nil))))
+    (assert (typep script '(cons (eql :alist) (cons list null))))
     ;; Build an edit
     (iter
       (for (action . rest) in (cadr script))
