@@ -142,7 +142,7 @@
   (unless language
     (setf language (guess-language old-file new-file)))
   ;; Create the diff.
-  
+
   (let* ((softwares
           (list (expand-options-for-which-files language "OLD")
                 (expand-options-for-which-files language "NEW")))
@@ -214,7 +214,7 @@
     (note 0 "Merging directories, out-dir set to ~a." out-dir))
   ;; Don't write notes when we're writing merge results to STDOUT.
   (unless out-dir (setf *note-level* 0))
-  
+
   (multiple-value-bind (new-merged unstable)
       (converge
        (expand-options-for-which-files language "MY")
@@ -231,6 +231,6 @@
                       (pathname-name old-file) "merged"
                       (pathname-type old-file))))
         (genome-string new-merged *standard-output*))
-    
+
     (wait-on-manual manual)
     (exit-command ast-merge (if unstable 1 0) new-merged)))

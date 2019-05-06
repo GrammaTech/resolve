@@ -304,7 +304,7 @@ of the substring inside the string."))
 
 (defmethod ast-to-list-form ((segment string-edit-segment))
   (ast-text segment))
-          
+
 (defmethod ast-to-list-form ((segment edit-segment))
   (let ((start (edit-segment-start segment))
         (len (edit-segment-length segment))
@@ -1016,7 +1016,7 @@ during calls to MAP-EDIT-TREE.")
                    (lambda (node) (print-edit-tree-node
                                    node :print-asts print-asts
                                    :coherence coherence)))))
-                   
+
 
 (defgeneric print-edit-tree-node (node &key &allow-other-keys)
   (:documentation "Print fragment of an edit tree, properly indented"))
