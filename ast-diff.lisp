@@ -122,11 +122,11 @@
   (let ((conses nil))
     (let ((y x))
       (iter (while (consp y))
-	    (push y conses)
-	    (pop y)))
+            (push y conses)
+            (pop y)))
     (let ((cost 1))
       (iter (while conses)
-	    (incf cost (ccost (car (pop conses)))))
+            (incf cost (ccost (car (pop conses)))))
       cost)))
 
 (defmethod ccost (x)
@@ -207,19 +207,19 @@
 
 (defmethod ast-text ((ast cons))
   (let ((strings (iter (while (consp ast))
-		       (collecting (ast-text (pop ast))))))
+                       (collecting (ast-text (pop ast))))))
     (if ast
-	(concatenate-strings (list strings "." (ast-text ast)))
-	(concatenate-strings strings))))
+        (concatenate-strings (list strings "." (ast-text ast)))
+        (concatenate-strings strings))))
 
 (defun concatenate-strings (strings)
   (let* ((total-length (iter (for s in strings) (summing (length s))))
-	 (result (make-string total-length :initial-element #\Space))
-	 (i 0))
+         (result (make-string total-length :initial-element #\Space))
+         (i 0))
     (iter (for s in strings)
-	  (let ((l (length s)))
-	    (setf (subseq result i (+ i l)) s)
-	    (incf i l)))
+          (let ((l (length s)))
+            (setf (subseq result i (+ i l)) s)
+            (incf i l)))
     result))
 
 (defgeneric ast-to-list-form (ast)
@@ -227,7 +227,7 @@
 
 (defmethod ast-to-list-form ((ast ast))
   (cons (ast-class ast)
-	(mapcar #'ast-to-list-form (ast-children ast))))
+        (mapcar #'ast-to-list-form (ast-children ast))))
 
 (defmethod ast-to-list-form (ast) ast)
 
