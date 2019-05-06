@@ -16,6 +16,7 @@
         :software-evolution-library/software/clang
         :software-evolution-library/software/javascript
         :software-evolution-library/software/json
+        :software-evolution-library/software/simple
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
@@ -568,6 +569,29 @@
 			      :stream s)))
 	      "char *s = \"a{+b+}d\";")
       "Print diff of insertion of a character in a string"))
+
+;;;; Simple object ast-diff tests
+(deftest simple.ast-diff.1 ()
+    (let ((obj1 (make-instance 'simple :genome nil))
+          (obj2 (make-instance 'simple :genome nil)))
+      (is (equalp (multiple-value-list (ast-diff obj1 obj2)) '(nil 0))
+          "AST-DIFF of two trivial simple objects")))
+
+(deftest simple.ast-diff.2 ()
+    (let ((obj1 (make-instance 'simple :genome '(((:code . "x")))))
+          (obj2 (make-instance 'simple :genome '(((:code . "x"))))))
+      (is (equalp (multiple-value-list (ast-diff obj1 obj2)) '(((:same . "x")) 0))
+          "AST-DIFF of two equivalent one line simple objects")))
+
+(deftest simple.ast-diff.3 ()
+    (let ((obj1 (make-instance 'simple :genome '(((:code . "x")))))
+          (obj2 (make-instance 'simple :genome '(((:code . "y"))))))
+      (is (equalp (multiple-value-list (ast-diff obj1 obj2))
+                  '(((:recurse (:insert . #\y) (:delete . #\x))) 2))
+          "AST-DIFF of two different one line simple objects")
+      (let ((obj3 (ast-patch obj1 '((:recurse (:insert . #\y) (:delete . #\x))))))
+        (is (equalp (genome obj3) '(((:code . "y"))))
+            "Patch correctly applies to a simple object"))))
 
 
 ;;;; AST edit tree tests
