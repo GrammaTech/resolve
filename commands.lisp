@@ -85,33 +85,43 @@
                :documentation "Bound used to find relevant nodes in the edit tree")
               ))))
 
-;; Some code duplication -- refactor this
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun argument-multiplier (&rest multipliers)
+    "Return a function to multiply command-line arguments across MULTIPLIERS.
+Every element of MULTIPLIERS results in a another multiple of the
+command-line options processed by the returned function."
+    (lambda (arg-spec)
+      (destructuring-bind
+            ((long short) &key type optional initial-value action documentation)
+          arg-spec
+        (declare (ignorable short))
+        (mapcar (lambda (which)
+                  (append
+                   (list (list (concatenate 'string which "-" long)))
+                   (when type (list :type type))
+                   (when optional (list :optional optional))
+                   (when action (list :action action))
+                   (when initial-value (list :initial-value initial-value))
+                   (nest
+                    (when documentation)
+                    (list :documentation)
+                    (concatenate 'string documentation " for " which " file"))))
+                multipliers))))
+  (nest
+   (defparameter +ast-diff-command-line-options+)
+   (append +command-line-options+)
+   (mappend (argument-multiplier "old" "new"))
+   (append +clang-command-line-options+
+           +project-command-line-options+
+           +clang-project-command-line-options+))
 
-(nest
- (eval-when (:compile-toplevel :load-toplevel :execute))
- (defparameter +ast-diff-command-line-options+)
- (append +command-line-options+)
- (mappend
-  (lambda (arg-spec)
-    (destructuring-bind
-          ((long short) &key type optional initial-value action documentation)
-        arg-spec
-      (declare (ignorable short))
-      (mapcar (lambda (which)
-                (append
-                 (list (list (concatenate 'string which "-" long)))
-                 (when type (list :type type))
-                 (when optional (list :optional optional))
-                 (when action (list :action action))
-                 (when initial-value (list :initial-value initial-value))
-                 (nest
-                  (when documentation)
-                  (list :documentation)
-                  (concatenate 'string documentation " for " which " file"))))
-              '("old" "new")))))
- (append +clang-command-line-options+
-         +project-command-line-options+
-         +clang-project-command-line-options+))
+  (nest
+   (defparameter +ast-merge-command-line-options+)
+   (append +command-line-options+)
+   (mappend (argument-multiplier "my" "old" "your"))
+   (append +clang-command-line-options+
+           +project-command-line-options+
+           +clang-project-command-line-options+)))
 
 (defmacro expand-options-for-which-files (language which)
   "Expand the options for WHICH calling `create-software' appropriately."
@@ -160,33 +170,6 @@
     (exit-command ast-diff
                   (if (every [{eql :same} #'car] diff) 0 1)
                   diff)))
-
-(nest
- (eval-when (:compile-toplevel :load-toplevel :execute))
- (defparameter +ast-merge-command-line-options+)
- (append +command-line-options+)
- ;; Triples (base, left, right) of relevant options.
- (mappend
-  (lambda (arg-spec)
-    (destructuring-bind
-          ((long short) &key type optional initial-value action documentation)
-        arg-spec
-      (declare (ignorable short))
-      (mapcar (lambda (which)
-                (append
-                 (list (list (concatenate 'string which "-" long)))
-                 (when type (list :type type))
-                 (when optional (list :optional optional))
-                 (when action (list :action action))
-                 (when initial-value (list :initial-value initial-value))
-                 (nest
-                  (when documentation)
-                  (list :documentation)
-                  (concatenate 'string documentation " for " which " file"))))
-              '("my" "old" "your")))))
- (append +clang-command-line-options+
-         +project-command-line-options+
-         +clang-project-command-line-options+))
 
 (define-command ast-merge (my-file old-file your-file
                                    &spec +ast-merge-command-line-options+)
