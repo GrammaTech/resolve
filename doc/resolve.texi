@@ -39,9 +39,7 @@ display and conflict resolution.
 
 @menu
 * Introduction::                What is Resolve?
-* Implementation::              How Resolve is implemented.
-* Components::                  Components provided by Resolve.
-* Utilities::                   Utilities provided by Resolve.
+* Tools::                       Tools provided by Resolve.
 * Usage::                       Using Resolve, including examples.
 
 Appendices
@@ -51,38 +49,52 @@ Appendices
 @end menu
 
 
-@node Introduction, Implementation, Top, Top
+@node Introduction, Tools, Top, Top
 @chapter Introduction
 @cindex introduction
 
 
-@node Implementation, Components, Introduction, Top
-@chapter Implementation
-@cindex implementation
-
-
-@node Components, AST Differencing, Implementation, Top
-@chapter Components
-@cindex components
+@node Tools, AST Differencing, Introduction, Top
+@chapter Tools
+@cindex tools
 
 @menu
 * AST Differencing::            Calculate differences between ASTs
 @end menu
 
-@node AST Differencing, Utilities, Components, Components
+@node AST Differencing, Usage, Tools, Tools
 @section AST Differencing
 @cindex ast-differencing
 @include include/ast-diff.texi
 
-@node Utilities, Usage, Components, Top
-@chapter Utilities
-@cindex utilities
-
-
-@node Usage, ChangeLog, Utilities, Top
+@node Usage, ChangeLog, Tools, Top
 @chapter Usage
 @cindex usage
 
+@menu
+* Options::                     Options to resolve tools
+* Examples::                    Example usage of resolve tools
+@end menu
+
+@node Options, edit-tree, Usage, Usage
+@section Options
+@cindex options
+
+@menu
+* edit-tree::                   TODO: brief description
+@end menu
+
+@node edit-tree, Examples, Options, Options
+@subsection edit-tree
+@cindex edit-tree
+
+TODO: long form description of the edit-tree option.
+
+@node Examples, ChangeLog, Options, Usage
+@section Examples
+@cindex examples
+
+TODO: examples of using ast-diff and ast-merge.
 
 @node ChangeLog, Index, Usage, Top
 @appendix ChangeLog
