@@ -293,7 +293,8 @@ of the substring inside the string."))
         (ast-node (edit-segment-node segment)))
     (apply #'concatenate 'string
            (mapcar #'ast-text
-                   (subseq (ast-children ast-node) start (+ start len))))))
+                   (subseq (ast-children ast-node)
+                           start (+ start len))))))
 
 (defmethod ast-text ((segment string-edit-segment))
   (with-slots (node start string-start string-length)
@@ -311,17 +312,19 @@ of the substring inside the string."))
         (ast-node (edit-segment-node segment)))
     `(,(ast-class ast-node)
        ,@(unless (eql start 0) '(|...|))
-       ,@(mapcar #'ast-to-list-form (subseq (ast-children ast-node)
-                                            start (+ start len)))
-       ,@(unless (eql (+ start len) (length (ast-children ast-node)))
+       ,@(mapcar #'ast-to-list-form
+                 (subseq (ast-children ast-node)
+                         start (+ start len)))
+       ,@(unless (eql (+ start len)
+                      (length (ast-children ast-node)))
            '(|...|)))))
 
 (defclass edit-tree-node-base (size-mixin)
   ((script :type list
            :initarg :script
            :accessor edit-tree-node-script
-           :documentation "The part of the edit script that applies to this
-part of the diff")
+           :documentation "The part of the edit script that
+applies to this part of the diff")
    (children :type list  ;; of edit-tree-node objects
              :initarg :children
              :initform nil
@@ -351,21 +354,23 @@ rewritten TO by part of the edit script"))
     (format stream "#<EDIT-TREE-NODE ~s>" s)))
 
 (defgeneric ast-size (node)
-  (:documentation "Number of nodes and leaves in an AST or ast-like thing"))
+  (:documentation "Number of nodes and leaves in an AST or
+ast-like thing"))
 
 (defmethod ast-size (node) 1)
 (defmethod ast-size ((ast ast))
   (reduce #'+ (ast-children ast) :key #'ast-size :initial-value 1))
 
 (defmethod slot-unbound (class (node edit-tree-node) (slot (eql 'size)))
-  (let ((value (reduce #'+ (edit-tree-node-children node) :key #'ast-size :initial-value 1)))
+  (let ((value (reduce #'+ (edit-tree-node-children node)
+                       :key #'ast-size :initial-value 1)))
     (setf (slot-value node slot) value)
     value))
 
 (defmethod ast-size ((segment string-edit-segment)) 1)
 
 ;; Cache for SIZE slot, accessed by ast-size
-(defmethod slot-unbound (class (segment edit-segment) (slot (eql 'size)))
+(defmethod slot-unbound (c (segment edit-segment) (slot (eql 'size)))
   (let* ((node (edit-segment-node segment))
          (length (edit-segment-length segment))
          (start (edit-segment-start segment))
@@ -642,12 +647,14 @@ Prefix and postfix returned as additional values."
 				diff)))
                   (let ((diff
                          (if prefix
-                             (append (mapcar (lambda (it) (cons :same it)) prefix)
+                             (append (mapcar (lambda (it) (cons :same it))
+                                             prefix)
                                      diff)
                              diff)))
                     (if postfix
                         (append diff
-                                (mapcar (lambda (it) (cons :same it)) postfix))
+                                (mapcar (lambda (it) (cons :same it))
+                                        postfix))
                         diff)))
                 cost)))
       (unless (or unique-a unique-b)
@@ -799,7 +806,8 @@ value that is used instead."
 	    (cdar p))
 	  g))
 
-(defmethod ast-diff ((soft1 simple) (soft2 simple) &rest args &key &allow-other-keys)
+(defmethod ast-diff ((soft1 simple) (soft2 simple)
+                     &rest args &key &allow-other-keys)
   #+debug (format t "ast-diff[SIMPLE]~%")
   (apply #'ast-diff
          (simple-genome-unpack (genome soft1))
@@ -812,7 +820,8 @@ Given list SEQ and a list of pairs SUBSEQ-INDICES, which are
 start/length indices for disjoint nonempty subsequences of SEQ, return
 a list of the N+1 subsequences between these subsequences (some
 possibly empty), as well as the N subsequences themselves."
-  (assert (every (lambda (x) (and (<= 0 (car x)) (< (car x) n) (<= 1 (cadr x))))
+  (assert (every (lambda (x) (and (<= 0 (car x))
+                                  (< (car x) n) (<= 1 (cadr x))))
                  subseq-indices))
   (assert (every (lambda (x y) (<= (+ (car x) (cadr x)) (car y)))
                  subseq-indices (cdr subseq-indices)))
@@ -848,7 +857,8 @@ root of the edit script (and implicitly also the program AST)."
 edit script SCRIPT, a target objec that is the result of the script on the
 source, build the edit tree corresponding to the script."))
 
-(defmethod create-edit-tree ((source ast) (target ast) (script cons) &key &allow-other-keys)
+(defmethod create-edit-tree ((source ast) (target ast) (script cons)
+                             &key &allow-other-keys)
   ;; The script is a list of actions on the AST's children
   (change-segments-on-seqs
    (ast-children source)
@@ -875,7 +885,8 @@ source, build the edit tree corresponding to the script."))
        (apply #'create-edit-tree source-child target-child action-cdr args))
    source target))
 
-(defun change-segments-on-seqs (source target script segment-fn recurse-fn source-node target-node)
+(defun change-segments-on-seqs (source target script segment-fn recurse-fn
+                                source-node target-node)
   "Traverses two sequences and finds the change segments."
   (let ((source-position 0)
         (source-segment-start 0)
@@ -894,8 +905,10 @@ source, build the edit tree corresponding to the script."))
                    (and (= changes 1)
                         (null collected-recurse)))
                (push (funcall segment-fn
-                              source-segment-start (- source-position source-segment-start)
-                              target-segment-start (- target-position target-segment-start)
+                              source-segment-start
+                              (- source-position source-segment-start)
+                              target-segment-start
+                              (- target-position target-segment-start)
                               (nreverse collected-recurse)
                               (nreverse collected-actions))
                      collected-nodes))
@@ -939,25 +952,27 @@ source, build the edit tree corresponding to the script."))
                                     (elt source source-position)
                                     (elt target target-position)
                                     (cdr action)
-                                    :source-node source-node :source-position source-position
-                                    :target-node target-node :target-position target-position)))
+                                    :source-node source-node
+                                    :source-position source-position
+                                    :target-node target-node
+                                    :target-position target-position)))
                  (assert node)
                  (if (listp node)
                      (dolist (n node) (push n collected-recurse))
                      (push node collected-recurse))
                  (incf changes)
                  (incf source-position)
-                 (incf target-position)
-                 ))))
+                 (incf target-position)))))
       (finish 0))
     (if (and (null (cdr collected-nodes))
              (listp (car collected-nodes)))
         (car collected-nodes)
         (reverse collected-nodes))))
 
-(defmethod create-edit-tree ((source-string string) (target-string string) script
-                             &key source-node target-node source-position target-position
-                               &allow-other-keys)
+(defmethod create-edit-tree
+    ((source-string string) (target-string string) script
+     &key source-node target-node source-position target-position
+       &allow-other-keys)
   ;; May want to just punt here
   (change-segments-on-seqs
    source-string target-string script
@@ -966,16 +981,18 @@ source, build the edit tree corresponding to the script."))
             children actions)
      ;; children should be empty, but that may change if we hierarchically
      ;; group substring edits
-     (let ((source-segment (make-instance 'string-edit-segment
-                                          :node source-node
-                                          :start source-position
-                                          :string-start source-segment-start
-                                          :string-length source-segment-length))
-           (target-segment (make-instance 'string-edit-segment
-                                          :node target-node
-                                          :start target-position
-                                          :string-start target-segment-start
-                                          :string-length target-segment-length)))
+     (let ((source-segment
+            (make-instance 'string-edit-segment
+                           :node source-node
+                           :start source-position
+                           :string-start source-segment-start
+                           :string-length source-segment-length))
+           (target-segment
+            (make-instance 'string-edit-segment
+                           :node target-node
+                           :start target-position
+                           :string-start target-segment-start
+                           :string-length target-segment-length)))
        (make-instance 'edit-tree-node :source source-segment
                       :target target-segment
                       :children children
@@ -993,7 +1010,8 @@ during calls to MAP-EDIT-TREE.")
 
 (defmethod map-edit-tree ((edit-tree edit-tree-node-base) fn)
   (funcall fn edit-tree)
-  (let ((*map-edit-tree-ancestors* (cons edit-tree *map-edit-tree-ancestors*)))
+  (let ((*map-edit-tree-ancestors*
+         (cons edit-tree *map-edit-tree-ancestors*)))
     (map-edit-tree (edit-tree-node-children edit-tree) fn))
   edit-tree)
 
@@ -1017,7 +1035,6 @@ during calls to MAP-EDIT-TREE.")
                                    node :print-asts print-asts
                                    :coherence coherence)))))
 
-
 (defgeneric print-edit-tree-node (node &key &allow-other-keys)
   (:documentation "Print fragment of an edit tree, properly indented"))
 
@@ -1038,8 +1055,12 @@ during calls to MAP-EDIT-TREE.")
                        (< (coherence parent) coherence))))
       (let ((source-text (ast-text (edit-tree-node-source node)))
             (target-text (ast-text (edit-tree-node-target node)))
-            (per-line-prefix (coerce (loop for x in *map-edit-tree-ancestors* collect #\> collect #\>) 'string)))
-        (format t "~%------------------------------------------------------------~%")
+            (per-line-prefix
+             (coerce (loop for x in *map-edit-tree-ancestors*
+                        collect #\> collect #\>) 'string)))
+        (terpri)
+        (loop repeat 6 do (princ "----------"))
+        (terpri)
         (format t "Coherence: ~a~%" node-coherence)
         (if (and (not (position #\Newline source-text))
                  (not (position #\Newline target-text)))
@@ -1055,8 +1076,7 @@ during calls to MAP-EDIT-TREE.")
           (format t "---------------~%")
           (format t "~s~%==>~%~s~%"
                   (ast-to-list-form (edit-tree-node-source node))
-                  (ast-to-list-form (edit-tree-node-target node))))
-        ))))
+                  (ast-to-list-form (edit-tree-node-target node))))))))
 
 (defun describe-edit-tree (edit-tree)
   (let ((*map-edit-tree-ancestors* nil))
@@ -1087,10 +1107,13 @@ object of type edit-tree-segment"))
 
 (defmethod describe-segment progn ((edit-tree-segment string-edit-segment))
   (let* ((start (edit-segment-start edit-tree-segment))
-         (str (elt (ast-children (edit-segment-node edit-tree-segment)) start)))
+         (str (elt (ast-children (edit-segment-node edit-tree-segment))
+                   start)))
     (format t "String = ~s~%" str))
-  (format t "String-start = ~a~%" (string-edit-segment-string-start edit-tree-segment))
-  (format t "String-length = ~a~%" (string-edit-segment-string-length edit-tree-segment)))
+  (format t "String-start = ~a~%"
+          (string-edit-segment-string-start edit-tree-segment))
+  (format t "String-length = ~a~%"
+          (string-edit-segment-string-length edit-tree-segment)))
 
 
 ;;; ast-patch and associated functions
@@ -1106,7 +1129,8 @@ object of type edit-tree-segment"))
 (defun extend-list (list desired-length extension-value)
   (let ((len (length list)))
     (if (< len desired-length)
-	(append list (make-list (- desired-length len) :initial-element extension-value))
+	(append list (make-list (- desired-length len)
+                                :initial-element extension-value))
 	list)))
 
 (defun apply-values-fn (fn arg-lists replicate?)

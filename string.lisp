@@ -114,9 +114,12 @@
 				       (:insert :insert-sequence)
 				       (:delete :delete-sequence)
 				       (:same :same-sequence))
-			    (cdar p) (make-array '(2) :element-type (%et (cdar p) (cdadr p))
-						 :initial-contents (list (cdar p) (cdadr p))
-						 :fill-pointer 2 :adjustable t)
+			    (cdar p) (make-array
+                                      '(2)
+                                      :element-type (%et (cdar p) (cdadr p))
+                                      :initial-contents (list (cdar p)
+                                                              (cdadr p))
+                                      :fill-pointer 2 :adjustable t)
 			    (cdr p) (cddr p)))
 		     ;; :insert-sequence could go here, but ignore
 		     (t (pop p))))

@@ -80,10 +80,11 @@
               (("edit-tree" #\T) :type boolean :optional t
                :documentation "Print edit tree")
               (("print-asts") :type boolean :optional t
-               :documentation "When printing edit trees, also print a representation of the ASTs")
+               :documentation
+               "Also print a representation of the edit tree ASTs")
               (("coherence") :type float :optional t
-               :documentation "Bound used to find relevant nodes in the edit tree")
-              ))))
+               :documentation
+               "Bound used to find relevant nodes in the edit tree")))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
@@ -179,7 +180,8 @@ command-line options processed by the returned function."
             +software-evolution-library-version+
             +resolve-version+
             (lisp-implementation-type) (lisp-implementation-version))
-  (declare (ignorable quiet verbose raw no-color edit-tree print-asts coherence))
+  (declare (ignorable quiet verbose raw no-color edit-tree
+                      print-asts coherence))
   (when help (show-help-for-ast-merge))
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file my-file your-file))
