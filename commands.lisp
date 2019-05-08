@@ -82,7 +82,7 @@
               (("print-asts") :type boolean :optional t
                :documentation
                "Also print a representation of the edit tree ASTs")
-              (("coherence") :type float :optional t
+              (("coherence") :type string :optional t
                :documentation
                "Bound used to find relevant nodes in the edit tree")))))
 
@@ -161,10 +161,17 @@ command-line options processed by the returned function."
     ;; Print according to the RAW option.
     (cond
       (raw (writeln (ast-diff-elide-same diff) :readably t))
-      (edit-tree (create-and-print-edit-tree
-                  softwares diff
-                  :print-asts print-asts
-                  :coherence coherence))
+      (edit-tree
+       (when coherence
+         (let ((n (let ((*read-eval* nil))
+                    (read-from-string coherence))))
+           (unless (typep n '(real 0 1))
+             (error "coherence must be a number in range [0.0,1.0]"))
+           (setf coherence n)))
+       (create-and-print-edit-tree
+        softwares diff
+        :print-asts print-asts
+        :coherence coherence))
       (t (print-diff diff :no-color no-color)))
     ;; Only exit with 0 if the two inputs match.
     (wait-on-manual manual)

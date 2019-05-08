@@ -25,7 +25,9 @@ BIN_TESTS =				\
 	java-diff-on-gcd		\
 	javascript-diff-on-gcd		\
 	lisp-diff-on-gcd		\
-	lisp-diff-on-gcd-raw
+	lisp-diff-on-gcd-raw		\
+	clang-diff-on-gcd-edit-tree	\
+	clang-diff-on-gcd-edit-tree-coherence
 
 # TODO: Fix this failing test.
 # ast-diff-on-simple-has-lines
