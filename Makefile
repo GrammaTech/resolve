@@ -27,7 +27,8 @@ BIN_TESTS =				\
 	lisp-diff-on-gcd		\
 	lisp-diff-on-gcd-raw		\
 	clang-diff-on-gcd-edit-tree	\
-	clang-diff-on-gcd-edit-tree-coherence
+	clang-diff-on-gcd-edit-tree-coherence \
+	octomap-diff-count
 
 # TODO: Fix this failing test.
 # ast-diff-on-simple-has-lines

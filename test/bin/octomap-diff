@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Driver for octomap diff tests
+
+DIR=`pwd`
+
+ast-diff $1 \
+  --old-flags "-I $DIR/test/etc/octomap/octomap-1.7.2/include,-I $DIR/test/etc/octomap/octomap-1.7.2/src" \
+  --new-flags "-I $DIR/test/etc/octomap/octomap-1.8.0/include,-I $DIR/test/etc/octomap/octomap-1.8.0/src" \
+  test/etc/octomap/octomap-1.7.2/src/test_iterators.cpp \
+  test/etc/octomap/octomap-1.8.0/src/test_iterators.cpp
+  
