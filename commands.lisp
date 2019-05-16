@@ -82,6 +82,8 @@
               (("print-asts") :type boolean :optional t
                :documentation
                "Also print a representation of the edit tree ASTs")
+              (("strings" #\S) :type boolean :optional t
+               :documentation "Diff descends into AST leaf strings")
               (("coherence") :type string :optional t
                :documentation
                "Bound used to find relevant nodes in the edit tree")))))
@@ -154,10 +156,11 @@ command-line options processed by the returned function."
     (setf language (guess-language old-file new-file)))
   ;; Create the diff.
 
-  (let* ((softwares
-          (list (expand-options-for-which-files language "OLD")
-                (expand-options-for-which-files language "NEW")))
-         (diff (apply #'resolve/ast-diff:ast-diff softwares)))
+  (let* ((old-sw (expand-options-for-which-files language "OLD"))
+         (new-sw (expand-options-for-which-files language "NEW"))
+         (softwares (list old-sw new-sw))
+         (diff (resolve/ast-diff:ast-diff old-sw new-sw :strings strings)))
+
     ;; Print according to the RAW option.
     (cond
       (raw (writeln (ast-diff-elide-same diff) :readably t))

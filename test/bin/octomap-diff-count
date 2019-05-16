@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NUM_DIFFS="$(test/bin/octomap-diff|grep -c "{+")"
-if [ "$NUM_DIFFS" == "10" ];then
+if [ "$NUM_DIFFS" == "11" ];then
     echo PASS
     exit 0
 else
