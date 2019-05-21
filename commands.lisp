@@ -91,9 +91,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter +ast-merge-only-command-line-options+
     `((("conflict") :type boolean :optional t
-       :documentation "Merge generates conflict nodes rather than trying
-to resolve all conflicts."))))
-    
+       :documentation
+       "Generate conflict nodes rather than resolving conflicts"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
