@@ -995,3 +995,24 @@
                            (mapcar #'symbol-name (list my-name your-name)))
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
+
+(deftest merges-of-abacus-variants-w-conflicts ()
+  (with-fixture javascript-abacus-variants
+    (let ((orig (aget :orig *variants*)))
+      (mapcar
+       (lambda (pair)
+         (nest
+          (destructuring-bind ((my-name . my-obj) . (your-name . your-obj))
+              pair)
+          (multiple-value-bind (merged unstable)
+              (converge my-obj orig your-obj :conflict t)
+            #+debug
+            (format t "~12a~12a~12a~%" my-name your-name (length unstable)))
+          (to-file merged)
+          (make-pathname :directory (append +javascript-dir+ '("abacus"))
+                         :type "js" :name)
+          (mapconcat #'identity
+                     (cons "merged"
+                           (mapcar #'symbol-name (list my-name your-name)))
+                     "-")))
+       (pairs (remove-if [{eql :orig} #'car] *variants*))))))
