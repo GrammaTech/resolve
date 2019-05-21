@@ -89,6 +89,13 @@
                "Bound used to find relevant nodes in the edit tree")))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter +ast-merge-only-command-line-options+
+    `((("conflict") :type boolean :optional t
+       :documentation "Merge generates conflict nodes rather than trying
+to resolve all conflicts."))))
+    
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
     "Return a function to multiply command-line arguments across MULTIPLIERS.
 Every element of MULTIPLIERS results in a another multiple of the
@@ -121,6 +128,7 @@ command-line options processed by the returned function."
   (nest
    (defparameter +ast-merge-command-line-options+)
    (append +command-line-options+)
+   (append +ast-merge-only-command-line-options+)
    (mappend (argument-multiplier "my" "old" "your"))
    (append +clang-command-line-options+
            +project-command-line-options+
@@ -214,7 +222,8 @@ command-line options processed by the returned function."
       (converge
        (expand-options-for-which-files language "MY")
        (expand-options-for-which-files language "OLD")
-       (expand-options-for-which-files language "YOUR"))
+       (expand-options-for-which-files language "YOUR")
+       :conflict conflict)
     ;; Write the result, either to out-dir or to STDOUT.
     (if out-dir
         (if (directory-p old-file)

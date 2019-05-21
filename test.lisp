@@ -638,10 +638,20 @@
 	      '(nil nil))
       "Simplest case"))
 
+(deftest sexp-merge3-empty-conflict ()
+  (is (equalp (multiple-value-list (merge3 nil nil nil :conflict t))
+	      '(nil nil))
+      "Simplest case, conflict enabled"))
+
 (deftest sexp-merge3-insert-first ()
   (is (equalp (multiple-value-list (merge3 nil '(a) nil))
 	      '(((:insert . a)) nil))
       "Adding one element in first change"))
+
+(deftest sexp-merge3-insert-first-conflict ()
+  (is (equalp (multiple-value-list (merge3 nil '(a) nil :conflict t))
+              '(((:conflict ((:insert . a)) nil)) nil))
+      "Adding one element in first change, conflict enabled"))
 
 (deftest sexp-merge3-insert-second ()
   (is (equalp (multiple-value-list (merge3 nil nil '(a)))
@@ -826,6 +836,119 @@
 		(((:insert . 3) (:insert . 4)))))
       "Special handling of strings following insertions"))
 
+(deftest sexpr-converge-same.1 ()
+  (is (equalp (converge nil nil nil) nil)
+      "Trivial converge on nil"))
+
+(deftest sexpr-converge-same.2 ()
+  (is (equalp (converge '(a) '(a) '(a)) '(a))
+      "Trivial converge on lists"))
+
+(deftest sexpr-converge-same.3 ()
+  (is (equalp (converge '(a b) '(a) '(a)) '(a b))
+      "Converge on lists with insertion"))
+
+(deftest sexpr-converge-same.4 ()
+  (is (equalp (converge '(a c) '(a c) '(a b c)) '(a b c))
+      "Converge on lists with insertion in second list"))
+
+(deftest sexpr-converge.1-conflict ()
+  (is (equalp (converge nil nil nil :meld? nil :conflict t) nil)
+      "Trivial converge on nil with conflict flag enabled"))
+
+(deftest sexpr-converge.2-conflict ()
+  (is (equalp (converge '(a) '(a) '(a) :meld? nil :conflict t) '(a))
+      "Trivial converge on lists with conflict flag enabled"))
+
+(deftest sexpr-converge.3-conflict ()
+  (is (equalp (converge '(a b) '(a) '(a b) :meld? nil :conflict t) '(a b))
+      "Converge with matching insertions on lists with conflict flag enabled"))
+
+(deftest sexpr-converge.4-conflict ()
+  (let ((merged (converge '(a b) '(a) '(a c) :meld? nil :conflict t)))
+    (is (= (length merged) 2) "4-conflict 1")
+    (is (eql (car merged) 'a) "4-conflict 2")
+    (is (typep (cadr merged) 'sel/sw/ast:conflict-ast)
+        "4-conflict 3")
+    (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
+               '((1 b) (2 c)))
+        "4-conflict 4")))
+
+(deftest sexpr-converge.5-conflict ()
+  (let ((merged (converge '(a b) '(a) '(a) :meld? nil :conflict t)))
+    (is (= (length merged) 2) "5-conflict 1")
+    (is (eql (car merged) 'a) "5-conflict 2")
+    (is (typep (cadr merged)  'conflict-ast)
+        "5-conflict 3")
+    (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
+               '((1 b)))
+        "5-conflict 4")))
+
+(deftest sexpr-converge.5a-conflict ()
+  (let ((merged (converge '(a c) '(a c) '(a b c) :meld? nil :conflict t)))
+    (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql c) null))))
+        "5a-conflict 1")
+    (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
+               '((2 b)))
+        "5a-conflict 2")))
+
+(deftest sexpr-converge.6-conflict ()
+  (let ((merged (converge '(a b c) '(a b) '(a) :meld? nil :conflict t)))
+    (is (typep merged '(cons (eql a)
+                        (cons conflict-ast null)))
+        "6-conflict 1")
+    (is (equalp (conflict-ast-child-alist (cadr merged))
+                '((0 b) (1 b c)))
+        "6-conflict 2")))
+
+(deftest sexpr-converge.6a-conflict ()
+  (let ((merged (converge '(a) '(a b) '(a b c) :meld? nil :conflict t)))
+    (is (typep merged '(cons (eql a)
+                        (cons conflict-ast null)))
+        "6a-conflict 1")
+    (is (equalp (conflict-ast-child-alist (cadr merged))
+                '((0 b) (2 b c)))
+        "6a-conflict 2")))
+
+(deftest sexpr-converge.7-conflict ()
+  (let ((merged (converge '(a (c) b) '(a (d) b) '(a (e) b) :meld? nil :conflict t)))
+    (is (typep merged '(cons (eql a)
+                        (cons (cons conflict-ast null)
+                         (cons (eql b) null))))
+        "7-conflict 1")
+    (is (equal (conflict-ast-child-alist (caadr merged))
+               '((1 c) (2 e) (0 d)))
+        "7-conflict 2")))
+
+(deftest sexpr-converge.8-conflict ()
+  (let ((merged (converge '(a ("a") b) '(a (d) b) '(a ("b") b) :meld? nil :conflict t :strings nil)))
+    (is (typep merged '(cons (eql a)
+                        (cons (cons conflict-ast null)
+                         (cons (eql b) null))))
+        "8-conflict 1")
+    (is (equal (conflict-ast-child-alist (caadr merged))
+               '((1 "a") (2 "b") (0 d)))
+        "8-conflict 2")))
+
+(deftest sexpr-converge.9-conflict ()
+  (let ((merged (converge '(a b) '(a (d) b) '(a (e) b) :meld? nil :conflict t)))
+    (is (typep merged '(cons (eql a)
+                        (cons conflict-ast
+                         (cons (eql b) null))))
+        "9-conflict 1")
+    (is (equal (conflict-ast-child-alist (cadr merged))
+               '((0 (D)) (2 (E))))
+        "9-conflict 2")))
+
+(deftest sexpr-converge.10-conflict ()
+  (let ((merged (converge '(a (d) b) '(a (d) b) '(a (e) b) :meld? nil :conflict t)))
+    (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
+                                      (cons (eql b) null))))
+        "10-conflict 1")
+    (is (equalp (conflict-ast-child-alist (caadr merged))
+                '((2 e) (0 d) (1 d)))
+        "10-conflict 2")))
+
 (deftest json-merge3 ()
   (with-fixture json-conflict-yargs
     (multiple-value-bind (merged unstable)
@@ -837,7 +960,7 @@
 (deftest gcd-conflict-merge3 ()
   (with-fixture gcd-conflict-clang
     (multiple-value-bind (merged unstable)
-        (converge *my* *old* *your*)
+        (converge *my* *old* *your* :conflict t)
       (declare (ignorable merged unstable))
       ;; TODO: This *should* be the case but it isn't.
       #+regression (is unstable))))
@@ -845,7 +968,7 @@
 (deftest gcd-conflict-merge3-js ()
   (with-fixture gcd-conflict-javascript
     (multiple-value-bind (merged unstable)
-        (converge *my* *old* *your*)
+        (converge *my* *old* *your* :conflict t)
       (declare (ignorable merged unstable))
       ;; TODO: Possibly another place where our merge is too eager.
       #+regression (is unstable))))

@@ -1185,7 +1185,7 @@ is shorter, replicate the last value (or NIL if none)."
        (apply-values-meld #'append ,@args)
        (apply-values-extend #'append ,@args)))
 
-(defgeneric ast-patch (original diff &rest keys &key &allow-other-keys)
+(defgeneric ast-patch (original diff &rest keys &key conflict &allow-other-keys)
   (:documentation "Create an edited AST by applying DIFF to ORIGINAL.
 
 A diff is a sequence of actions as returned by `ast-diff' including:
@@ -1254,19 +1254,99 @@ A diff is a sequence of actions as returned by `ast-diff' including:
                              (collect (ast-patch original s)))))
          (t (error "Invalid diff on atom: ~a" script)))))))
 
+#|
+(defun create-conflict-node (ast args keys)
+  ;; (:conflict . args) being applied to AST
+  ;; Create a conflict node with option keys 1, 2, etc.
+  (let ((alist
+         (iter (for script in args)
+               (for i from 1)
+               (when script
+                 (collecting
+                   (list i
+                         (apply #'ast-patch ast script keys)))))))
+    (make-instance 'conflict-ast :children-alist alist)))
+|#
+
+(defun ast-patch-conflict-action (asts args)
+  "Perform a patch of the action (:conflict . args) on ASTS.
+Returns the conflict node and the list of remaining asts to
+process with the rest of the script."
+  ;; Special case: one conflict action is :SAME, the other is :RECURSE
+  ;; In that case, we need to propagate the changes down the tree
+  (cond
+    ((and (eql (caaar args) :same)
+          (eql (caaadr args) :recurse))
+     (values (ast-patch-same-recurse (car asts) (cdaadr args) 2)
+             (cdr asts)))
+    ((and (eql (caaar args) :recurse)
+          (eql (caaadr args) :same))
+     (values (ast-patch-same-recurse (car asts) (cdaar args) 1)
+             (cdr asts)))
+    (t
+     (let ((consume nil)) ;; If set to true, consume an element of ASTS
+       (flet ((%process (action)
+                "Process an inner action.  Returns a list of asts"
+                (ecase (car action)
+                  ((nil) nil)
+                  (:insert (list (cdr action)))
+                  (:delete
+                   (setf consume t)
+                   nil)
+                  (:same (setf consume t)
+                         (list (car asts)))
+                  (:recurse (setf consume t)
+                            ;; Don't process recursive conflicts
+                            ;; In particular, this means :delete actions in the
+                            ;; conflict branch do not cause recording
+                            ;; of the original version in conflict nodes.
+                            ;; This is arguably wrong, but for now we do it this way.
+                            (list (ast-patch (car asts) (cdr action) :conflict nil))))))
+         (let ((child-alist
+                (iter (for script in args)
+                      (for i from 1)
+                      (let ((actions (%process (car script))))
+                        (when actions
+                          (collecting (cons i actions)))))))
+           (when consume
+             ;; 0 is the key for the base version
+             (setf child-alist (cons (list 0 (pop asts))
+                                     child-alist)))
+           (values
+            (make-instance 'conflict-ast :child-alist child-alist)
+            asts)))))))
+
+(defun ast-patch-same-recurse (asts script tag)
+  "Perform actions in SCRIPT in ASTS in parallel with implicit :SAME operations"
+  ;; Should only happen when CONFLICT is true
+  (ast-patch asts script :tag tag :conflict t))
+
 (defmethod ast-patch ((original cons) (script list)
-                      &rest keys &key (delete? t) (meld? t) &allow-other-keys)
+                      &rest keys &key (delete? t) (meld? t) conflict tag &allow-other-keys)
   ;; MELD? causes conflicts to be all placed into the list, if possible
+  ;; CONFLICT causes conflict objects to be produced
   ;; Otherwise, multiple values are returned, one for each conflict
   ;; This feature allows conflicts to be migrated up ASTs until they can
   ;; be more safely combined.
   ;; When MELD? is true, place conflicts in contiguous pieces.
+  ;; When TAG is true, the patch is being done in the context
+  ;; of another patch that is implicitly :SAME.  This can generate
+  ;; conflict nodes.
+  ;;
+  ;; This desperately needs to be cleaned up.
   (declare (ignorable delete?))
   (labels
-      ((edit (asts script)
+      ((merge-conflict-ast (conflict-node rest)
+         (if (typep (car rest) 'conflict-ast)
+             (cons (combine-conflict-asts conflict-node (car rest))
+                   (cdr rest))
+             (cons conflict-node rest)))
+       (edit (asts script)
          ;; Returns multiple values, depending on the value of MELD
          ;; When MELD is false, return a single value if there are no
-         ;; conflicts, otherwise return the conflict versions.
+         ;; conflicts, otherwise if conflict is false, return the conflict
+         ;; versions.  If conflict is true, return a single version
+         ;; with conflict nodes.
          ;; When MELD is true, returns three values: the common list
          ;; formed by patching some tail of this list, and the partial
          ;; lists of the conflict versions (this will be three values).
@@ -1274,12 +1354,25 @@ A diff is a sequence of actions as returned by `ast-diff' including:
            (destructuring-bind (action . args) (car script)
              (ecase action
                (:conflict
-                (assert meld?) ;; was handled by around method in false case
-                (edit asts (append (meld-scripts (first args) (second args))
-                                   (cdr script))))
-               (:recurse (cons-values meld?
-                                      (apply #'ast-patch (car asts) args keys)
-                                      (edit (cdr asts) (cdr script))))
+                (cond
+                  (meld? ;; was handled by around method in false case
+                   (edit asts (append (meld-scripts (first args) (second args))
+                                      (cdr script))))
+                  (conflict
+                   ;; (assert (null meld?))
+                   (multiple-value-bind (conflict-node asts-rest)
+                       (ast-patch-conflict-action asts args)
+                     ;; Possible merge conflict nodes here
+                     (let ((rest (edit asts-rest (cdr script))))
+                       (merge-conflict-ast conflict-node rest))))
+                  (t (error "This case should never happen"))))
+               (:recurse
+                (if tag
+                    (cons (ast-patch-same-recurse (car asts) args tag)
+                          (edit (cdr asts) (cdr script)))
+                    (cons-values meld?
+                                 (apply #'ast-patch (car asts) args keys)
+                                 (edit (cdr asts) (cdr script)))))
                (:same (cons-values meld?
                                    (car asts)
                                    (edit (cdr asts) (cdr script))))
@@ -1298,15 +1391,37 @@ A diff is a sequence of actions as returned by `ast-diff' including:
                         ()
                         "AST-PATCH (CONS): :DELETE not same as in script: ~a,~a"
                         (car asts) args)
-                ;; The key DELETE?, if NIL (default T) will
-                ;; cause :DELETE edits to be ignored.  The
-                ;; use case for this is to do a kind of binary
-                ;; merge of two objects, sharing as much structure
-                ;; as possible
-                (if delete?
-                    (edit (cdr asts) (cdr script))
-                    (cons-values meld? (car asts) (edit (cdr asts) (cdr script)))))
-               (:insert (cons-values meld? args (edit asts (cdr script))))
+                (cond
+                  (tag
+                   ;; Conducting an implicit :SAME
+                   (let ((alist (iter (for i from 0 to 2)
+                                      (unless (eql i tag)
+                                        (collecting (list i (car asts)))))))
+                     (merge-conflict-ast
+                      (make-instance 'conflict-ast :child-alist alist)
+                      (edit (cdr asts) (cdr script)))))
+                  (conflict
+                   ;; Record this, since it conflicts with 0
+                   (multiple-value-bind (conflict-node asts-rest)
+                       (ast-patch-conflict-action asts (list (list (car script))))
+                     (let ((rest (edit asts-rest (cdr script))))
+                       (merge-conflict-ast conflict-node rest))))
+                  ;; The key DELETE?, if NIL (default T) will
+                  ;; cause :DELETE edits to be ignored.  The
+                  ;; use case for this is to do a kind of binary
+                  ;; merge of two objects, sharing as much structure
+                  ;; as possible
+                  (delete?
+                   (edit (cdr asts) (cdr script)))
+                  (t
+                   (cons-values meld? (car asts) (edit (cdr asts) (cdr script))))))
+               (:insert
+                (if tag
+                    (let ((alist `((,tag ,args))))
+                      (merge-conflict-ast
+                       (make-instance 'conflict-ast :child-alist alist)
+                       (edit asts (cdr script))))
+                    (cons-values meld? args (edit asts (cdr script)))))
                (:insert-sequence
                 (append-values meld? args (edit asts (cdr script))))
                (:delete-sequence
@@ -1391,21 +1506,23 @@ and replicating the others."
        "Could not meld scripts: different number of fixed location actions"))))
 
 (defmethod ast-patch :around ((original sequence) (script list)
-                              &key delete? meld? &allow-other-keys)
+                              &key delete? meld? conflict &allow-other-keys)
   (declare (ignorable delete?))
-  (if (and (find :conflict script :key #'car) (not meld?))
-      (let ((script1 (iter (for action in script)
-                           (appending
-                            (if (eql (car action) :conflict)
-                                (second action)
-                                (list action)))))
-            (script2 (iter (for action in script)
-                           (appending
-                            (if (eql (car action) :conflict)
-                                (third action)
-                                (list action))))))
-        (values (ast-patch original script1)
-                (ast-patch original script2)))
+  (if (find :conflict script :key #'car)
+      (if (or meld? conflict)
+          (call-next-method)
+          (let ((script1 (iter (for action in script)
+                               (appending
+                                (if (eql (car action) :conflict)
+                                    (second action)
+                                    (list action)))))
+                (script2 (iter (for action in script)
+                               (appending
+                                (if (eql (car action) :conflict)
+                                    (third action)
+                                    (list action))))))
+            (values (ast-patch original script1)
+                    (ast-patch original script2))))
       (call-next-method)))
 
 (defmethod ast-patch ((original vector) (script list)
@@ -1565,20 +1682,21 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
 ;;; Merge algorithms
 
 
-(defgeneric converge (my old your &key &allow-other-keys)
+(defgeneric converge (my old your &key conflict &allow-other-keys)
   (:documentation
    "Merge changes in MY and YOUR when both are descended from OLD.
 Compute a version of OLD that is the result of trying to apply to OLD
 both the changes from OLD -> MY and the changes from OLD -> YOUR.
 Returns this object, and a second argument that describes problems
-that were encountered, or NIL if no problems were found."))
+that were encountered, or NIL if no problems were found.  If CONFLICT
+is true then insert conflict objects into the result AST."))
 
 (defmethod converge ((branch-a t) (original t) (branch-b t)
-                     &key &allow-other-keys)
+                     &key conflict &allow-other-keys)
   "Assumes the arguments are things that can be treated as ASTs or SEXPRs."
   (multiple-value-bind (diff problems)
-      (merge3 original branch-a branch-b)
-    (values (ast-patch original diff :meld? t)
+      (merge3 original branch-a branch-b :conflict conflict)
+    (values (ast-patch original diff :meld? (not conflict) :conflict conflict)
             problems)))
 
 (declaim (special *unstable*))
@@ -1590,20 +1708,38 @@ the deletions in that diff."
   (let ((diff (apply #'ast-diff branch-a branch-b args)))
     (ast-patch branch-a diff :delete? nil)))
 
-(defun merge3 (original branch-a branch-b &rest args &key &allow-other-keys)
+(defvar *conflict* nil "Holds the CONFLICT parameter for MERGE3")
+
+(defun merge3 (original branch-a branch-b &rest args &key conflict &allow-other-keys)
   "Find a version of that is a plausible combination of the changes from
 ORIGINAL -> BRANCH-A and ORIGINAL -> BRANCH-B.  Return the edit sequence
 from ORIGINAL to this merged version.   Also return a second value that
 is true if a clean merge could be found; otherwise, it is a list of
-unstable differences."
+unstable differences.  CONFLICT controls how merge conflicts are handled."
   (let ((*unstable* nil))
     (values
-     (merge-diffs2 (apply #'ast-diff original branch-a args)
-                   (apply #'ast-diff original branch-b args))
+     (let ((*conflict* conflict))
+       (merge-diffs2 (apply #'ast-diff original branch-a args)
+                     (apply #'ast-diff original branch-b args)))
      *unstable*)))
 
 (defun record-unstable (o-a o-b)
   (push (list (car o-a) (car o-b)) *unstable*))
+
+(defun handle-conflict (o-a o-b &key (unstable t) leave-a leave-b use-b)
+  (assert (consp o-a))
+  (assert (consp o-b))
+  (values
+   (if (or (equalp (car o-a) (car o-b))
+           (and (not *conflict*)
+                (not unstable)))
+       (list (car (if (or leave-a use-b) o-b o-a)))
+       (progn
+         (record-unstable o-a o-b)
+         (flet ((%f (x) (when x `(,(car x)))))
+           `((:conflict ,(unless leave-a (%f o-a)) ,(unless leave-b (%f o-b)))))))
+   (if leave-a o-a (cdr o-a))
+   (if leave-b o-b (cdr o-b))))
 
 ;; New implementation of merge-diffs that uses methods for dispatching
 ;; on different combinations of diff symbols
@@ -1614,22 +1750,18 @@ three things: a list to be appended to the final merged diff,
 a tail of diff-a, and a tail of diff-b.")
   ;; sym-a is :same
   (:method ((sym-a (eql :same)) (sym-b (eql :same)) o-a o-b)
-    (unless (equalp (car o-a) (car o-b))
-      ;; should not happen
-      (record-unstable o-a o-b))
-    (values (list (car o-a)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b))
   (:method ((sym-a (eql :same)) (sym-b null) o-a o-b)
-    (record-unstable o-a o-b)
-    (values (list (car o-a)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b))
   (:method ((sym-a (eql :same)) (sym-b (eql :insert)) o-a o-b)
-    (values (list (car o-b)) o-a (cdr o-b)))
+    (handle-conflict o-a o-b :unstable nil :leave-a t))
+  ;; (values (list (car o-b)) o-a (cdr o-b))
   (:method ((sym-a (eql :same)) (sym-b (eql :delete)) o-a o-b)
-    (unless (equalp (cdar o-a) (cdar o-b))
-      ;; should not happen
-      (record-unstable o-a o-b))
-    (values (list (car o-b)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b :unstable nil :use-b t))
   (:method ((sym-a (eql :same)) (sym-b (eql :recurse)) o-a o-b)
-    (values (list (car o-b)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b :use-b t :unstable nil))
+
+  ;;; Leaving these as-is for now, no conflict handler
   (:method ((sym-a (eql :same)) (sym-b (eql :same-tail)) o-a o-b)
     ;; The tail should never be a cons
     ;; cdr o-b should be nil
@@ -1641,57 +1773,30 @@ a tail of diff-a, and a tail of diff-b.")
 
   ;; sym-a is :insert
   (:method ((sym-a (eql :insert)) (sym-b (eql :insert)) o-a o-b)
-    (cond ((equalp (car o-a) (car o-b))
-           (values (list (car o-a)) (cdr o-a) (cdr o-b)))
-          (t
-           (record-unstable o-a o-b)
-           ;; At this point, we want to keep groups of inserts together
-           ;; Scan down the lists, copying inserts and sames of strings
-           #|
-           (flet ((%p (x) (and (consp x) (or (eql (car x) :insert)
-                                             (and (eql (car x) :same)
-                                                  (stringp (cdr x)))))))
-             (let ((prefix-a (iter (while (consp o-a))
-                                   (while (%p (car o-a)))
-                                   (collecting
-                                     (if (eql (caar o-a) :same)
-                                         (cons :insert (cdr (pop o-a)))
-                                         (pop o-a)))))
-                   (prefix-b (iter (while (consp o-b))
-                                   (while (%p (car o-b)))
-                                   (collecting (pop o-b)))))
-               (values (append prefix-a prefix-b) o-a o-b)))
-           |#
-           ;; :CONFLICT simplifies this
-           (values `((:conflict (,(car o-a)) (,(car o-b)))) (cdr o-a) (cdr o-b))
-           )))
+    (declare (ignorable sym-a sym-b))
+    (handle-conflict o-a o-b))
   ;; default cases for :insert
   (:method ((sym-a (eql :insert)) (sym-b t) o-a o-b)
     (declare (ignorable sym-a sym-b))
-    (values (list (car o-a)) (cdr o-a) o-b))
+    (handle-conflict o-a o-b :unstable nil :leave-b t))
   (:method (sym-a (sym-b (eql :insert)) o-a o-b)
     (declare (ignorable sym-a sym-b))
-    (values (list (car o-b)) o-a (cdr o-b)))
+    (handle-conflict o-a o-b :unstable nil :leave-a t))
   ;; sym-a is :delete
   (:method ((sym-a (eql :delete)) (sym-b (eql :delete)) o-a o-b)
-    (unless (equalp (cdar o-a) (cdar o-b))
-      ;; should not happen
-      (record-unstable o-a o-b))
-    (values (list (car o-a)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b))
   (:method ((sym-a (eql :delete)) (sym-b (eql :recurse)) o-a o-b)
-    (record-unstable o-a o-b)
-    (values `((:conflict (,(car o-a)) (,(car o-b)))) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b))
   (:method ((sym-a (eql :delete)) (sym-b (eql :insert)) o-a o-b)
     (record-unstable o-a o-b)
     ;; Do insert first, keep the delete around
-    (values (list (car o-b)) o-a (cdr o-b)))
+    (handle-conflict o-a o-b :unstable nil :leave-a t))
   (:method ((sym-a (eql :delete)) (sym-b null) o-a o-b)
-    (record-unstable o-a o-b)
-    (values (list (car o-a)) (cdr o-a) o-b))
+    (handle-conflict o-a o-b :leave-b t))
   (:method ((sym-a (eql :delete)) (sym-b (eql :same)) o-a o-b)
-    (unless (eql (cdar o-a) (cdar o-b))
-      (record-unstable o-a o-b))
-    (values (list (car o-a)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b :unstable nil))
+
+  ;;; Do not handle these for now
   (:method ((sym-a (eql :delete)) (sym-b (eql :same-tail)) o-a o-b)
     ;; should not happen?
     (record-unstable o-a o-b)
@@ -1703,17 +1808,16 @@ a tail of diff-a, and a tail of diff-b.")
 
   ;; sym-a is :recurse
   (:method ((sym-a (eql :recurse)) (sym-b (eql :delete)) o-a o-b)
-    (record-unstable o-a o-b)
-    (values `((:conflict (,(car o-a)) (,(car o-b)))) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b :unstable t))
   (:method ((sym-a (eql :recurse)) (sym-b null) o-a o-b)
-    (record-unstable o-a o-b)
-    (values (list (car o-a)) (cdr o-a) o-b))
+    (handle-conflict o-a o-b :unstable t :leave-b t))
   (:method ((sym-a (eql :recurse)) (sym-b (eql :recurse)) o-a o-b)
     (values (list (cons :recurse (merge-diffs2 (cdar o-a) (cdar o-b))))
             (cdr o-a) (cdr o-b)))
   (:method ((sym-a (eql :recurse)) (sym-b (eql :same)) o-a o-b)
-    (values (list (car o-a)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b :unstable nil))
 
+  ;; Do not handle these for now
   (:method ((sym-a (eql :recurse)) (sym-b (eql :same-tail)) o-a o-b)
     ;; should not happen
     (record-unstable o-a o-b)
@@ -1725,10 +1829,11 @@ a tail of diff-a, and a tail of diff-b.")
 
   (:method ((sym-a null) (sym-b null) o-a o-b)
     (error "Bad diff merge: ~A, ~A" o-a o-b))
+  
   (:method ((sym-a null) sym-b o-a o-b)
-    (declare (ignorable sym-b))
-    (values (list (car o-b)) (cdr o-a) (cdr o-b)))
+    (handle-conflict o-a o-b :leave-a t))
 
+  ;; do not handle these for now
   (:method ((sym-a (eql :same-tail)) (sym-b (eql :same)) o-a o-b)
     ;; should not happen
     (record-unstable o-a o-b)
@@ -1838,7 +1943,15 @@ a tail of diff-a, and a tail of diff-b.")
              (setf last (last last)))
        (if (or o-a o-b)
            ;; collected must be a proper list
-           (append (cdr result) o-a o-b)
+           (append
+            (cdr result)
+            (if *conflict*
+                (if o-a
+                    (iter (for action in o-a)
+                          (collect `(:conflict (,action) nil)))
+                    (iter (for action in o-b)
+                          (collect `(:conflict nil (,action)))))
+               (append o-a o-b)))
            (cdr result))))
     (t
      (assert (eql (car orig-a) (car orig-b)))
