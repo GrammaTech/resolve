@@ -164,20 +164,21 @@
   ;; (apply #'+ (mapcar #'ast-cost (ast-children ast)))
   (reduce #'+ (ast-children ast) :initial-value 0 :key #'ast-cost))
 
-(defgeneric ast-can-recurse (ast-a ast-b)
-  (:documentation "Check if recursion is possible on AST-A and AST-B."))
+(defgeneric ast-can-recurse (ast-a ast-b &optional strings)
+  (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
+can be recursed on if STRINGS is true (defaults to true)"))
 
-
-(defmethod ast-can-recurse ((ast-a cons) (ast-b cons))
-  (declare (ignorable ast-a ast-b))
+(defmethod ast-can-recurse ((ast-a cons) (ast-b cons) &optional strings)
+  (declare (ignorable ast-a ast-b strings))
   t)
-(defmethod ast-can-recurse ((ast-a string) (ast-b string))
+(defmethod ast-can-recurse ((ast-a string) (ast-b string) &optional (strings t))
   (declare (ignorable ast-a ast-b))
-  t)
-(defmethod ast-can-recurse (ast-a ast-b)
-  (declare (ignorable ast-a ast-b))
+  strings)
+(defmethod ast-can-recurse (ast-a ast-b &optional strings)
+  (declare (ignorable ast-a ast-b strings))
   nil)
-(defmethod ast-can-recurse ((ast-a ast) (ast-b ast))
+(defmethod ast-can-recurse ((ast-a ast) (ast-b ast) &optional strings)
+  (declare (ignore strings))
   (eq (ast-class ast-a) (ast-class ast-b)))
 
 (defgeneric ast-on-recurse (ast)
@@ -391,9 +392,9 @@ The following generic functions may be specialized to configure
 differencing of specialized AST structures.; `ast-equal-p',
 `ast-cost', `ast-can-recurse', and `ast-on-recurse'."))
 
-(defmethod ast-diff ((ast-a ast) (ast-b ast) &rest args &key &allow-other-keys)
+(defmethod ast-diff ((ast-a ast) (ast-b ast) &rest args &key (strings t) &allow-other-keys)
   #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%" (ast-can-recurse ast-a ast-b))
-  (if (ast-can-recurse ast-a ast-b)
+  (if (ast-can-recurse ast-a ast-b strings)
       (apply #'ast-diff (ast-children ast-a) (ast-children ast-b) args)
       (call-next-method)))
 
@@ -451,6 +452,7 @@ Prefix and postfix returned as additional values."
 
 (defun recursive-diff (total-a total-b &rest args
                        &key (upper-bound most-positive-fixnum)
+                         (strings t)
                        &allow-other-keys
                        &aux
                          (from (make-cache total-a total-b))
@@ -583,7 +585,7 @@ Prefix and postfix returned as additional values."
                #+ast-diff-debug (format t "  diagonal~%")
                (add (cons (cdr a) (cdr b))
                     (cons :same (car a))))
-              ((ast-can-recurse (car a) (car b)) ; Recurse.
+              ((ast-can-recurse (car a) (car b) strings) ; Recurse.
                #+ast-diff-debug (format t "  recurse~%")
                (add (cons (cdr a) (cdr b))
                     (cons  :recurse

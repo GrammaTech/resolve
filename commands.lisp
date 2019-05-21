@@ -223,6 +223,7 @@ command-line options processed by the returned function."
        (expand-options-for-which-files language "MY")
        (expand-options-for-which-files language "OLD")
        (expand-options-for-which-files language "YOUR")
+       :strings strings
        :conflict conflict)
     ;; Write the result, either to out-dir or to STDOUT.
     (if out-dir
