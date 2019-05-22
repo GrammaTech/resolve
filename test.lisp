@@ -1009,10 +1009,8 @@
               (converge my-obj orig your-obj)
             #-debug (declare (ignorable unstable))
             #+debug
-            (format t "~12a~12a~12a~%" my-name your-name (length unstable))
+            (format t "~&~12a~12a~12a~%" my-name your-name (length unstable))
             (to-file merged path))
-          (when (member (list my-name your-name) expected-functional-pairs
-                        :test #'equalp))
           (multiple-value-bind (stdout stderr errno)
               (shell "~a ~a ~a"
                      (namestring test) (namestring path)
@@ -1021,8 +1019,10 @@
                                         (list my-name your-name))
                                 ","))
             (declare (ignorable stdout stderr)))
-          #+debug (format t "~12a~12a~12a~%" my-name your-name
+          #+debug (format t "~&~12a~12a~12a~%" my-name your-name
                           (if (zerop errno) "PASS" "FAIL"))
+          (when (member (list my-name your-name) expected-functional-pairs
+                        :test #'equalp))
           (is (zerop errno)
               "Combination of ~a and ~a should be functional"
               (list my-name your-name))))
