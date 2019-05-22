@@ -10,6 +10,8 @@
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/command-line
+        :software-evolution-library/software/ast
+        :software-evolution-library/software/parseable
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
@@ -33,10 +35,11 @@
     (nest
      ;; Modify the parent of all conflict nodes to replace with OPTION.
      (mapc (lambda (conflict)
-             (setf (ast-children (get-ast-parent conflict))
-                   (aget option (conflict-ast-children conflict)))))
+             (setf (ast-children (get-parent-ast conflicted conflict))
+                   (aget option (conflict-ast-child-alist conflict)))))
      ;; Modify conflict nodes in reverse to work up the tree.
-     (reverse (remove-if-not [{subtypep _ 'conflict-ast} #'type-of] (asts cnf))))))
+     (reverse (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                             (asts conflicted))))))
 
 (defgeneric resolve-to-base (conflicted)
   (:documentation "Resolve every conflict in CONFLICTED to :BASE.")
@@ -56,6 +59,7 @@ NOTE: this is exponential in the size of UNSTABLE.")
      (prog1 pop)
      (mapc
       (lambda (chunk)
+        (declare (ignorable chunk))     ; Temporary.
         (setf pop
               (mappend (lambda (el)
                          ;; TODO: New variants for each possible resolution:
@@ -67,7 +71,7 @@ NOTE: this is exponential in the size of UNSTABLE.")
                          el)
                        pop)))
       ;; Conflicted chunks.
-      (remove-if-not [{subtypep _ 'conflict-ast} #'type-of] (asts cnf))))))
+      (remove-if-not [{subtypep _ 'conflict-ast} #'type-of] (asts conflicted))))))
 
 (defgeneric resolve (my old your test &key &allow-other-keys)
   (:documentation
