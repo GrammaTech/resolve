@@ -1,4 +1,12 @@
 #!/bin/bash
+#
+# Test this script works against all original with:
+#
+#     for script in abacus-*.js;do
+#       echo "#### $(echo $script|sed 's/^[^-]*-//;s/.js//')"
+#       ./test.sh ./$script $(echo $script|sed 's/^[^-]*-//;s/.js//')
+#     done
+#
 if [ $1 == "-h" ] || [ $1 == "--help" ];then
   cat <<EOF
 Usage: $0 EXE [FLAVOR]... [TEST_CASE]
@@ -42,13 +50,11 @@ match(){ if $($EXE $1|grep -q -E "$2");then pass;else fail;fi }
 last_frame(){ tr '\033[H' 'CLR'|tr '\n' 'z'|sed 's/^.*zCLR//'|tr 'z' '\n'; }
 count(){
   local count=$3
-  # COUNT ×10 if FLAVORS includes min-lines.
-  if $(echo $FLAVORS|grep -q min-lines);then ((count = count * 10));fi
+  if $(echo $FLAVORS|grep -q min-lines);then count=$4;fi
   if [ $($EXE $1|grep -c -E "$2") -eq $count ];then pass;else fail;fi }
 count_last_frame(){
   local count=$3
-  # COUNT rounds up to 10 if FLAVORS includes min-lines.
-  if $(echo $FLAVORS|grep -q min-lines);then (( count = (count+10)/10, count *= 10));fi
+  if $(echo $FLAVORS|grep -q min-lines);then count=$4;fi
   if [ $($EXE $1|last_frame|grep -c -E "$2") -eq $count ];then pass;else fail;fi }
 test_case(){
   local case=$1;
@@ -60,7 +66,7 @@ test_case(){
         1) match 0 "[ .]{7}[X∘]{9}";;
         2) match 1 "[ .]{7}[X∘]{9}";
            match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) count 15 "[X∘]" 22;;   # (+ 10 #|0..9|# (* 6 2)) ;=> 21
+        3) count 15 "[X∘]" 22 220;;   # (+ 10 #|0..9|# (* 6 2)) ;=> 21
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
       esac;;
     bead)
@@ -68,33 +74,35 @@ test_case(){
         0) match "" "^Usage: .* NUMBER$";;
         1) match 0 "[ .]{7}∘{9}";;
         2) match 1 "∘[ .]{7}∘{8}";;
-        3) count_last_frame 10 "∘" 2;;
+        3) count_last_frame 10 "∘" 2 10;;
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
       esac;;
     borders)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) count_last_frame 3 "^----------------$" 2;
-           count_last_frame 20 "^----------------$" 3;;
+        1) count_last_frame 3 "^----------------$" 2 11;
+           count_last_frame 20 "^----------------$" 3 11;
+           # Last line should be a border
+           if $($EXE 4|tail -1|grep -q "^----------------$");then pass;else fail;fi;;
         2) match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) count_last_frame 10 "[X∘]" 2;;
+        3) count_last_frame 10 "[X∘]" 2 10;;
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
       esac;;
     min-lines)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) count_last_frame     3 "[ .X∘]{16}" 1;
-           count_last_frame 33333 "[ .X∘]{16}" 1;; # Always 10 lines.
+        1) count_last_frame     3 "[ .X∘]{16}" NaN 10;
+           count_last_frame 33333 "[ .X∘]{16}" NaN 10;; # Always 10 lines.
         2) match 1 "[X∘][ .]{7}[X∘]{8}";;
         3) match 0 "[ .]{7}[X∘]{9}";;
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
       esac;;
-    orig|calc-lines)
+    orig|calc-line)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
         1) match 0 "[ .]{7}[X∘]{9}";;
         2) match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) count_last_frame 10 "[X∘]" 2;;
+        3) count_last_frame 10 "[X∘]" 2 10;;
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
       esac;;
     space)
@@ -102,7 +110,7 @@ test_case(){
         0) match "" "^Usage: .* NUMBER$";;
         1) match 0 " {7}[X∘]{9}";;
         2) match 1 "[X∘] {7}[X∘]{8}";;
-        3) count_last_frame 10 "[X∘]" 2;;
+        3) count_last_frame 10 "[X∘]" 2 10;;
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
       esac;;
     *) echo "Unmatched FLAVOR:$FLAVOR" >&2; exit 1;;
