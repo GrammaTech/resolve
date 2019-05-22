@@ -1004,6 +1004,7 @@
          (nest
           (destructuring-bind ((my-name . my-obj) . (your-name . your-obj))
               pair)
+          #+debug (ignore-errors)
           (multiple-value-bind (merged unstable)
               (converge my-obj orig your-obj :conflict t)
             #+debug
@@ -1012,7 +1013,7 @@
           (make-pathname :directory (append +javascript-dir+ '("abacus"))
                          :type "js" :name)
           (mapconcat #'identity
-                     (cons "merged"
+                     (cons "conflict"
                            (mapcar #'symbol-name (list my-name your-name)))
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
