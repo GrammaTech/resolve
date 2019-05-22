@@ -946,8 +946,9 @@
     (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
                                       (cons (eql b) null))))
         "10-conflict 1")
-    (is (equalp (conflict-ast-child-alist (caadr merged))
-                '((:your e) (:old d) (:my d)))
+    (is (equalp (sort (copy-list (conflict-ast-child-alist (caadr merged)))
+                      #'string< :key #'car)
+                '((:my d) (:old d) (:your e)))
         "10-conflict 2")))
 
 (deftest sexpr-converge.11-conflict ()
@@ -955,7 +956,8 @@
     (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
                                       (cons (eql b) null))))
         "11-conflict 1")
-    (is (equalp (conflict-ast-child-alist (caadr merged))
+    (is (equalp (sort (copy-list (conflict-ast-child-alist (caadr merged)))
+                      #'string< :key #'car)
                 '((:my e) (:old d) (:your d)))
         "11-conflict 2")))
 
@@ -1036,7 +1038,7 @@
                         :test #'equalp))
           (is (zerop errno)
               "Combination of ~a and ~a should be functional"
-              (list my-name your-name))))
+              my-name your-name)))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
 (deftest merges-of-abacus-variants-w-conflicts ()
