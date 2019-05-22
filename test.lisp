@@ -871,7 +871,7 @@
     (is (typep (cadr merged) 'sel/sw/ast:conflict-ast)
         "4-conflict 3")
     (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
-               '((1 b) (2 c)))
+               '((:my b) (:your c)))
         "4-conflict 4")))
 
 (deftest sexpr-converge.5-conflict ()
@@ -881,7 +881,7 @@
     (is (typep (cadr merged)  'conflict-ast)
         "5-conflict 3")
     (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
-               '((1 b)))
+               '((:my b)))
         "5-conflict 4")))
 
 (deftest sexpr-converge.5a-conflict ()
@@ -889,7 +889,7 @@
     (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql c) null))))
         "5a-conflict 1")
     (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
-               '((2 b)))
+               '((:your b)))
         "5a-conflict 2")))
 
 (deftest sexpr-converge.6-conflict ()
@@ -898,7 +898,7 @@
                         (cons conflict-ast null)))
         "6-conflict 1")
     (is (equalp (conflict-ast-child-alist (cadr merged))
-                '((0 b) (1 b c)))
+                '((:old b) (:my b c)))
         "6-conflict 2")))
 
 (deftest sexpr-converge.6a-conflict ()
@@ -907,7 +907,7 @@
                         (cons conflict-ast null)))
         "6a-conflict 1")
     (is (equalp (conflict-ast-child-alist (cadr merged))
-                '((0 b) (2 b c)))
+                '((:old b) (:your b c)))
         "6a-conflict 2")))
 
 (deftest sexpr-converge.7-conflict ()
@@ -917,7 +917,7 @@
                          (cons (eql b) null))))
         "7-conflict 1")
     (is (equal (conflict-ast-child-alist (caadr merged))
-               '((1 c) (2 e) (0 d)))
+               '((:my c) (:your e) (:old d)))
         "7-conflict 2")))
 
 (deftest sexpr-converge.8-conflict ()
@@ -927,7 +927,7 @@
                          (cons (eql b) null))))
         "8-conflict 1")
     (is (equal (conflict-ast-child-alist (caadr merged))
-               '((1 "a") (2 "b") (0 d)))
+               '((:my "a") (:your "b") (:old d)))
         "8-conflict 2")))
 
 (deftest sexpr-converge.9-conflict ()
@@ -937,7 +937,7 @@
                          (cons (eql b) null))))
         "9-conflict 1")
     (is (equal (conflict-ast-child-alist (cadr merged))
-               '((0 (D)) (2 (E))))
+               '((:old (d)) (:your (e))))
         "9-conflict 2")))
 
 (deftest sexpr-converge.10-conflict ()
@@ -946,8 +946,17 @@
                                       (cons (eql b) null))))
         "10-conflict 1")
     (is (equalp (conflict-ast-child-alist (caadr merged))
-                '((2 e) (0 d) (1 d)))
+                '((:your e) (:old d) (:my d)))
         "10-conflict 2")))
+
+(deftest sexpr-converge.11-conflict ()
+  (let ((merged (converge '(a (e) b) '(a (d) b) '(a (d) b) :meld? nil :conflict t)))
+    (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
+                                      (cons (eql b) null))))
+        "11-conflict 1")
+    (is (equalp (conflict-ast-child-alist (caadr merged))
+                '((:my e) (:old d) (:your d)))
+        "11-conflict 2")))
 
 (deftest json-merge3 ()
   (with-fixture json-conflict-yargs

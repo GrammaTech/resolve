@@ -1279,11 +1279,11 @@ process with the rest of the script."
   (cond
     ((and (eql (caaar args) :same)
           (eql (caaadr args) :recurse))
-     (values (ast-patch-same-recurse (car asts) (cdaadr args) 2)
+     (values (ast-patch-same-recurse (car asts) (cdaadr args) :your)
              (cdr asts)))
     ((and (eql (caaar args) :recurse)
           (eql (caaadr args) :same))
-     (values (ast-patch-same-recurse (car asts) (cdaar args) 1)
+     (values (ast-patch-same-recurse (car asts) (cdaar args) :my)
              (cdr asts)))
     (t
      (let ((consume nil)) ;; If set to true, consume an element of ASTS
@@ -1306,13 +1306,13 @@ process with the rest of the script."
                             (list (ast-patch (car asts) (cdr action) :conflict nil))))))
          (let ((child-alist
                 (iter (for script in args)
-                      (for i from 1)
+                      (for i in '(:my :your))
                       (let ((actions (%process (car script))))
                         (when actions
                           (collecting (cons i actions)))))))
            (when consume
-             ;; 0 is the key for the base version
-             (setf child-alist (cons (list 0 (pop asts))
+             ;; :old is the key for the base version
+             (setf child-alist (cons (list :old (pop asts))
                                      child-alist)))
            (values
             (make-instance 'conflict-ast :child-alist child-alist)
@@ -1397,14 +1397,14 @@ process with the rest of the script."
                 (cond
                   (tag
                    ;; Conducting an implicit :SAME
-                   (let ((alist (iter (for i from 0 to 2)
+                   (let ((alist (iter (for i in '(:old :my :your))
                                       (unless (eql i tag)
                                         (collecting (list i (car asts)))))))
                      (merge-conflict-ast
                       (make-instance 'conflict-ast :child-alist alist)
                       (edit (cdr asts) (cdr script)))))
                   (conflict
-                   ;; Record this, since it conflicts with 0
+                   ;; Record this, since it conflicts with :old
                    (multiple-value-bind (conflict-node asts-rest)
                        (ast-patch-conflict-action asts (list (list (car script))))
                      (let ((rest (edit asts-rest (cdr script))))
