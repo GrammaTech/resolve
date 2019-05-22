@@ -1339,7 +1339,8 @@ process with the rest of the script."
   (declare (ignorable delete?))
   (labels
       ((merge-conflict-ast (conflict-node rest)
-         (if (typep (car rest) 'conflict-ast)
+         (if (and (typep (car rest) 'conflict-ast)
+                  (typep conflict-node 'conflict-ast))
              (cons (combine-conflict-asts conflict-node (car rest))
                    (cdr rest))
              (cons conflict-node rest)))
@@ -1544,7 +1545,6 @@ and replicating the others."
        (destructuring-bind (action . args) (pop script)
          (ecase action
            (:conflict
-            (assert meld?)
             (setf script (append (meld-scripts (first args) (second args))
                                  script)))
            (:same
