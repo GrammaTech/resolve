@@ -1,0 +1,5 @@
+#!/bin/bash
+#
+# Error on missing method merging package files with --conflict
+#
+ast-merge --conflict test/etc/javascript/package-json/{ea14630,d5da5eb,6655688}.json
