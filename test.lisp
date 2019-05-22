@@ -1051,3 +1051,11 @@
                            (mapcar #'symbol-name (list my-name your-name)))
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
+
+(deftest products-of-conflicts ()
+  (with-fixture javascript-abacus-variants
+    ;; borders and min-lines
+    (let ((cnf (converge (aget :borders *variants*)
+                         (aget :orig *variants*)
+                         (aget :min-lines *variants*) :conflict t)))
+      (is (asts cnf)))))
