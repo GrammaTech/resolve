@@ -1267,7 +1267,7 @@ A diff is a sequence of actions as returned by `ast-diff' including:
                  (collecting
                    (list i
                          (apply #'ast-patch ast script keys)))))))
-    (make-instance 'conflict-ast :children-alist alist)))
+    (make-conflict-ast :children-alist alist)))
 |#
 
 (defun ast-patch-conflict-action (asts args)
@@ -1315,7 +1315,7 @@ process with the rest of the script."
              (setf child-alist (cons (list :old (pop asts))
                                      child-alist)))
            (values
-            (make-instance 'conflict-ast :child-alist child-alist)
+            (make-conflict-ast :child-alist child-alist)
             asts)))))))
 
 (defun ast-patch-same-recurse (asts script tag)
@@ -1402,7 +1402,7 @@ process with the rest of the script."
                                           (collecting (list i))
                                           (collecting (list i (car asts)))))))
                      (merge-conflict-ast
-                      (make-instance 'conflict-ast :child-alist alist)
+                      (make-conflict-ast :child-alist alist)
                       (edit (cdr asts) (cdr script)))))
                   (conflict
                    ;; Record this, since it conflicts with :old
@@ -1425,7 +1425,7 @@ process with the rest of the script."
                                        (collecting
                                         (if (eql i tag) `(,i ,args) (list i))))))
                       (merge-conflict-ast
-                       (make-instance 'conflict-ast :child-alist alist)
+                       (make-conflict-ast :child-alist alist)
                        (edit asts (cdr script))))
                     (cons-values meld? args (edit asts (cdr script)))))
                (:insert-sequence

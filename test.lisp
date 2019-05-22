@@ -20,6 +20,7 @@
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
+        :resolve/auto-merge
         :resolve/software/project
         :resolve/software/parseable
         :resolve/software/lisp)
