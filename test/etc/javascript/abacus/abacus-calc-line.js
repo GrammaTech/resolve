@@ -6,7 +6,7 @@ function line(number){
   for(var i=0; i < num; i++){
     process.stdout.write("X");
   }
-  for(var i=0; i < 5; i++){
+  for(var i=0; i < 7; i++){
     process.stdout.write(".")
   }
   for(var i=0; i < (9 - num); i++){
