@@ -988,7 +988,8 @@
              (:SPACE :ANIMATE)
              (:SPACE :MIN-LINES)
              (:BEAD :ANIMATE)
-             (:BEAD :MIN-LINES))))
+             (:BEAD :MIN-LINES)
+             (:ANIMATE :MIN-LINES))))
       (mapcar
        (lambda (pair)
          (nest
