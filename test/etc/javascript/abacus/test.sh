@@ -66,7 +66,7 @@ test_case(){
         1) match 0 "[ .]{7}[X∘]{9}";;
         2) match 1 "[ .]{7}[X∘]{9}";
            match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) count 15 "[X∘]" 22 220;;   # (+ 10 #|0..9|# (* 6 2)) ;=> 21
+        3) count 15 "[X∘]" 22 160;;   # (+ 10 #|0..9|# (* 6 2)) ;=> 21
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
       esac;;
     bead)
@@ -91,8 +91,8 @@ test_case(){
     min-lines)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) count_last_frame     3 "[ .X∘]{16}" NaN 10;
-           count_last_frame 33333 "[ .X∘]{16}" NaN 10;; # Always 10 lines.
+        1) count_last_frame   3 "[ .X∘]{16}" NaN 10;
+           count_last_frame 333 "[ .X∘]{16}" NaN 10;; # Always 10 lines.
         2) match 1 "[X∘][ .]{7}[X∘]{8}";;
         3) match 0 "[ .]{7}[X∘]{9}";;
         *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
