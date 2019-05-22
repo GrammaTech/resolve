@@ -980,9 +980,15 @@
     (let ((orig (aget :orig *variants*))
           ;; Expected to work on a simple merge.
           (expected-functional-pairs
-           '((:BORDERS :SPACE)
+           '((:CALC-LINE :MIN-LINES)
+             (:BORDERS :SPACE)
              (:BORDERS :BEAD)
-             (:SPACE :BEAD))))
+             (:BORDERS :ANIMATE)
+             (:SPACE :BEAD)
+             (:SPACE :ANIMATE)
+             (:SPACE :MIN-LINES)
+             (:BEAD :ANIMATE)
+             (:BEAD :MIN-LINES))))
       (mapcar
        (lambda (pair)
          (nest
@@ -1001,11 +1007,12 @@
                                         "-")))))
           (multiple-value-bind (merged unstable)
               (converge my-obj orig your-obj)
+            #-debug (declare (ignorable unstable))
             #+debug
             (format t "~12a~12a~12a~%" my-name your-name (length unstable))
             (to-file merged path))
-          ;; (when (member (list my-name your-name) expected-functional-pairs
-          ;;               :test #'equalp))
+          (when (member (list my-name your-name) expected-functional-pairs
+                        :test #'equalp))
           (multiple-value-bind (stdout stderr errno)
               (shell "~a ~a ~a"
                      (namestring test) (namestring path)
@@ -1014,8 +1021,11 @@
                                         (list my-name your-name))
                                 ","))
             (declare (ignorable stdout stderr)))
-          (when (zerop errno)
-            (format t "PASS: ~S~%" (list my-name your-name)))))
+          #+debug (format t "~12a~12a~12a~%" my-name your-name
+                          (if (zerop errno) "PASS" "FAIL"))
+          (is (zerop errno)
+              "Combination of ~a and ~a should be functional"
+              (list my-name your-name))))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
 (deftest merges-of-abacus-variants-w-conflicts ()
@@ -1029,6 +1039,7 @@
           #+debug (ignore-errors)
           (multiple-value-bind (merged unstable)
               (converge my-obj orig your-obj :conflict t)
+            #-debug (declare (ignorable unstable))
             #+debug
             (format t "~12a~12a~12a~%" my-name your-name (length unstable)))
           (to-file merged)
