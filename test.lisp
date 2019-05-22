@@ -975,25 +975,47 @@
 
 
 ;;; Automatic merge tests
-(deftest merges-of-abacus-variants ()
+(deftest merges-and-test-of-abacus-variants ()
   (with-fixture javascript-abacus-variants
-    (let ((orig (aget :orig *variants*)))
+    (let ((orig (aget :orig *variants*))
+          ;; Expected to work on a simple merge.
+          (expected-functional-pairs
+           '((:BORDERS :SPACE)
+             (:BORDERS :BEAD)
+             (:SPACE :BEAD))))
       (mapcar
        (lambda (pair)
          (nest
+          (let ((test (make-pathname
+                       :name "test" :type "sh"
+                       :directory (append +javascript-dir+ '("abacus"))))))
           (destructuring-bind ((my-name . my-obj) . (your-name . your-obj))
               pair)
+          (let ((path (make-pathname
+                       :directory (append +javascript-dir+ '("abacus"))
+                       :type "js"
+                       :name (mapconcat #'identity
+                                        (cons "merged"
+                                              (mapcar #'symbol-name
+                                                      (list my-name your-name)))
+                                        "-")))))
           (multiple-value-bind (merged unstable)
               (converge my-obj orig your-obj)
             #+debug
-            (format t "~12a~12a~12a~%" my-name your-name (length unstable)))
-          (to-file merged)
-          (make-pathname :directory (append +javascript-dir+ '("abacus"))
-                         :type "js" :name)
-          (mapconcat #'identity
-                     (cons "merged"
-                           (mapcar #'symbol-name (list my-name your-name)))
-                     "-")))
+            (format t "~12a~12a~12a~%" my-name your-name (length unstable))
+            (to-file merged path))
+          ;; (when (member (list my-name your-name) expected-functional-pairs
+          ;;               :test #'equalp))
+          (multiple-value-bind (stdout stderr errno)
+              (shell "~a ~a ~a"
+                     (namestring test) (namestring path)
+                     (mapconcat #'identity
+                                (mapcar [#'string-downcase #'symbol-name]
+                                        (list my-name your-name))
+                                ","))
+            (declare (ignorable stdout stderr)))
+          (when (zerop errno)
+            (format t "PASS: ~S~%" (list my-name your-name)))))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
 (deftest merges-of-abacus-variants-w-conflicts ()
