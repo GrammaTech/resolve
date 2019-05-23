@@ -17,6 +17,7 @@
         :software-evolution-library/software/javascript
         :software-evolution-library/software/json
         :software-evolution-library/software/simple
+        :software-evolution-library/components/formatting
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
@@ -1041,6 +1042,15 @@
               my-name your-name)))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
+(defvar cnf nil)
+(defvar new nil)
+
+(defixture javascript-converge-conflict
+  (:setup (setf cnf (converge (aget :borders *variants*)
+                              (aget :orig *variants*)
+                              (aget :min-lines *variants*) :conflict t)))
+  (:teardown (setf cnf nil)))
+
 (deftest merges-of-abacus-variants-w-conflicts ()
   (with-fixture javascript-abacus-variants
     (let ((orig (aget :orig *variants*)))
@@ -1064,10 +1074,36 @@
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
-(deftest products-of-conflicts ()
+(deftest resolve-to-selects-alternatives-of-conflicts ()
   (with-fixture javascript-abacus-variants
     ;; borders and min-lines
     (let ((cnf (converge (aget :borders *variants*)
                          (aget :orig *variants*)
                          (aget :min-lines *variants*) :conflict t)))
-      (is (asts cnf)))))
+      (is (asts cnf))
+      (is (not (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                                    (ast-to-list (ast-root cnf))))))
+      (let ((old (resolve-to (copy cnf) :old))
+            (my (resolve-to (copy cnf) :my))
+            (your (resolve-to (copy cnf) :your)))
+        (is (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                                 (ast-to-list (ast-root old)))))
+        (is (not (string= (genome my) (genome old))))
+        (is (not (string= (genome your) (genome old))))
+        (is (not (string= (genome my) (genome your))))
+        (is (string= (genome (astyle old))
+                     (genome (astyle (aget :orig *variants*)))))
+        ;; TODO: These next two should probably be passing.  In both
+        ;;       (my and your) cases the trailing "}" closing the
+        ;;       "board" function (in which the conflict was resolved)
+        ;;       is being dropped.  This must be due to us somehow
+        ;;       losing string siblings of resolved conflict nodes.
+        ;;
+        ;; NOTE: One could call `astyle' before calling `genome' to
+        ;;       ensure more uniformity, but it doesn't matter yet.
+        #+broken
+        (is (string= (genome my)
+                     (genome (aget :borders *variants*))))
+        #+broken
+        (is (string= (genome your)
+                     (genome (aget :min-lines *variants*))))))))

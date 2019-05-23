@@ -6,6 +6,7 @@
         :curry-compose-reader-macros
         :resolve/ast-diff
         :software-evolution-library
+        :software-evolution-library/software/ast
         :software-evolution-library/software/parseable))
 (in-package :resolve/software/parseable)
 (in-readtable :curry-compose-reader-macros)

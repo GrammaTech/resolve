@@ -23,7 +23,9 @@
    :appendf :ensure-list :featurep :emptyp
    :if-let :ensure-function :ensure-gethash :copy-file
    :parse-body :simple-style-warning)
-  (:export :resolve :run-resolve))
+  (:export :resolve
+           :populate
+           :resolve-to))
 (in-package :resolve/auto-merge)
 (in-readtable :curry-compose-reader-macros)
 
@@ -34,32 +36,29 @@
   (:method ((conflicted software) option)
     (nest
      ;; Modify the parent of all conflict nodes to replace with OPTION.
-     (mapc (lambda (conflict)
-             (setf (ast-children (get-parent-ast conflicted conflict))
-                   (aget option (conflict-ast-child-alist conflict)))))
+     (mapc (lambda (ast)
+             (setf conflicted
+                   (replace-ast conflicted ast
+                                (aget option (conflict-ast-child-alist ast))
+                                ;; Needs literal to avoid recontextualization breaking.
+                                :literal t))))
      ;; Modify conflict nodes in reverse to work up the tree.
      (reverse (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
-                             (asts conflicted))))))
-
-(defgeneric resolve-to-base (conflicted)
-  (:documentation "Resolve every conflict in CONFLICTED to :BASE.")
-  (:method ((conflicted software))
-    ;; (resolve-to conflicted :base)
-    (resolve-to conflicted 1))) ; FIXME: This is a temporary stand in.
+                             (asts conflicted))))
+    conflicted))
 
 
 ;;; Actual population and evolution of resolution.
 (defgeneric populate (conflicted)
   (:documentation "Build a population from MERGED and UNSTABLE chunks.
-NOTE: this is exponential in the size of UNSTABLE.")
+NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:method ((conflicted software))
     (nest
      ;; Initially population is just a list of the base object.
-     (let ((pop (resolve-to-base ))))
+     (let ((pop (resolve-to conflicted :old))))
      (prog1 pop)
      (mapc
       (lambda (chunk)
-        (declare (ignorable chunk))     ; Temporary.
         (setf pop
               (mappend (lambda (el)
                          ;; TODO: New variants for each possible resolution:
