@@ -33,4 +33,7 @@
     (multiple-value-bind (merged-root problems)
 	(apply #'converge root2 root1 root3 args)
       (declare (ignorable problems))
-      (make-instance (class-of obj1) :genome nil :ast-root merged-root))))
+      (let ((converged (make-instance (class-of obj1)
+                         :genome nil :ast-root merged-root)))
+        (update-paths converged)
+        converged))))
