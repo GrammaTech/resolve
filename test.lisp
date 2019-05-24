@@ -90,6 +90,8 @@
 (defvar *my*            nil "Software used in diff/merge tests.")
 (defvar *your*          nil "Software used in diff/merge tests.")
 (defvar *variants*      nil "List of software variants.")
+(defvar *cnf* nil)
+(defvar *new* nil)
 
 
 ;;; Fixtures
@@ -162,20 +164,29 @@
   (:teardown
    (setf *old* nil *my* nil *your* nil)))
 
+(defun populate-js-abacus-variants ()
+  (mapcar
+   (lambda (name)
+     (cons (make-keyword (string-upcase name))
+           (from-file
+            (make-instance 'javascript)
+            (make-pathname :directory (append +javascript-dir+ '("abacus"))
+                           :type "js"
+                           :name (concatenate 'string "abacus-" name)))))
+   '("orig" "calc-line" "borders" "space" "bead" "animate" "min-lines")))
+
 (defixture javascript-abacus-variants
   (:setup
-   (setf *variants*
-         (mapcar
-          (lambda (name)
-            (cons (make-keyword (string-upcase name))
-                  (from-file
-                   (make-instance 'javascript)
-                   (make-pathname :directory (append +javascript-dir+ '("abacus"))
-                                  :type "js"
-                                  :name (concatenate 'string "abacus-" name)))))
-          '("orig" "calc-line" "borders" "space" "bead" "animate" "min-lines"))))
+   (setf *variants* (populate-js-abacus-variants)))
   (:teardown
    (setf *variants* nil)))
+
+(defixture javascript-converge-conflict
+  (:setup (setf *variants* (populate-js-abacus-variants)
+                *cnf* (converge (aget :borders *variants*)
+                                (aget :orig *variants*)
+                                (aget :min-lines *variants*) :conflict t)))
+  (:teardown (setf *variants* nil *cnf* nil)))
 
 (defroot test)
 
@@ -1042,15 +1053,6 @@
               my-name your-name)))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
-(defvar cnf nil)
-(defvar new nil)
-
-(defixture javascript-converge-conflict
-  (:setup (setf cnf (converge (aget :borders *variants*)
-                              (aget :orig *variants*)
-                              (aget :min-lines *variants*) :conflict t)))
-  (:teardown (setf cnf nil)))
-
 (deftest merges-of-abacus-variants-w-conflicts ()
   (with-fixture javascript-abacus-variants
     (let ((orig (aget :orig *variants*)))
@@ -1073,6 +1075,17 @@
                            (mapcar #'symbol-name (list my-name your-name)))
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
+
+(deftest every-node-only-appears-once-in-conflict-children-alist ()
+  (with-fixture javascript-converge-conflict
+    (let ((conflict-alist (conflict-ast-child-alist
+                           (find-if [{subtypep _ 'conflict-ast} #'type-of]
+                                    (ast-to-list *cnf*)))))
+      (flet ((count-tag (tag) (count-if [{eql tag} #'car] conflict-alist)))
+        ;; TODO: Currently :OLD and :MY appear twice.
+        #+broken
+        (is (mapcar [{= 1} #'count-tag] '(:old :my :your))
+            "Every tag appears in the child alist exactly once.")))))
 
 (deftest resolve-to-selects-alternatives-of-conflicts ()
   (with-fixture javascript-abacus-variants
