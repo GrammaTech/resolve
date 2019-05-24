@@ -99,28 +99,30 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:method ((conflicted software))
     (nest
      ;; Initially population is just a list of the base object.
-     (let ((pop (list (resolve-to conflicted :old)))))
+     (let ((pop (list (resolve-to conflicted :old)))
+           (chunks (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                                  (asts conflicted))))
+       ;; Warn if we're about to do something really expensive.
+       (when (> (expt 6 (length chunks)) *max-population-size*)
+         (warn "About to generate ~d possible resolutions from ~d chunks"
+               (expt 6 (length chunks)) (length chunks))))
      (prog1 pop)
-     (mapc
-      (lambda (chunk)
-        (setf pop
-              (mappend (lambda (el)
-                         ;; TODO: New variants for each possible resolution:
-                         ;; 1. mine
-                         ;; 2. your
-                         ;; 3. mine+your
-                         ;; 4. your+mine
-                         ;; 5. neither
-                         el)
-                       pop))))
+     (mapc (lambda (chunk)
+             (setf pop
+                   (mappend
+                    (lambda (variant)
+                      (mappend
+                       (lambda (strategy)
+                         (resolve-conflict (copy variant) chunk strategy))
+                       `(:V1 :V2 :C1 :C2 :CB :NC :NN)))
+                    pop))))
      ;; Conflicted chunks.
-     (remove-if-not [{subtypep _ 'conflict-ast} #'type-of] (asts conflicted)))))
+     chunks)))
 
 (defgeneric resolve (my old your test &key &allow-other-keys)
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.")
   (:method (test (my software) (old software) (your software)
             &key &allow-other-keys)
-    (let ((*population* (multiple-value-call #'populate
-                          (apply #'converge (list my old your)))))
+    (let ((*population* (populate (converge my old your :conflict t))))
       (evolve test))))
