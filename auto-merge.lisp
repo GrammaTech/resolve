@@ -38,28 +38,23 @@
      #+debug (let ((counter 0))
                (to-file cp (format nil "/tmp/resolve-original.c")))
      ;; Modify the parent of all conflict nodes to replace with OPTION.
-     (mapc (lambda (ast)
-             #+debug (format t "Replacing conflict at ~S~%" (ast-path ast))
-             (setf conflicted
-                   (replace-ast conflicted ast
-                                (aget option (conflict-ast-child-alist ast))
-                                ;; Needs :literal t to avoid undefined
-                                ;; recontextualization invoked on JS
-                                ;; object.  Could also just define
-                                ;; recontextaulization for JS.
-                                :literal t))
-             #+debug
-             (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
-             #+debug
-             (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
-             #+debug (incf counter)))
+     (mapc
+      (lambda (ast)
+        #+debug (format t "Replacing conflict at ~S~%" (ast-path ast))
+        (setf conflicted
+              (replace-ast conflicted ast
+                           (aget option (conflict-ast-child-alist ast))
+                           ;; Needs :literal t to avoid undefined
+                           ;; recontextualization invoked on JS
+                           ;; object.  Could also just define
+                           ;; recontextaulization for JS.
+                           :literal t))
+        #+debug (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
+        #+debug (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
+        #+debug (incf counter)))
      ;; Modify conflict nodes in reverse to work up the tree.
      (reverse (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
                              (asts conflicted))))
-    ;; Maybe the problem in `resolve-to-selects-alternatives-of-conflicts'
-    ;; relates to the conflict nodes at:
-    ;; 5 3 1
-    ;; 5 3 4
     conflicted))
 
 
@@ -70,7 +65,7 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:method ((conflicted software))
     (nest
      ;; Initially population is just a list of the base object.
-     (let ((pop (resolve-to conflicted :old))))
+     (let ((pop (list (resolve-to conflicted :old)))))
      (prog1 pop)
      (mapc
       (lambda (chunk)
@@ -83,9 +78,9 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
                          ;; 4. your+mine
                          ;; 5. neither
                          el)
-                       pop)))
-      ;; Conflicted chunks.
-      (remove-if-not [{subtypep _ 'conflict-ast} #'type-of] (asts conflicted))))))
+                       pop))))
+     ;; Conflicted chunks.
+     (remove-if-not [{subtypep _ 'conflict-ast} #'type-of] (asts conflicted)))))
 
 (defgeneric resolve (my old your test &key &allow-other-keys)
   (:documentation
