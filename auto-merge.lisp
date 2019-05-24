@@ -57,6 +57,40 @@
                              (asts conflicted))))
     conflicted))
 
+(defgeneric resolve-conflict (conflicted conflict strategy
+                              &key fodder &allow-other-keys)
+  (:documentation
+   "Resolve CONFLICT in CONFLICTED with STRATEGY.
+Keyword argument FODDER may be used to provide a source of novel code.
+See the empirical study _On the Nature of Merge Conflicts: a Study of
+2,731 Open Source Java Projects Hosted by GitHub_ for the source of
+the strategies.")
+  (:method ((conflicted software) (conflict ast) (strategy symbol)
+            &key (fodder (resolve-to (copy conflicted) :old)) &allow-other-keys)
+    (nest (setf conflicted)
+          (replace-ast conflicted conflict)
+          (let ((options (conflict-ast-child-alist conflict))))
+          (flet ((generate-novel-code ()
+                   (repeatedly (random (+ (length (aget :my options))
+                                          (length (aget :your options))))
+                     (pick-good fodder)))))
+          ;; Six ways of resolving a conflict:
+          (case strategy
+            ;; 1. (V1) version 1
+            (:V1 (aget :my options))
+            ;; 2. (V2) version 2
+            (:V2 (aget :your options))
+            ;; 3. (CC) concatenate versions (either order)
+            (:C1 (append (aget :my options) (aget :your options)))
+            (:C2 (append (aget :your options) (aget :my options)))
+            ;; 4. (CB) interleaving subset of versions
+            (:CB (shuffle (append (aget :my options) (aget :your options))))
+            ;; 5. (NC) mix interleaving subset with novel code
+            (:NC (shuffle (append (generate-novel-code)
+                                  (aget :my options) (aget :your options))))
+            ;; 6. (NN) select the base version
+            (:NN (aget :old options))))))
+
 
 ;;; Actual population and evolution of resolution.
 (defgeneric populate (conflicted)
