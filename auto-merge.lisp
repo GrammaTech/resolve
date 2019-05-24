@@ -67,57 +67,60 @@ See the empirical study _On the Nature of Merge Conflicts: a Study of
 the strategies.")
   (:method ((conflicted software) (conflict ast) (strategy symbol)
             &key (fodder (resolve-to (copy conflicted) :old)) &allow-other-keys)
-    (nest (setf conflicted)
-          (replace-ast conflicted conflict)
-          (let ((options (conflict-ast-child-alist conflict))))
-          (flet ((generate-novel-code ()
-                   (repeatedly (random (+ (length (aget :my options))
-                                          (length (aget :your options))))
-                     (pick-good fodder)))))
-          ;; Six ways of resolving a conflict:
-          (case strategy
-            ;; 1. (V1) version 1
-            (:V1 (aget :my options))
-            ;; 2. (V2) version 2
-            (:V2 (aget :your options))
-            ;; 3. (CC) concatenate versions (either order)
-            (:C1 (append (aget :my options) (aget :your options)))
-            (:C2 (append (aget :your options) (aget :my options)))
-            ;; 4. (CB) interleaving subset of versions
-            (:CB (shuffle (append (aget :my options) (aget :your options))))
-            ;; 5. (NC) mix interleaving subset with novel code
-            (:NC (shuffle (append (generate-novel-code)
-                                  (aget :my options) (aget :your options))))
-            ;; 6. (NN) select the base version
-            (:NN (aget :old options))))))
+    (nest
+     (macrolet ((literal-replace (a b c) `(replace-ast ,a ,b ,c :literal t))))
+     (setf conflicted)
+     (literal-replace conflicted conflict)
+     (let ((options (conflict-ast-child-alist conflict))))
+     (flet ((generate-novel-code ()
+              (repeatedly (random (+ (length (aget :my options))
+                                     (length (aget :your options))))
+                (pick-good fodder)))))
+     ;; Six ways of resolving a conflict:
+     (case strategy
+       ;; 1. (V1) version 1
+       (:V1 (aget :my options))
+       ;; 2. (V2) version 2
+       (:V2 (aget :your options))
+       ;; 3. (CC) concatenate versions (either order)
+       (:C1 (append (aget :my options) (aget :your options)))
+       (:C2 (append (aget :your options) (aget :my options)))
+       ;; 4. (CB) interleaving subset of versions
+       (:CB (shuffle (append (aget :my options) (aget :your options))))
+       ;; 5. (NC) mix interleaving subset with novel code
+       (:NC (shuffle (append (generate-novel-code)
+                             (aget :my options) (aget :your options))))
+       ;; 6. (NN) select the base version
+       (:NN (aget :old options))))))
 
 
 ;;; Actual population and evolution of resolution.
-(defgeneric populate (conflicted)
+(defgeneric populate (conflicted &key strategies &allow-other-keys)
   (:documentation "Build a population from MERGED and UNSTABLE chunks.
 NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
-  (:method ((conflicted software))
+  (:method ((conflicted software)
+            &key (strategies `(:V1 :V2 :C1 :C2 :CB :NC :NN)))
     (nest
      ;; Initially population is just a list of the base object.
-     (let ((pop (list (resolve-to conflicted :old)))
-           (chunks (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
-                                  (asts conflicted))))
+     (let ((pop (list (resolve-to (copy conflicted) :old)))
+           (chunks (remove-if-not #'conflict-ast-p (asts conflicted))))
+       (assert chunks (chunks) "Software ~S must have conflict ASTs" conflicted)
        ;; Warn if we're about to do something really expensive.
-       (when (> (expt 6 (length chunks)) *max-population-size*)
+       (when (> (expt (length strategies) (length chunks))
+                *max-population-size*)
          (warn "About to generate ~d possible resolutions from ~d chunks"
-               (expt 6 (length chunks)) (length chunks))))
+               (expt (length strategies) (length chunks)) (length chunks))))
      (prog1 pop)
      (mapc (lambda (chunk)
              (setf pop
                    (mappend
                     (lambda (variant)
-                      (mappend
+                      (mapcar
                        (lambda (strategy)
                          (resolve-conflict (copy variant) chunk strategy))
-                       `(:V1 :V2 :C1 :C2 :CB :NC :NN)))
-                    pop))))
-     ;; Conflicted chunks.
-     chunks)))
+                       strategies))
+                    pop)))
+           (reverse chunks)))))
 
 (defgeneric resolve (my old your test &key &allow-other-keys)
   (:documentation

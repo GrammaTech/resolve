@@ -1,4 +1,4 @@
-;;;; test.lisp --- Tests for software search and replace.
+;;;; test.lisp --- Tests for software difference display and resolution
 (defpackage :resolve/test
   (:use :common-lisp
         :alexandria
@@ -1181,3 +1181,20 @@
                    (genome (aget :borders *variants*))))
       (is (string= (genome your)
                    (genome (aget :min-lines *variants*)))))))
+
+#+debug
+(deftest can-populate-from-conflicted-merges ()
+  ;; TODO: Running into `replace-ast' errors.  Trace that function and debug.
+  (nest
+   (with-fixture javascript-converge-conflict)
+   (destructuring-bind (my old your)
+       (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
+   (let* ((*max-population-size* (expt 2 10))
+          (conflicted (converge my old your :conflict t))
+          (chunks (remove-if-not #'conflict-ast-p (ast-to-list conflicted)))
+          (*population* (populate conflicted))))
+   (is (= (length *population*) (expt 7 (length chunks)))
+       "Population has the expected size ~d = 7^|chunks| => ~d."
+       (length *population*) (expt 7 (length chunks)))
+   (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
+       "Population has no conflict ASTs remaining.")))
