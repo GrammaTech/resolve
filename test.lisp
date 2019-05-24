@@ -1103,6 +1103,8 @@
                  (genome (astyle (aget :min-lines *variants*)))))))
 
 (deftest resolve-to-should-not-modify-conflict-nodes-in-the-original ()
+  ;; NOTE: This was fixed by replacing `nconc' with `append' in
+  ;; `set-ast-siblings' in SEL/SW/AST.
   (flet ((conflict-nodes (obj)
            (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
                           (ast-to-list obj))))
