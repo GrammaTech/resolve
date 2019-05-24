@@ -33,18 +33,33 @@
 ;;; Utility functions
 (defgeneric resolve-to (conflicted option)
   (:documentation "Resolve every conflict in CONFLICTED to OPTION.")
-  (:method ((conflicted software) option)
+  (:method ((conflicted software) option &aux (cp (copy conflicted)))
     (nest
+     #+debug (let ((counter 0))
+               (to-file cp (format nil "/tmp/resolve-original.c")))
      ;; Modify the parent of all conflict nodes to replace with OPTION.
      (mapc (lambda (ast)
+             #+debug (format t "Replacing conflict at ~S~%" (ast-path ast))
              (setf conflicted
                    (replace-ast conflicted ast
                                 (aget option (conflict-ast-child-alist ast))
-                                ;; Needs literal to avoid recontextualization breaking.
-                                :literal t))))
+                                ;; Needs :literal t to avoid undefined
+                                ;; recontextualization invoked on JS
+                                ;; object.  Could also just define
+                                ;; recontextaulization for JS.
+                                :literal t))
+             #+debug
+             (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
+             #+debug
+             (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
+             #+debug (incf counter)))
      ;; Modify conflict nodes in reverse to work up the tree.
      (reverse (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
                              (asts conflicted))))
+    ;; Maybe the problem in `resolve-to-selects-alternatives-of-conflicts'
+    ;; relates to the conflict nodes at:
+    ;; 5 3 1
+    ;; 5 3 4
     conflicted))
 
 

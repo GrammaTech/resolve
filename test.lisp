@@ -1043,9 +1043,9 @@
                                 (mapcar [#'string-downcase #'symbol-name]
                                         (list my-name your-name))
                                 ","))
-            (declare (ignorable stdout stderr)))
-          #+debug (format t "~&~12a~12a~12a~%" my-name your-name
-                          (if (zerop errno) "PASS" "FAIL"))
+            (declare (ignorable stdout stderr))
+            #+debug (format t "~&~12a~12a~12a~%" my-name your-name
+                            (if (zerop errno) "PASS" "FAIL")))
           (when (member (list my-name your-name) expected-functional-pairs
                         :test #'equalp))
           (is (zerop errno)
@@ -1076,47 +1076,92 @@
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
+#+broken
 (deftest every-node-only-appears-once-in-conflict-children-alist ()
   (with-fixture javascript-converge-conflict
     (let ((conflict-alist (conflict-ast-child-alist
                            (find-if [{subtypep _ 'conflict-ast} #'type-of]
                                     (ast-to-list *cnf*)))))
+      ;; TODO: Currently :OLD and :MY appear twice.
       (flet ((count-tag (tag) (count-if [{eql tag} #'car] conflict-alist)))
-        ;; TODO: Currently :OLD and :MY appear twice.
-        #+broken
         (is (mapcar [{= 1} #'count-tag] '(:old :my :your))
             "Every tag appears in the child alist exactly once.")))))
 
+(deftest resolve-to-single-equals-original/old ()
+  (with-fixture javascript-converge-conflict
+    (is (string= (genome (astyle (resolve-to (copy *cnf*) :old)))
+                 (genome (astyle (aget :orig *variants*)))))))
+
+(deftest resolve-to-single-equals-original/my ()
+  (with-fixture javascript-converge-conflict
+    (is (string= (genome (astyle (resolve-to (copy *cnf*) :my)))
+                 (genome (astyle (aget :borders *variants*)))))))
+
+(deftest resolve-to-single-equals-original/your ()
+  (with-fixture javascript-converge-conflict
+    (is (string= (genome (astyle (resolve-to (copy *cnf*) :your)))
+                 (genome (astyle (aget :min-lines *variants*)))))))
+
+(deftest resolve-to-of-copy-leaves-original-genome-unmollested ()
+  (with-fixture javascript-converge-conflict
+    (let* (;; (orig-asts (mapc-ast (ast-root *cnf*) #'copy))
+           (orig-genome (genome *cnf*))
+           (my (resolve-to (copy *cnf*) :my)))
+      (is (not (string= orig-genome (genome my)))
+          "Resolved should have a different genome from original.~% ~
+           orig:~Snew:~%~S~%" orig-genome (genome my))
+      (is (string= orig-genome (genome *cnf*))
+          "Original should *NOT* have a different genome from original.~% ~
+           orig:~Snew:~%~S~%" orig-genome (genome *cnf*))
+      ;; (is (equal-it orig-asts (mapc-ast (ast-root *cnf*) #'copy))
+      ;;     "Original should *NOT* have different ASTs from original.~% ~
+      ;;      orig:~Snew:~%~S~%" orig-asts (mapc-ast (ast-root *cnf*) #'copy))
+      )))
+
+(deftest resolve-to-of-copy-leaves-original-genome-unmollested-simple ()
+  (with-fixture javascript-converge-conflict
+    (let ((it (lastcar (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                                      (asts *cnf*)))))
+      (is (subtypep (type-of (get-ast *cnf* '(5 3 4))) 'conflict-ast)
+          "Path (5 3 4) is a conflict ast in the original.")
+      (let ((new (replace-ast
+                  (copy *cnf*) it (aget :my (conflict-ast-child-alist it))
+                  :literal t)))
+        (is (subtypep (type-of (get-ast new '(5 3 4))) 'javascript-ast)
+            "Path (5 3 4) is a JavaScript ast in result of replace-ast.")
+        (is (subtypep (type-of (get-ast *cnf* '(5 3 4))) 'conflict-ast)
+            "Path (5 3 4) is STILL a conflict-ast in the original ~
+             after replace-ast.")))))
+
 (deftest resolve-to-selects-alternatives-of-conflicts ()
-  (with-fixture javascript-abacus-variants
-    ;; borders and min-lines
-    (let ((cnf (converge (aget :borders *variants*)
-                         (aget :orig *variants*)
-                         (aget :min-lines *variants*) :conflict t)))
-      (is (asts cnf))
-      (is (not (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
-                                    (ast-to-list (ast-root cnf))))))
-      (let ((old (resolve-to (copy cnf) :old))
-            (my (resolve-to (copy cnf) :my))
-            (your (resolve-to (copy cnf) :your)))
-        (is (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
-                                 (ast-to-list (ast-root old)))))
-        (is (not (string= (genome my) (genome old))))
-        (is (not (string= (genome your) (genome old))))
-        (is (not (string= (genome my) (genome your))))
-        (is (string= (genome (astyle old))
-                     (genome (astyle (aget :orig *variants*)))))
-        ;; TODO: These next two should probably be passing.  In both
-        ;;       (my and your) cases the trailing "}" closing the
-        ;;       "board" function (in which the conflict was resolved)
-        ;;       is being dropped.  This must be due to us somehow
-        ;;       losing string siblings of resolved conflict nodes.
-        ;;
-        ;; NOTE: One could call `astyle' before calling `genome' to
-        ;;       ensure more uniformity, but it doesn't matter yet.
-        #+broken
-        (is (string= (genome my)
-                     (genome (aget :borders *variants*))))
-        #+broken
-        (is (string= (genome your)
-                     (genome (aget :min-lines *variants*))))))))
+  (with-fixture javascript-converge-conflict
+    ;; Conflicted software object has ASTs.
+    (is (asts *cnf*))
+    ;; Conflicted software object has conflcit ASTs.
+    (is (not (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                                  (ast-to-list (ast-root *cnf*))))))
+    (let ((old (resolve-to (copy *cnf*) :old))
+          (my (resolve-to (copy *cnf*) :my))
+          (your (resolve-to (copy *cnf*) :your)))
+      (is (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                               (ast-to-list (ast-root old)))))
+      (is (not (string= (genome my) (genome old))))
+      (is (not (string= (genome your) (genome old))))
+      (is (not (string= (genome my) (genome your))))
+      (is (string= (genome (astyle old))
+                   (genome (astyle (aget :orig *variants*)))))
+      ;; TODO: These next two should probably be passing.  In both
+      ;;       (my and your) cases the trailing "}" closing the
+      ;;       "board" function (in which the conflict was resolved)
+      ;;       is being dropped.  This must be due to us somehow
+      ;;       losing string siblings of resolved conflict nodes.
+      ;;
+      ;; NOTE: One could call `astyle' before calling `genome' to
+      ;;       ensure more uniformity, but it doesn't matter yet.
+      ;;
+      ;; NOTE: It may be that replace-ast is actually modifying the
+      ;;       original program's AST.  This is something to check.
+      (is (string= (genome my)
+                   (genome (aget :borders *variants*))))
+      (is (string= (genome your)
+                   (genome (aget :min-lines *variants*)))))))
