@@ -1102,6 +1102,20 @@
     (is (string= (genome (astyle (resolve-to (copy *cnf*) :your)))
                  (genome (astyle (aget :min-lines *variants*)))))))
 
+(deftest resolve-to-should-not-modify-conflict-nodes-in-the-original ()
+  (flet ((conflict-nodes (obj)
+           (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+                          (ast-to-list obj))))
+    (with-fixture javascript-converge-conflict
+      (is (= (length (aget :my (conflict-ast-child-alist
+                                (car (conflict-nodes *cnf*)))))
+             (progn (replace-ast (copy *cnf*) (first (conflict-nodes *cnf*))
+                                 (aget :my (conflict-ast-child-alist
+                                            (first (conflict-nodes *cnf*))))
+                                 :literal t)
+                    (length (aget :my (conflict-ast-child-alist
+                                       (car (conflict-nodes *cnf*)))))))))))
+
 (deftest resolve-to-of-copy-leaves-original-genome-unmollested ()
   (with-fixture javascript-converge-conflict
     (let* (;; (orig-asts (mapc-ast (ast-root *cnf*) #'copy))

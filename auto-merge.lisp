@@ -33,7 +33,7 @@
 ;;; Utility functions
 (defgeneric resolve-to (conflicted option)
   (:documentation "Resolve every conflict in CONFLICTED to OPTION.")
-  (:method ((conflicted software) option &aux (cp (copy conflicted)))
+  (:method ((conflicted software) option &aux #+debug (cp (copy conflicted)))
     (nest
      #+debug (let ((counter 0))
                (to-file cp (format nil "/tmp/resolve-original.c")))
