@@ -13,11 +13,13 @@
         :software-evolution-library/stefil-plus
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/source
         :software-evolution-library/software/clang
         :software-evolution-library/software/javascript
         :software-evolution-library/software/json
         :software-evolution-library/software/simple
         :software-evolution-library/components/formatting
+        :software-evolution-library/components/test-suite
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
@@ -1173,19 +1175,14 @@
 
 #+manual          ; This test is only useful for manual investigation.
 (deftest targeted-populate-run ()
-  (with-fixture javascript-abacus-variants
-    (setf *population* (populate (converge (aget :borders *variants*)
-                                           (aget :orig *variants*)
-                                           (aget :min-lines *variants*)
-                                           :conflict t)))))
+  )
 
 (deftest can-populate-from-conflicted-merges ()
   (nest
    (with-fixture javascript-converge-conflict)
    (destructuring-bind (my old your)
        (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
-   (let* ((*max-population-size* (expt 2 10))
-          (conflicted (converge my old your :conflict t))
+   (let* ((conflicted (converge my old your :conflict t))
           (chunks (remove-if-not #'conflict-ast-p (ast-to-list conflicted)))
           (*population* (populate conflicted))))
    (is (= (length *population*) (expt 7 (length chunks)))
@@ -1193,3 +1190,36 @@
        (length *population*) (expt 7 (length chunks)))
    (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
        "Population has no conflict ASTs remaining.")))
+
+
+;;; Functions for interactive testing and experimentation.
+(defun do-populate ()
+  (with-fixture javascript-abacus-variants
+    (setf *population* (populate (converge (aget :borders *variants*)
+                                           (aget :orig *variants*)
+                                           (aget :min-lines *variants*)
+                                           :conflict t)))))
+
+(defun do-populate-and-resolve ()
+  (let ((*note-level* 3))
+    (with-fixture javascript-converge-conflict
+      (destructuring-bind (my old your)
+          (mapcar {aget _ *variants*} '(:borders :orig :min-lines))
+        (let ((script (namestring (make-pathname
+                                   :directory (append +javascript-dir+
+                                                      '("abacus"))
+                                   :name "test"
+                                   :type "sh"))))
+          ;; Target is 6 + 5 = 11.
+          (flet ((test (variant)
+                   (with-temp-file (bin)
+                     (phenome variant :bin bin)
+                     (multiple-value-bind (stdout stderr errno)
+                         (shell "~a ~a borders,min-lines" script bin)
+                       (declare (ignorable errno stderr))
+                       (- 11 (count-if {string= "PASS"}
+                                       (split-sequence #\Newline stdout)))))))
+            (note 1 "OLD:~S" (test old))
+            (note 1 "YOUR:~S" (test your))
+            (note 1 "MY:~S" (test my))
+            (resolve #'test my old your)))))))

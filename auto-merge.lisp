@@ -12,6 +12,11 @@
         :software-evolution-library/command-line
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/source
+        :software-evolution-library/software/clang
+        :software-evolution-library/software/javascript
+        :software-evolution-library/software/json
+        :software-evolution-library/software/simple
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
@@ -122,10 +127,15 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
             (reverse chunks)))
     pop))
 
-(defgeneric resolve (my old your test &key &allow-other-keys)
+(defgeneric resolve (my old your test &rest rest &key &allow-other-keys)
   (:documentation
-   "Resolve merge conflicts between software versions MY OLD and YOUR.")
+   "Resolve merge conflicts between software versions MY OLD and YOUR.
+Extra keys are passed through to EVOLVE.")
   (:method (test (my software) (old software) (your software)
-            &key &allow-other-keys)
-    (let ((*population* (populate (converge my old your :conflict t))))
-      (evolve test))))
+            &rest rest &key &allow-other-keys)
+    (note 2 "Populate")
+    (setf *population* (populate (converge my old your :conflict t)))
+    (note 2 "Evaluate ~d population members" (length *population*))
+    (mapc {evaluate test} *population*)
+    (note 2 "Evolve conflict resolution")
+    (eval `(evolve test ,@rest))))
