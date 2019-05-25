@@ -3,16 +3,16 @@ const path = require('path')
 
 function line(number){
   switch(number){
-  case "0": console.log('.......∘∘∘∘∘∘∘∘∘'); break;
-  case "1": console.log('∘.......∘∘∘∘∘∘∘∘'); break;  
-  case "2": console.log('∘∘.......∘∘∘∘∘∘∘'); break;  
-  case "3": console.log('∘∘∘.......∘∘∘∘∘∘'); break;  
-  case "4": console.log('∘∘∘∘.......∘∘∘∘∘'); break;  
-  case "5": console.log('∘∘∘∘∘.......∘∘∘∘'); break;  
-  case "6": console.log('∘∘∘∘∘∘.......∘∘∘'); break;  
-  case "7": console.log('∘∘∘∘∘∘∘.......∘∘'); break;  
-  case "8": console.log('∘∘∘∘∘∘∘∘.......∘'); break;  
-  case "9": console.log('∘∘∘∘∘∘∘∘∘.......'); break;  
+  case "0": console.log('.......OOOOOOOOO'); break;
+  case "1": console.log('O.......OOOOOOOO'); break;
+  case "2": console.log('OO.......OOOOOOO'); break;
+  case "3": console.log('OOO.......OOOOOO'); break;
+  case "4": console.log('OOOO.......OOOOO'); break;
+  case "5": console.log('OOOOO.......OOOO'); break;
+  case "6": console.log('OOOOOO.......OOO'); break;
+  case "7": console.log('OOOOOOO.......OO'); break;
+  case "8": console.log('OOOOOOOO.......O'); break;
+  case "9": console.log('OOOOOOOOO.......'); break;
   }
 }
 

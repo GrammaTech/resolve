@@ -29,6 +29,7 @@ else
   VERBOSE=
 fi
 EXE=$1
+SUCCESS=0
 if [ -z $2 ];then
   FLAVORS=animate,bead,borders,min-lines,orig,calc-lines,space
 else
@@ -43,7 +44,7 @@ ulimit -t 1
 ulimit -c 0
 
 pass(){ echo PASS; }
-fail(){ echo FAIL;exit 1; }
+fail(){ echo FAIL; ((SUCCESS++)); }
 match(){ if $($EXE $1|grep -q -E "$2");then pass;else fail;fi }
 # Wipe all output except the last frame.
 # Useful to normalize output in the face of animation.
@@ -63,19 +64,19 @@ test_case(){
     animate)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) match 0 "[ .]{7}[X∘]{9}";;
-        2) match 1 "[ .]{7}[X∘]{9}";
-           match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) count 15 "[X∘]" 22 160;;   # (+ 10 #|0..9|# (* 6 2)) ;=> 21
-        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
+        1) match 0 "[ .]{7}[XO]{9}";;
+        2) match 1 "[ .]{7}[XO]{9}";
+           match 1 "[XO][ .]{7}[XO]{8}";;
+        3) count 15 "[XO]" 22 160;;   # (+ 10 #|0..9|# (* 6 2)) ;=> 21
+        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 127;
       esac;;
     bead)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) match 0 "[ .]{7}∘{9}";;
-        2) match 1 "∘[ .]{7}∘{8}";;
-        3) count_last_frame 10 "∘" 2 10;;
-        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
+        1) match 0 "[ .]{7}O{9}";;
+        2) match 1 "O[ .]{7}O{8}";;
+        3) count_last_frame 10 "O" 2 10;;
+        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 127;
       esac;;
     borders)
       case $case in
@@ -84,36 +85,36 @@ test_case(){
            count_last_frame 20 "^----------------$" 3 11;
            # Last line should be a border
            if $($EXE 4|tail -1|grep -q "^----------------$");then pass;else fail;fi;;
-        2) match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) count_last_frame 10 "[X∘]" 2 10;;
-        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
+        2) match 1 "[XO][ .]{7}[XO]{8}";;
+        3) count_last_frame 10 "[XO]" 2 10;;
+        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 127;
       esac;;
     min-lines)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) count_last_frame   3 "[ .X∘]{16}" NaN 10;
-           count_last_frame 333 "[ .X∘]{16}" NaN 10;; # Always 10 lines.
-        2) match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) match 0 "[ .]{7}[X∘]{9}";;
-        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
+        1) count_last_frame   3 "[ .XO]{16}" NaN 10;
+           count_last_frame 333 "[ .XO]{16}" NaN 10;; # Always 10 lines.
+        2) match 1 "[XO][ .]{7}[XO]{8}";;
+        3) match 0 "[ .]{7}[XO]{9}";;
+        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 127;
       esac;;
     orig|calc-line)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) match 0 "[ .]{7}[X∘]{9}";;
-        2) match 1 "[X∘][ .]{7}[X∘]{8}";;
-        3) count_last_frame 10 "[X∘]" 2 10;;
-        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
+        1) match 0 "[ .]{7}[XO]{9}";;
+        2) match 1 "[XO][ .]{7}[XO]{8}";;
+        3) count_last_frame 10 "[XO]" 2 10;;
+        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 127;
       esac;;
     space)
       case $case in
         0) match "" "^Usage: .* NUMBER$";;
-        1) match 0 " {7}[X∘]{9}";;
-        2) match 1 "[X∘] {7}[X∘]{8}";;
-        3) count_last_frame 10 "[X∘]" 2 10;;
-        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 2;
+        1) match 0 " {7}[XO]{9}";;
+        2) match 1 "[XO] {7}[XO]{8}";;
+        3) count_last_frame 10 "[XO]" 2 10;;
+        *) echo "Test case $TEST_CASE is not implemented." >&2;exit 127;
       esac;;
-    *) echo "Unmatched FLAVOR:$FLAVOR" >&2; exit 1;;
+    *) echo "Unmatched FLAVOR:$FLAVOR" >&2; exit 126;;
   esac
 }
 
@@ -130,4 +131,4 @@ for FLAVOR in $FLAVORS;do
   fi
 done
 
-exit 0
+exit $SUCCESS
