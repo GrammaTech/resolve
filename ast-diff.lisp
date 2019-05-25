@@ -1398,9 +1398,8 @@ process with the rest of the script."
                   (tag
                    ;; Conducting an implicit :SAME
                    (let ((alist (iter (for i in '(:old :my :your))
-                                      (if (eql i tag)
-                                          (collecting (list i))
-                                          (collecting (list i (car asts)))))))
+                                      (unless (eql i tag)
+                                        (collecting (list i (car asts)))))))
                      (merge-conflict-ast
                       (make-conflict-ast :child-alist alist)
                       (edit (cdr asts) (cdr script)))))
@@ -1421,9 +1420,7 @@ process with the rest of the script."
                    (cons-values meld? (car asts) (edit (cdr asts) (cdr script))))))
                (:insert
                 (if tag
-                    (let ((alist (iter (for i in '(:old :my :your))
-                                       (collecting
-                                        (if (eql i tag) `(,i ,args) (list i))))))
+                    (let ((alist `((,tag ,args))))
                       (merge-conflict-ast
                        (make-conflict-ast :child-alist alist)
                        (edit asts (cdr script))))
