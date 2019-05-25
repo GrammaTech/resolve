@@ -1200,26 +1200,40 @@
                                            (aget :min-lines *variants*)
                                            :conflict t)))))
 
-(defun do-populate-and-resolve ()
-  (let ((*note-level* 3))
-    (with-fixture javascript-converge-conflict
-      (destructuring-bind (my old your)
-          (mapcar {aget _ *variants*} '(:borders :orig :min-lines))
-        (let ((script (namestring (make-pathname
-                                   :directory (append +javascript-dir+
-                                                      '("abacus"))
-                                   :name "test"
-                                   :type "sh"))))
-          ;; Target is 6 + 5 = 11.
-          (flet ((test (variant)
-                   (with-temp-file (bin)
-                     (phenome variant :bin bin)
-                     (multiple-value-bind (stdout stderr errno)
-                         (shell "~a ~a borders,min-lines" script bin)
-                       (declare (ignorable errno stderr))
-                       (- 11 (count-if {string= "PASS"}
-                                       (split-sequence #\Newline stdout)))))))
-            (note 1 "OLD:~S" (test old))
-            (note 1 "YOUR:~S" (test your))
-            (note 1 "MY:~S" (test my))
-            (resolve #'test my old your)))))))
+(defun do-populate-and-resolve (my-name your-name)
+  (assert (and (keywordp my-name) (keywordp your-name)) (my-name your-name)
+          "MY and YOUR must be keywords indicating abacus variants.")
+  (assert (null *population*) (*population*)
+          "Population should be nil to run `do-populate-and-resolve'.")
+  (setf *fitness-evals* 0)
+  (nest
+   (let ((*note-level* 3)))
+   (with-fixture javascript-converge-conflict)
+   (destructuring-bind (my old your)
+       (mapcar {aget _ *variants*} (list my-name :orig your-name)))
+   (let ((script (namestring (make-pathname
+                              :directory (append +javascript-dir+
+                                                 '("abacus"))
+                              :name "test"
+                              :type "sh")))
+         (test-fmt (format nil "~~a ~~a ~a"
+                           (mapconcat #'identity
+                                      (mapcar [#'string-downcase #'symbol-name]
+                                              (list my-name your-name)) ",")))))
+   ;; Target is 6 + 5 = 11.
+   (flet ((test (variant)
+            (with-temp-file (bin)
+              (phenome variant :bin bin)
+              (multiple-value-bind (stdout stderr errno)
+                  (shell test-fmt script bin)
+                (declare (ignorable errno stderr))
+                (- 11 (count-if {string= "PASS"}
+                                (split-sequence #\Newline stdout)))))))
+     (note 1 "OLD:~S" (test old))
+     (note 1 "YOUR:~S" (test your))
+     (note 1 "MY:~S" (test my))
+     (let ((*target-fitness-p* {= 11}))
+       (resolve #'test my old your)))))
+
+#+run
+(do-populate-and-resolve :borders :min-lines)
