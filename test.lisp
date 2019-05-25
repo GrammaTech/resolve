@@ -1076,17 +1076,6 @@
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
-#+broken
-(deftest every-node-only-appears-once-in-conflict-children-alist ()
-  (with-fixture javascript-converge-conflict
-    (let ((conflict-alist (conflict-ast-child-alist
-                           (find-if [{subtypep _ 'conflict-ast} #'type-of]
-                                    (ast-to-list *cnf*)))))
-      ;; TODO: Currently :OLD and :MY appear twice.
-      (flet ((count-tag (tag) (count-if [{eql tag} #'car] conflict-alist)))
-        (is (mapcar [{= 1} #'count-tag] '(:old :my :your))
-            "Every tag appears in the child alist exactly once.")))))
-
 (deftest resolve-to-single-equals-original/old ()
   (with-fixture javascript-converge-conflict
     (is (string= (genome (astyle (resolve-to (copy *cnf*) :old)))
@@ -1182,9 +1171,15 @@
       (is (string= (genome your)
                    (genome (aget :min-lines *variants*)))))))
 
-#+debug
+#+manual          ; This test is only useful for manual investigation.
+(deftest targeted-populate-run ()
+  (with-fixture javascript-abacus-variants
+    (setf *population* (populate (converge (aget :borders *variants*)
+                                           (aget :orig *variants*)
+                                           (aget :min-lines *variants*)
+                                           :conflict t)))))
+
 (deftest can-populate-from-conflicted-merges ()
-  ;; TODO: Running into `replace-ast' errors.  Trace that function and debug.
   (nest
    (with-fixture javascript-converge-conflict)
    (destructuring-bind (my old your)

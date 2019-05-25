@@ -25,7 +25,8 @@
    :parse-body :simple-style-warning)
   (:export :resolve
            :populate
-           :resolve-to))
+           :resolve-to
+           :resolve-conflict))
 (in-package :resolve/auto-merge)
 (in-readtable :curry-compose-reader-macros)
 
@@ -99,28 +100,27 @@ the strategies.")
   (:documentation "Build a population from MERGED and UNSTABLE chunks.
 NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:method ((conflicted software)
-            &key (strategies `(:V1 :V2 :C1 :C2 :CB :NC :NN)))
-    (nest
-     ;; Initially population is just a list of the base object.
-     (let ((pop (list (resolve-to (copy conflicted) :old)))
-           (chunks (remove-if-not #'conflict-ast-p (asts conflicted))))
-       (assert chunks (chunks) "Software ~S must have conflict ASTs" conflicted)
-       ;; Warn if we're about to do something really expensive.
-       (when (> (expt (length strategies) (length chunks))
-                *max-population-size*)
-         (warn "About to generate ~d possible resolutions from ~d chunks"
-               (expt (length strategies) (length chunks)) (length chunks))))
-     (prog1 pop)
-     (mapc (lambda (chunk)
-             (setf pop
-                   (mappend
-                    (lambda (variant)
-                      (mapcar
-                       (lambda (strategy)
-                         (resolve-conflict (copy variant) chunk strategy))
-                       strategies))
-                    pop)))
-           (reverse chunks)))))
+            &key (strategies `(:V1 :V2 :C1 :C2 :CB :NC :NN))
+            &aux (pop (list (copy conflicted))))
+    ;; Initially population is just a list of the base object.
+    (let ((chunks (remove-if-not #'conflict-ast-p (asts conflicted))))
+      (assert chunks (chunks) "Software ~S must have conflict ASTs" conflicted)
+      ;; Warn if we're about to do something really expensive.
+      (when (> (expt (length strategies) (length chunks))
+               (or *max-population-size* (expt 2 10)))
+        (warn "About to generate ~d possible resolutions from ~d chunks"
+              (expt (length strategies) (length chunks)) (length chunks)))
+      (mapc (lambda (chunk)
+              (setf pop
+                    (mappend
+                     (lambda (variant)
+                       (mapcar
+                        (lambda (strategy)
+                          (resolve-conflict (copy variant) chunk strategy))
+                        strategies))
+                     pop)))
+            (reverse chunks)))
+    pop))
 
 (defgeneric resolve (my old your test &key &allow-other-keys)
   (:documentation
