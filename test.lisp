@@ -1193,14 +1193,33 @@
 
 
 ;;; Functions for interactive testing and experimentation.
-(defun do-populate ()
+(defun do-populate (my your)
+  "Build a population of resolutions of conflicts from the merge of MY and YOUR."
   (with-fixture javascript-abacus-variants
-    (setf *population* (populate (converge (aget :borders *variants*)
+    (setf *population* (populate (converge (aget my *variants*)
                                            (aget :orig *variants*)
-                                           (aget :min-lines *variants*)
+                                           (aget your *variants*)
                                            :conflict t)))))
 
-(defun do-populate-and-resolve (my-name your-name)
+(defun test-variant (variant my your)
+  "One-off test of a variant."
+  (let ((script (namestring (make-pathname
+                             :directory (append +javascript-dir+
+                                                '("abacus"))
+                             :name "test"
+                             :type "sh"))))
+    (with-temp-file (bin)
+      (phenome variant :bin bin)
+      (multiple-value-bind (stdout stderr errno)
+          (shell "~a ~a ~a"
+                 script bin (mapconcat #'identity
+                                       (mapcar [#'string-downcase #'symbol-name]
+                                               (list my your))
+                                       ","))
+        (declare (ignorable errno stderr))
+        (count-if {string= "PASS"} (split-sequence #\Newline stdout))))))
+
+(defun do-populate-and-resolve (my-name your-name target)
   (assert (and (keywordp my-name) (keywordp your-name)) (my-name your-name)
           "MY and YOUR must be keywords indicating abacus variants.")
   (assert (null *population*) (*population*)
@@ -1211,29 +1230,15 @@
    (with-fixture javascript-converge-conflict)
    (destructuring-bind (my old your)
        (mapcar {aget _ *variants*} (list my-name :orig your-name)))
-   (let ((script (namestring (make-pathname
-                              :directory (append +javascript-dir+
-                                                 '("abacus"))
-                              :name "test"
-                              :type "sh")))
-         (test-fmt (format nil "~~a ~~a ~a"
-                           (mapconcat #'identity
-                                      (mapcar [#'string-downcase #'symbol-name]
-                                              (list my-name your-name)) ",")))))
    ;; Target is 6 + 5 = 11.
-   (flet ((test (variant)
-            (with-temp-file (bin)
-              (phenome variant :bin bin)
-              (multiple-value-bind (stdout stderr errno)
-                  (shell test-fmt script bin)
-                (declare (ignorable errno stderr))
-                (- 11 (count-if {string= "PASS"}
-                                (split-sequence #\Newline stdout)))))))
+   (flet ((test (variant) (test-variant variant my-name your-name)))
      (note 1 "OLD:~S" (test old))
      (note 1 "YOUR:~S" (test your))
      (note 1 "MY:~S" (test my))
-     (let ((*target-fitness-p* {= 11}))
-       (resolve #'test my old your)))))
+     (let ((*target-fitness-p* {= target}))
+       (resolve #'test my old your :target target)))))
+
+(do-populate-and-resolve :calc-line :animate 9)
 
 #+run
 (do-populate-and-resolve :borders :min-lines)
