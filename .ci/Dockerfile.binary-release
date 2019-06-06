@@ -1,0 +1,23 @@
+ARG REF=docker.grammatech.com/synthesis/resolve/ubuntu-sbcl
+FROM $REF as resolve
+RUN cd /root/quicklisp/local-projects/resolve && make doc
+
+FROM docker.grammatech.com/synthesis/sel/ubuntu
+
+# Ensure we get *all* of the shared libraries.
+COPY --from=resolve /usr /usr
+
+# Install requirement tools and additional desirable tools.
+RUN apt-get -y update && \
+    apt-get -y install python3 expect curl wget nano vim emacs-nox git subversion kdiff3 ack-grep silversearcher-ag screen tmux
+
+COPY --from=resolve /root/quicklisp/local-projects/resolve/bin /root/quicklisp/local-projects/resolve/bin
+COPY --from=resolve /root/quicklisp/local-projects/resolve/doc /root/quicklisp/local-projects/resolve/doc
+COPY --from=resolve /root/quicklisp/local-projects/resolve/test /root/quicklisp/local-projects/resolve/test
+COPY --from=resolve /root/quicklisp/local-projects/resolve/exp /root/quicklisp/local-projects/resolve/exp
+COPY --from=resolve /root/.cache /root/.cache
+
+WORKDIR /root/quicklisp/local-projects/resolve/exp
+
+ENV PATH=/root/quicklisp/local-projects/resolve/bin:/root/quicklisp/local-projects/resolve/exp/bin:$PATH
+CMD /bin/bash
