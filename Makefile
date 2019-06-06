@@ -16,7 +16,7 @@ DOC_PACKAGES =				\
 LISP_DEPS =				\
 	$(wildcard *.lisp)
 
-BINS = ast-diff ast-merge
+BINS = ast-diff ast-merge auto-merge
 
 BIN_TEST_DIR = test/bin
 BIN_TESTS =					\

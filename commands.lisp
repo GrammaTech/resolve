@@ -39,6 +39,7 @@
         :software-evolution-library/command-line
         :resolve/core
         :resolve/ast-diff
+        :resolve/auto-merge
         :resolve/software/parseable
         :resolve/software/project
         :resolve/software/lisp
@@ -127,7 +128,15 @@ command-line options processed by the returned function."
   (nest
    (defparameter +ast-merge-command-line-options+)
    (append +command-line-options+)
-   (append +ast-merge-only-command-line-options+)
+   (mappend (argument-multiplier "my" "old" "your"))
+   (append +clang-command-line-options+
+           +project-command-line-options+
+           +clang-project-command-line-options+))
+
+  (nest
+   (defparameter +auto-merge-command-line-options+)
+   (append +command-line-options+
+           +evolutionary-command-line-options+)
    (mappend (argument-multiplier "my" "old" "your"))
    (append +clang-command-line-options+
            +project-command-line-options+
@@ -238,3 +247,30 @@ command-line options processed by the returned function."
 
     (wait-on-manual manual)
     (exit-command ast-merge (if unstable 1 0) new-merged)))
+
+(define-command auto-merge (my-file old-file your-file test-script
+                                    &spec +auto-merge-command-line-options+)
+  "Merge MY-FILE and YOUR-FILE ensuring TEST-SCRIPT continues to pass."
+  #.(format nil "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
+            +software-evolution-library-version+
+            +resolve-version+
+            (lisp-implementation-type) (lisp-implementation-version))
+  (declare (ignorable manual quiet verbose raw no-color edit-tree
+                      print-asts coherence strings))
+  (when help (show-help-for-ast-merge))
+  (unless (every #'resolve-file (list old-file my-file your-file))
+    (exit-command auto-merge 2 (error "Missing source.")))
+  (setf out-dir (resolve-out-dir-from-source old-file)
+        old-file (truenamize old-file)
+	my-file (truenamize my-file)
+	your-file (truenamize your-file)
+        language (or language (guess-language old-file my-file your-file)))
+  (assert nil "TODO: Implement test-script handling (from variegate).")
+  (to-file (apply #'resolve
+                  (expand-options-for-which-files language "MY")
+                  (expand-options-for-which-files language "OLD")
+                  (expand-options-for-which-files language "YOUR")
+                  test-script
+                  (append (when max-evals (list max-evals))
+                          (when max-time (list max-time))))
+           (make-pathname :directory (append out-dir (list "auto-merged")))))

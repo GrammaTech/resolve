@@ -31,3 +31,12 @@
   :build-operation "asdf:program-op"
   :build-pathname "bin/ast-merge"
   :entry-point "resolve/commands::run-ast-merge")
+
+(defsystem "resolve/run-auto-merge"
+  :author "GrammaTech"
+  :description "Automatically two programs (w/ancestor) against a test script."
+  :version "0.0.0"
+  :depends-on (resolve/commands)
+  :build-operation "asdf:program-op"
+  :build-pathname "bin/auto-merge"
+  :entry-point "resolve/commands::run-auto-merge")
