@@ -1238,7 +1238,5 @@
      (let ((*target-fitness-p* {= target}))
        (resolve #'test my old your :target target)))))
 
-(do-populate-and-resolve :calc-line :animate 9)
-
 #+run
 (do-populate-and-resolve :borders :min-lines)
