@@ -53,7 +53,8 @@
         :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/json
-        :software-evolution-library/software/lisp)
+        :software-evolution-library/software/lisp
+        :software-evolution-library/components/test-suite)
   (:import-from :uiop :writeln :truenamize :nest)
   (:shadow :merge :ast-diff)
   (:export :ast-diff :ast-merge))
@@ -237,7 +238,8 @@ command-line options processed by the returned function."
     (if out-dir
         (if (directory-p old-file)
             (to-file new-merged
-                     (make-pathname :directory (append out-dir (list "merged"))))
+                     (make-pathname
+                      :directory (append out-dir (list "merged"))))
             (to-file new-merged
                      (resolve-store-path-from-out-dir-and-name
                       out-dir
@@ -248,9 +250,18 @@ command-line options processed by the returned function."
     (wait-on-manual manual)
     (exit-command ast-merge (if unstable 1 0) new-merged)))
 
+(defmethod test ((obj software) (tests test-suite))
+  "Direct fitness of OBJ against TESTS.
+If the tests fail then infinity, otherwise diversity."
+  (with-temp-file (bin)
+    (if (ignore-phenome-errors (phenome obj :bin bin))
+        (evaluate bin tests)
+        0)))
+
 (define-command auto-merge (my-file old-file your-file test-script
-                                    &spec +auto-merge-command-line-options+)
-  "Merge MY-FILE and YOUR-FILE ensuring TEST-SCRIPT continues to pass."
+                                    &spec +auto-merge-command-line-options+
+                                    &aux tests)
+  "Merge MY-FILE and YOUR-FILE, from OLD-FILE, with TEST-SCRIPT passing."
   #.(format nil "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
             +software-evolution-library-version+
             +resolve-version+
@@ -264,13 +275,13 @@ command-line options processed by the returned function."
         old-file (truenamize old-file)
 	my-file (truenamize my-file)
 	your-file (truenamize your-file)
-        language (or language (guess-language old-file my-file your-file)))
-  (assert nil "TODO: Implement test-script handling (from variegate).")
+        language (or language (guess-language old-file my-file your-file))
+        tests (create-test test-script))
   (to-file (apply #'resolve
                   (expand-options-for-which-files language "MY")
                   (expand-options-for-which-files language "OLD")
                   (expand-options-for-which-files language "YOUR")
-                  test-script
+                  {test _ tests}
                   (append (when max-evals (list max-evals))
                           (when max-time (list max-time))))
            (make-pathname :directory (append out-dir (list "auto-merged")))))
