@@ -883,7 +883,7 @@
   (let ((merged (converge '(a b) '(a) '(a c) :meld? nil :conflict t)))
     (is (= (length merged) 2) "4-conflict 1")
     (is (eql (car merged) 'a) "4-conflict 2")
-    (is (typep (cadr merged) 'sel/sw/ast:conflict-ast)
+    (is (conflict-ast-p (cadr merged))
         "4-conflict 3")
     (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
                '((:my b) (:your c)))
@@ -893,7 +893,7 @@
   (let ((merged (converge '(a b) '(a) '(a) :meld? nil :conflict t)))
     (is (= (length merged) 2) "5-conflict 1")
     (is (eql (car merged) 'a) "5-conflict 2")
-    (is (typep (cadr merged)  'conflict-ast)
+    (is (conflict-ast-p (cadr merged))
         "5-conflict 3")
     (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
                '((:my b)))
@@ -1097,8 +1097,7 @@
   ;; NOTE: This was fixed by replacing `nconc' with `append' in
   ;; `set-ast-siblings' in SEL/SW/AST.
   (flet ((conflict-nodes (obj)
-           (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
-                          (ast-to-list obj))))
+           (remove-if-not #'conflict-ast-p (ast-to-list obj))))
     (with-fixture javascript-converge-conflict
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
@@ -1127,16 +1126,16 @@
 
 (deftest resolve-to-of-copy-leaves-original-genome-unmollested-simple ()
   (with-fixture javascript-converge-conflict
-    (let ((it (lastcar (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+    (let ((it (lastcar (remove-if-not #'conflict-ast-p
                                       (asts *cnf*)))))
-      (is (subtypep (type-of (get-ast *cnf* '(5 3 4))) 'conflict-ast)
+      (is (conflict-ast-p (get-ast *cnf* '(5 3 4)))
           "Path (5 3 4) is a conflict ast in the original.")
       (let ((new (replace-ast
                   (copy *cnf*) it (aget :my (conflict-ast-child-alist it))
                   :literal t)))
-        (is (subtypep (type-of (get-ast new '(5 3 4))) 'javascript-ast)
+        (is (typep (get-ast new '(5 3 4)) 'javascript-ast)
             "Path (5 3 4) is a JavaScript ast in result of replace-ast.")
-        (is (subtypep (type-of (get-ast *cnf* '(5 3 4))) 'conflict-ast)
+        (is (conflict-ast-p (get-ast *cnf* '(5 3 4)))
             "Path (5 3 4) is STILL a conflict-ast in the original ~
              after replace-ast.")))))
 
@@ -1145,16 +1144,16 @@
     ;; Conflicted software object has ASTs.
     (is (asts *cnf*))
     ;; Conflicted software object has conflcit ASTs.
-    (is (not (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
-                                  (ast-to-list (ast-root *cnf*))))))
+    (is (remove-if-not #'conflict-ast-p
+                       (ast-to-list (ast-root *cnf*))))
     (let ((old (resolve-to (copy *cnf*) :old))
           (my (resolve-to (copy *cnf*) :my))
           (your (resolve-to (copy *cnf*) :your)))
-      (is (null (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+      (is (null (remove-if-not #'conflict-ast-p
                                (ast-to-list (ast-root old)))))
-      (is (not (string= (genome my) (genome old))))
-      (is (not (string= (genome your) (genome old))))
-      (is (not (string= (genome my) (genome your))))
+      (is (string/= (genome my) (genome old)))
+      (is (string/= (genome your) (genome old)))
+      (is (string/= (genome my) (genome your)))
       (is (string= (genome (astyle old))
                    (genome (astyle (aget :orig *variants*)))))
       ;; TODO: These next two should probably be passing.  In both
