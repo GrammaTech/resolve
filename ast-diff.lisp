@@ -142,8 +142,10 @@
 (defgeneric ast-cost (ast)
   (:documentation "Return cost of AST."))
 
-(defmethod ast-cost ((ast t))
-  1)
+(defmethod ast-cost ((ast ast))
+  (reduce #'+ (ast-children ast) :initial-value 0 :key #'ast-cost))
+
+(defmethod ast-cost (ast) 1)
 
 (defmethod ast-cost ((ast string))
   (length ast))
@@ -159,10 +161,6 @@
            (while (consp ast)))
      ;; cost of terminal NIL is 0
      (if ast (ast-cost ast) 0)))
-
-(defmethod ast-cost ((ast ast))
-  ;; (apply #'+ (mapcar #'ast-cost (ast-children ast)))
-  (reduce #'+ (ast-children ast) :initial-value 0 :key #'ast-cost))
 
 (defgeneric ast-can-recurse (ast-a ast-b &optional strings)
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
@@ -183,10 +181,8 @@ can be recursed on if STRINGS is true (defaults to true)"))
 
 (defgeneric ast-on-recurse (ast)
   (:documentation "Possibly AST on recursion."))
-(defmethod ast-on-recurse ((ast t))
-  ast)
-(defmethod ast-on-recurse ((ast ast))
-  (ast-children ast))
+(defmethod ast-on-recurse ((ast ast)) (ast-children ast))
+(defmethod ast-on-recurse ((ast t)) ast)
 
 (defgeneric ast-un-recurse (ast sub-ast)
   (:documentation
@@ -199,9 +195,6 @@ can be recursed on if STRINGS is true (defaults to true)"))
 (defmethod ast-equal-op ((s1 simple) (s2 simple))
   "Useful to treat simple objects as ASTs when calculating differences."
   (ast-equal-p (genome s1) (genome s2)))
-
-(defmethod ast-text ((ast t))
-  (format nil "~A" ast))
 
 (defmethod ast-text ((ast string))
   ast)
@@ -226,9 +219,12 @@ can be recursed on if STRINGS is true (defaults to true)"))
 (defgeneric ast-to-list-form (ast)
   (:documentation "Convert ast into a more readable list form"))
 
-(defmethod ast-to-list-form ((ast ast))
+(defun actual-ast-to-list-form (ast)
   (cons (ast-class ast)
         (mapcar #'ast-to-list-form (ast-children ast))))
+
+(defmethod ast-to-list-form ((ast ast))
+  (actual-ast-to-list-form ast))
 
 (defmethod ast-to-list-form (ast) ast)
 
@@ -358,9 +354,9 @@ rewritten TO by part of the edit script"))
   (:documentation "Number of nodes and leaves in an AST or
 ast-like thing"))
 
+(defmethod ast-size ((node ast))
+  (reduce #'+ (ast-children node) :key #'ast-size :initial-value 1))
 (defmethod ast-size (node) 1)
-(defmethod ast-size ((ast ast))
-  (reduce #'+ (ast-children ast) :key #'ast-size :initial-value 1))
 
 (defmethod slot-unbound (class (node edit-tree-node) (slot (eql 'size)))
   (let ((value (reduce #'+ (edit-tree-node-children node)
@@ -700,15 +696,20 @@ value that is used instead."
       (setf (gethash hash table) ast))
     hash))
 
-(defmethod ast-diff (ast-a ast-b &key &allow-other-keys)
+(defmethod ast-diff (ast-a ast-b &rest args &key (strings t) &allow-other-keys)
   #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
   #+debug (format t "ast-diff[T] subtypep of parseable: ~S~%"
                   (mapcar [{subtypep _ 'sel/sw/parseable:parseable}
                            #'class-of] (list ast-a ast-b)))
-  (if (equal ast-a ast-b)
-      (values `((:same . ,ast-a)) 0)
-      (values `((:delete . ,ast-a) (:insert . ,ast-b))
-              (+ (ast-cost ast-a) (ast-cost ast-b)))))
+  (cond
+    ((and (ast-p ast-a)
+          (ast-p ast-b)
+          (ast-can-recurse ast-a ast-b strings))
+     (apply #'ast-diff (ast-children ast-a) (ast-children ast-b) args))
+    ((equal ast-a ast-b)
+     (values `((:same . ,ast-a)) 0))
+    (t (values `((:delete . ,ast-a) (:insert . ,ast-b))
+               (+ (ast-cost ast-a) (ast-cost ast-b))))))
 
 (defmethod ast-diff ((ast-a list) (ast-b list) &rest args &key &allow-other-keys
                      &aux tail-a tail-b)
@@ -859,33 +860,36 @@ root of the edit script (and implicitly also the program AST)."
 edit script SCRIPT, a target objec that is the result of the script on the
 source, build the edit tree corresponding to the script."))
 
-(defmethod create-edit-tree ((source ast) (target ast) (script cons)
+(defmethod create-edit-tree (source target (script cons)
                              &key &allow-other-keys)
   ;; The script is a list of actions on the AST's children
-  (change-segments-on-seqs
-   (ast-children source)
-   (ast-children target)
-   script
-   (lambda (source-segment-start source-segment-length
-            target-segment-start target-segment-length
-            children actions)
-     (let ((source-segment (make-instance 'edit-segment
-                                          :node source
-                                          :start source-segment-start
-                                          :length source-segment-length))
-           (target-segment (make-instance 'edit-segment
-                                          :node target
-                                          :start target-segment-start
-                                          :length target-segment-length)))
-       (make-instance 'edit-tree-node
-                      :source source-segment
-                      :target target-segment
-                      :children children
-                      :script actions)))
-   (lambda (source-child target-child action-cdr &rest args &key &allow-other-keys)
-       ;; Need to include source, target in case children are strings
-       (apply #'create-edit-tree source-child target-child action-cdr args))
-   source target))
+  (if (and (ast-p source)
+           (ast-p target))
+      (change-segments-on-seqs
+       (ast-children source)
+       (ast-children target)
+       script
+       (lambda (source-segment-start source-segment-length
+                target-segment-start target-segment-length
+                children actions)
+         (let ((source-segment (make-instance 'edit-segment
+                                              :node source
+                                              :start source-segment-start
+                                              :length source-segment-length))
+               (target-segment (make-instance 'edit-segment
+                                              :node target
+                                              :start target-segment-start
+                                              :length target-segment-length)))
+           (make-instance 'edit-tree-node
+                          :source source-segment
+                          :target target-segment
+                          :children children
+                          :script actions)))
+       (lambda (source-child target-child action-cdr &rest args &key &allow-other-keys)
+         ;; Need to include source, target in case children are strings
+         (apply #'create-edit-tree source-child target-child action-cdr args))
+       source target)
+      (call-next-method)))
 
 (defun change-segments-on-seqs (source target script segment-fn recurse-fn
                                 source-node target-node)
@@ -1200,8 +1204,8 @@ A diff is a sequence of actions as returned by `ast-diff' including:
   (declare (ignorable original script))
   nil)
 
-(defmethod ast-patch ((ast ast) script &rest keys
-                      &key delete? (meld? (ast-meld-p ast)) &allow-other-keys)
+(defun actual-ast-patch (ast script &rest keys
+                        &key delete? (meld? (ast-meld-p ast)) &allow-other-keys)
   (declare (ignorable delete? meld?))
   (let* ((children (ast-children ast))
          ;; For now, always meld
@@ -1213,48 +1217,53 @@ A diff is a sequence of actions as returned by `ast-diff' including:
            (iter (for new-children in new-child-lists)
                  (collect (copy ast :children new-children))))))
 
+(defmethod ast-patch ((ast ast) script &rest keys &key &allow-other-keys)
+  (apply #'actual-ast-patch ast script keys))
+
 (defmethod ast-patch ((original t) (script cons)
                       &rest keys &key (delete? t) &allow-other-keys)
   (declare (ignorable delete? keys))
-  (case (car script)
-    (:recurse-tail
-     (ast-patch original (cdr script)))
-    (:same
-     (assert (ast-equal-p original (cdr script))
-             ()
-             "AST-PATCH: :SAME not same as in script: ~a, ~a"
-             original
-             (cdr script))
-     (cdr script))
-    (t
-     (assert (proper-list-p script))
-     (let ((keys (mapcar #'car script)))
-       (cond
-         ((equal keys '(:same))
-          (assert (ast-equal-p original (cdar script))
-                  ()
-                  "AST-PATCH: :SAME not same as in script(2): ~a, ~a"
-                  original
-                  (cdar script))
-          (cdar script))
-         ((equal keys '(:insert :delete))
-          (assert (ast-equal-p original (cdadr script))
-                  ()
-                  "AST-PATCH: ~a not same as in script(2): ~a, ~a"
-                  keys
-                  original (cdadr script))
-          (cdar script))
-         ((equal keys '(:delete :insert))
-          (assert (ast-equal-p original (cdar script))
-                  ()
-                  "AST-PATCH: ~a not same as in script(2): ~a, ~a"
-                  keys
-                  original (cdar script))
-          (cdadr script))
-         ((member :conflict keys)
-          (values-list (iter (for s in (cdr script))
-                             (collect (ast-patch original s)))))
-         (t (error "Invalid diff on atom: ~a" script)))))))
+  (if (ast-p original)
+      (apply #'actual-ast-patch original script keys)
+      (case (car script)
+        (:recurse-tail
+         (ast-patch original (cdr script)))
+        (:same
+         (assert (ast-equal-p original (cdr script))
+                 ()
+                 "AST-PATCH: :SAME not same as in script: ~a, ~a"
+                 original
+                 (cdr script))
+         (cdr script))
+        (t
+         (assert (proper-list-p script))
+         (let ((keys (mapcar #'car script)))
+           (cond
+             ((equal keys '(:same))
+              (assert (ast-equal-p original (cdar script))
+                      ()
+                      "AST-PATCH: :SAME not same as in script(2): ~a, ~a"
+                      original
+                      (cdar script))
+              (cdar script))
+             ((equal keys '(:insert :delete))
+              (assert (ast-equal-p original (cdadr script))
+                      ()
+                      "AST-PATCH: ~a not same as in script(2): ~a, ~a"
+                      keys
+                      original (cdadr script))
+              (cdar script))
+             ((equal keys '(:delete :insert))
+              (assert (ast-equal-p original (cdar script))
+                      ()
+                      "AST-PATCH: ~a not same as in script(2): ~a, ~a"
+                      keys
+                      original (cdar script))
+              (cdadr script))
+             ((member :conflict keys)
+              (values-list (iter (for s in (cdr script))
+                                 (collect (ast-patch original s)))))
+             (t (error "Invalid diff on atom: ~a" script))))))))
 
 #|
 (defun create-conflict-node (ast args keys)
@@ -1339,8 +1348,8 @@ process with the rest of the script."
   (declare (ignorable delete?))
   (labels
       ((merge-conflict-ast (conflict-node rest)
-         (if (and (typep (car rest) 'conflict-ast)
-                  (typep conflict-node 'conflict-ast))
+         (if (and (conflict-ast-p (car rest))
+                  (conflict-ast-p conflict-node))
              (cons (combine-conflict-asts conflict-node (car rest))
                    (cdr rest))
              (cons conflict-node rest)))
