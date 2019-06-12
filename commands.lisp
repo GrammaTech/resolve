@@ -129,6 +129,7 @@ command-line options processed by the returned function."
   (nest
    (defparameter +ast-merge-command-line-options+)
    (append +command-line-options+)
+   (append +ast-merge-only-command-line-options+)
    (mappend (argument-multiplier "my" "old" "your"))
    (append +clang-command-line-options+
            +project-command-line-options+
@@ -141,7 +142,8 @@ command-line options processed by the returned function."
    (mappend (argument-multiplier "my" "old" "your"))
    (append +clang-command-line-options+
            +project-command-line-options+
-           +clang-project-command-line-options+)))
+           +clang-project-command-line-options+
+           )))
 
 (defmacro expand-options-for-which-files (language which)
   "Expand the options for WHICH calling `create-software' appropriately."
