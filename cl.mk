@@ -131,7 +131,7 @@ unit-check: test-artifacts $(TEST_LISP_DEPS) $(LISP_DEPS) $(MANIFEST)
 	--eval '(pushnew (truename ".") ql:*local-project-directories*)' \
 	--eval '(ql:quickload :$(PACKAGE_NAME)/test)' \
 	--eval '(setq sel/stefil+:*long-tests* t)' \
-	--eval '(sel/utility::with-quiet-compilation (asdf:test-system :$(PACKAGE_NAME)))' \
+	--eval '($(PACKAGE_NAME)/test::run-batch)' \
 	--eval '(uiop:quit (if $(PACKAGE_NAME)/test::*success* 0 1))'
 
 check: unit-check bin-check
