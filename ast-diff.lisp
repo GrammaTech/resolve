@@ -699,8 +699,8 @@ value that is used instead."
 (defmethod ast-diff (ast-a ast-b &rest args &key (strings t) &allow-other-keys)
   #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
   #+debug (format t "ast-diff[T] subtypep of parseable: ~S~%"
-                  (mapcar [{subtypep _ 'sel/sw/parseable:parseable}
-                           #'class-of] (list ast-a ast-b)))
+                  (mapcar {typep _ 'sel/sw/parseable:parseable}
+                          (list ast-a ast-b)))
   (cond
     ((and (ast-p ast-a)
           (ast-p ast-b)

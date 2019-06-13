@@ -59,7 +59,7 @@
         #+debug (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
         #+debug (incf counter)))
      ;; Modify conflict nodes in reverse to work up the tree.
-     (reverse (remove-if-not [{subtypep _ 'conflict-ast} #'type-of]
+     (reverse (remove-if-not #'conflict-ast-p
                              (asts conflicted))))
     conflicted))
 
