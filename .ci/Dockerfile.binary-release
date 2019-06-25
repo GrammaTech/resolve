@@ -6,11 +6,11 @@ FROM docker.grammatech.com/synthesis/sel/ubuntu
 
 mkdir -p /root/quicklisp/local-projects/resolve/exp/benchmark
 
-# Checkout all C/C++ benchmarks.
-RUN cd /root/quicklisp/local-projects/resolve/exp/benchmark && \
-    for bench in acorn grep grep-single-file file leafnode lighttpd memcached morgan mosh nginx openvpn pks proftpd redis sqlite unrealircd wireshark zlib;do \
-        git clone  https://git.grammatech.com/benchmark/${bench}.git; \
-    done
+# # Checkout all C/C++ benchmarks.
+# RUN cd /root/quicklisp/local-projects/resolve/exp/benchmark && \
+#     for bench in acorn grep grep-single-file file leafnode lighttpd memcached morgan mosh nginx openvpn pks proftpd redis sqlite unrealircd wireshark zlib;do \
+#         git clone  https://git.grammatech.com/benchmark/${bench}.git; \
+#     done
 
 # Checkout all JavaScript benchmarks.
 RUN cd /root/quicklisp/local-projects/resolve/exp/benchmark && \
