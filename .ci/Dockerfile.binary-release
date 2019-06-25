@@ -4,7 +4,7 @@ RUN cd /root/quicklisp/local-projects/resolve && make doc
 
 FROM docker.grammatech.com/synthesis/sel/ubuntu
 
-mkdir -p /root/quicklisp/local-projects/resolve/exp/benchmark
+RUN mkdir -p /root/quicklisp/local-projects/resolve/exp/benchmark
 
 # # Checkout all C/C++ benchmarks.
 # RUN cd /root/quicklisp/local-projects/resolve/exp/benchmark && \
