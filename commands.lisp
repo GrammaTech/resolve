@@ -162,10 +162,14 @@ command-line options processed by the returned function."
 (define-command ast-diff (old-file new-file &spec +ast-diff-command-line-options+)
   "Compare source code in OLD-FILE and NEW-FILE by AST."
   #.(format nil
-            "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
+            "~%Built from SEL ~a, Resolve ~a, and ~a ~a on ~a.~%"
             +software-evolution-library-version+
             +resolve-version+
-            (lisp-implementation-type) (lisp-implementation-version))
+            (lisp-implementation-type) (lisp-implementation-version)
+            (multiple-value-bind (second minute hour date month year)
+                (get-decoded-time)
+              (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
+                      year month date hour minute second)))
   (declare (ignorable quiet verbose))
   (when help (show-help-for-ast-diff))
   (setf *note-out* (list *error-output*))
@@ -205,10 +209,14 @@ command-line options processed by the returned function."
                                    &spec +ast-merge-command-line-options+)
   "Merge changes from old-file->my-file and old-file->your-file."
   #.(format nil
-            "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
+            "~%Built from SEL ~a, Resolve ~a, and ~a ~a on ~a.~%"
             +software-evolution-library-version+
             +resolve-version+
-            (lisp-implementation-type) (lisp-implementation-version))
+            (lisp-implementation-type) (lisp-implementation-version)
+            (multiple-value-bind (second minute hour date month year)
+                (get-decoded-time)
+              (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
+                      year month date hour minute second)))
   (declare (ignorable quiet verbose raw no-color edit-tree
                       print-asts coherence))
   (when help (show-help-for-ast-merge))
@@ -264,10 +272,14 @@ If the tests fail then infinity, otherwise diversity."
                                     &spec +auto-merge-command-line-options+
                                     &aux tests)
   "Merge MY-FILE and YOUR-FILE, from OLD-FILE, with TEST-SCRIPT passing."
-  #.(format nil "~%Built from SEL ~a, Resolve ~a, and ~a ~a.~%"
+  #.(format nil "~%Built from SEL ~a, Resolve ~a, and ~a ~a on ~a.~%"
             +software-evolution-library-version+
             +resolve-version+
-            (lisp-implementation-type) (lisp-implementation-version))
+            (lisp-implementation-type) (lisp-implementation-version)
+            (multiple-value-bind (second minute hour date month year)
+                (get-decoded-time)
+              (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
+                      year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color edit-tree
                       print-asts coherence strings))
   (when help (show-help-for-ast-merge))
