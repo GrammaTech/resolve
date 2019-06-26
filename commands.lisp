@@ -159,12 +159,9 @@ command-line options processed by the returned function."
                (mappend «list [#'make-keyword #'second] {cons 'or}»
                         (cdr pairs))))))
 
-(defmacro drop-dead-date ((&optional (times 100) (cutoff (random times))
-                                     (day 1) (month 1) (year 2020))
+(defmacro drop-dead-date ((&key (times 100) (cutoff (random times))
+                                (day 1) (month 1) (year 2020))
                           &body body)
-  #-drop-dead
-  (declare (ignorable enclosing-tag))
-  #+drop-dead
   ;; TODO: Also break if before a certain date.
   (with-gensyms (this that random-form-arg)
     (labels ((plus-or-times () (if (zerop (random 2)) '+ '*))
@@ -183,7 +180,21 @@ command-line options processed by the returned function."
              (when (> ,this ,(mapt (lambda (el) (if (eql el random-form-arg) that el)) random-form))
                ,@body)))))))
 
-;;; TODO: Add drop-dead-date to some :before and :after methods.
+#+drop-dead
+(progn
+  (defmacro drop-dead-method (method-name)
+    (cons 'progn
+          (mapcar
+           (lambda (method)
+             `(defmethod ,method-name ,(if (zerop (random 2)) :before :after)
+                ,(closer-mop:method-lambda-list method)
+                (drop-dead-date () (quit))))
+           (closer-mop:generic-function-methods (eval `(function ,method-name))))))
+  (defmacro drop-dead-method-all ()
+    (cons 'progn (mapcar (lambda (method) `(drop-dead-method ,method))
+                         '(genome from-file mutate print-object create-edit-tree
+                           map-edit-tree ast-patch merge-diffs-on-syms))))
+  (drop-dead-method-all))
 
 (define-command ast-diff (old-file new-file &spec +ast-diff-command-line-options+)
   "Compare source code in OLD-FILE and NEW-FILE by AST."
@@ -197,6 +208,7 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable quiet verbose))
+  #+drop-dead
   (drop-dead-date ()
     (exit-command ast-diff 2
                   (progn (format *error-output* "Software no longer valid.~%")
@@ -250,6 +262,7 @@ command-line options processed by the returned function."
                       year month date hour minute second)))
   (declare (ignorable quiet verbose raw no-color edit-tree
                       print-asts coherence))
+  #+drop-dead
   (drop-dead-date ()
     (exit-command ast-merge 2
                   (progn (format *error-output* "Software no longer valid.~%")
@@ -318,6 +331,7 @@ If the tests fail then infinity, otherwise diversity."
                       year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color edit-tree
                       print-asts coherence strings))
+  #+drop-dead
   (drop-dead-date ()
     (exit-command auto-merge 2
                   (progn (format *error-output* "Software no longer valid.~%")
