@@ -100,7 +100,7 @@ build-binary-release:
   script:
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
     - docker pull $DOCKER_REGISTRY/$CI_PROJECT_PATH/ubuntu
-    - docker build --build-arg=REF=$DOCKER_REGISTRY/$CI_PROJECT_PATH/ubuntu -f .ci/Dockerfile.binary-release -t $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release .
+    - docker build --build-arg=DD=yes --build-arg=REF=$DOCKER_REGISTRY/$CI_PROJECT_PATH/ubuntu -f .ci/Dockerfile.binary-release -t $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release .
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
     - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release
   only:

@@ -77,6 +77,11 @@ ifneq ($(GT),)
 LISP_FLAGS += --eval "(push :GT *features*)"
 endif
 
+# A flag for adding code to disable software after a hard-coded date.
+ifneq ($(DD),)
+LISP_FLAGS += --eval "(push :DROP-DEAD *features*)"
+endif
+
 ifneq ($(REPORT),)
 LISP_FLAGS += --eval "(push :REPORT *features*)"
 endif

@@ -1,6 +1,8 @@
 ARG REF=docker.grammatech.com/synthesis/resolve/ubuntu-sbcl
 FROM $REF as resolve
 RUN cd /root/quicklisp/local-projects/resolve && make doc
+ARG DD=
+RUN cd /root/quicklisp/local-projects/resolve && make clean all
 
 FROM docker.grammatech.com/synthesis/sel/ubuntu
 
