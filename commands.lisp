@@ -171,9 +171,12 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable quiet verbose))
-  #+drop-dead                   ; Exit unless before January 1st 2020.
-  (unless (< (get-universal-time) (encode-universal-time 0 0 0 1 1 2020))
-    (exit-command auto-merge 2 (error "Software no longer valid.")))
+  #+drop-dead
+  (when (> (get-universal-time) (encode-universal-time 0 0 0 1 1 2020))
+    (exit-command ast-diff 2
+                  (progn (format *error-output* "Software no longer valid.~%")
+                         (finish-output *error-output*)
+                         (quit 2))))
   (when help (show-help-for-ast-diff))
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file new-file))
@@ -222,9 +225,12 @@ command-line options processed by the returned function."
                       year month date hour minute second)))
   (declare (ignorable quiet verbose raw no-color edit-tree
                       print-asts coherence))
-  #+drop-dead                   ; Exit unless before January 1st 2020.
-  (unless (< (get-universal-time) (encode-universal-time 0 0 0 1 1 2020))
-    (exit-command auto-merge 2 (error "Software no longer valid.")))
+  #+drop-dead
+  (when (> (get-universal-time) (encode-universal-time 0 0 0 1 1 2020))
+    (exit-command ast-diff 2
+                  (progn (format *error-output* "Software no longer valid.~%")
+                         (finish-output *error-output*)
+                         (quit 2))))
   (when help (show-help-for-ast-merge))
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file my-file your-file))
@@ -288,9 +294,12 @@ If the tests fail then infinity, otherwise diversity."
                       year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color edit-tree
                       print-asts coherence strings))
-  #+drop-dead                   ; Exit unless before January 1st 2020.
-  (unless (< (get-universal-time) (encode-universal-time 0 0 0 1 1 2020))
-    (exit-command auto-merge 2 (error "Software no longer valid.")))
+  #+drop-dead
+  (when (> (get-universal-time) (encode-universal-time 0 0 0 1 1 2020))
+    (exit-command ast-diff 2
+                  (progn (format *error-output* "Software no longer valid.~%")
+                         (finish-output *error-output*)
+                         (quit 2))))
   (when help (show-help-for-ast-merge))
   (unless (every #'resolve-file (list old-file my-file your-file))
     (exit-command auto-merge 2 (error "Missing source.")))
