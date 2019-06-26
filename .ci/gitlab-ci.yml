@@ -8,6 +8,7 @@ stages:
   - build
   - test-and-tag
   - binary-release
+  - nightly
   - deploy-and-cleanup
 
 .build-template: &build
@@ -105,6 +106,20 @@ build-binary-release:
     - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release
   only:
     - master
+
+nightly:
+  stage: nightly
+  only:
+    - schedules
+  when: always
+  allow_failure: true
+  script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY;
+    - docker pull $DOCKER_REGISTRY/$CI_PROJECT_PATH/ubuntu
+    - docker build -f .ci/Dockerfile.nightly -t resolve-nightly .
+    - docker run resolve-nightly make -f .ci/Makefile -j8
+  after_script:
+    - docker rmi -f resolve-nightly
 
 # pages:
 #   stage: deploy-and-cleanup
