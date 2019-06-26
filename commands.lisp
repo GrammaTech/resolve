@@ -159,15 +159,31 @@ command-line options processed by the returned function."
                (mappend «list [#'make-keyword #'second] {cons 'or}»
                         (cdr pairs))))))
 
-(defmacro drop-dead-date (enclosing-tag)
+(defmacro drop-dead-date ((&optional (times 100) (cutoff (random times))
+                                     (day 1) (month 1) (year 2020))
+                          &body body)
   #-drop-dead
   (declare (ignorable enclosing-tag))
   #+drop-dead
-  `(when (> (get-universal-time) (encode-universal-time 0 0 0 1 1 2020))
-     (exit-command ,enclosing-tag 2
-                   (progn (format *error-output* "Software no longer valid.~%")
-                          (finish-output *error-output*)
-                          (quit 2)))))
+  ;; TODO: Also break if before a certain date.
+  (with-gensyms (this that random-form-arg)
+    (labels ((plus-or-times () (if (zerop (random 2)) '+ '*))
+             (many-plus-or-times (counter base)
+               (if (zerop counter)
+                   base
+                   `(,(plus-or-times) ,(1+ (random 20))
+                      ,(many-plus-or-times (- counter 1) base)))))
+      (let ((randoms-list (loop :for i :below times :collect (1+ (random 100))))
+            (random-form (many-plus-or-times 20 random-form-arg)))
+        `(let ((,this (get-universal-time)))
+           ,@(loop :for i :from 0 :below cutoff :collect `(incf ,this ,(elt randoms-list i)))
+           (let ((,that ,(+ (encode-universal-time 0 0 0 day month year) (reduce #'+ randoms-list))))
+             ,@(loop :for i :from cutoff :below times :collect `(incf ,this ,(elt randoms-list i)))
+             (setf ,this (funcall (lambda (,random-form-arg) ,random-form) ,this))
+             (when (> ,this ,(mapt (lambda (el) (if (eql el random-form-arg) that el)) random-form))
+               ,@body)))))))
+
+;;; TODO: Add drop-dead-date to some :before and :after methods.
 
 (define-command ast-diff (old-file new-file &spec +ast-diff-command-line-options+)
   "Compare source code in OLD-FILE and NEW-FILE by AST."
@@ -181,7 +197,11 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable quiet verbose))
-  (drop-dead-date ast-diff)
+  (drop-dead-date ()
+    (exit-command ast-diff 2
+                  (progn (format *error-output* "Software no longer valid.~%")
+                         (finish-output *error-output*)
+                         (quit 2))))
   (when help (show-help-for-ast-diff))
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file new-file))
@@ -230,7 +250,11 @@ command-line options processed by the returned function."
                       year month date hour minute second)))
   (declare (ignorable quiet verbose raw no-color edit-tree
                       print-asts coherence))
-  (drop-dead-date ast-merge)
+  (drop-dead-date ()
+    (exit-command ast-merge 2
+                  (progn (format *error-output* "Software no longer valid.~%")
+                         (finish-output *error-output*)
+                         (quit 2))))
   (when help (show-help-for-ast-merge))
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file my-file your-file))
@@ -294,7 +318,11 @@ If the tests fail then infinity, otherwise diversity."
                       year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color edit-tree
                       print-asts coherence strings))
-  (drop-dead-date auto-merge)
+  (drop-dead-date ()
+    (exit-command auto-merge 2
+                  (progn (format *error-output* "Software no longer valid.~%")
+                         (finish-output *error-output*)
+                         (quit 2))))
   (when help (show-help-for-ast-merge))
   (unless (every #'resolve-file (list old-file my-file your-file))
     (exit-command auto-merge 2 (error "Missing source.")))
