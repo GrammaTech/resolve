@@ -13,3 +13,9 @@ Software difference display and resolution
 - C/C++ via Clang ASTs
 - Java via JavaParser ASTs
 - Common-Lisp via Eclector
+
+## License
+Resolve, and any accompanying documentation or other materials are
+GrammaTech, Inc. (GrammaTech) Proprietary Information.
+
+See [LICENSE.txt](LICENSE.txt) for more information.

@@ -1,0 +1,71 @@
+Unless otherwise specified, this software, resolve, and any
+accompanying documentation or other materials are GrammaTech,
+Inc. (GrammaTech) Proprietary Information.
+
+All GrammaTech Proprietary Information is subject to following
+copyright and conditions:
+
+
+Copyright (c) 2019 GrammaTech, Inc. All rights reserved.
+
+
+Any marks and brands contained herein are the property of GrammaTech, Inc.
+unless otherwise expressly noted.
+
+If this software is furnished under an accompanying license and may
+be used and copied only in accordance with the terms of such license
+and the inclusion of the above copyright notice. This software or any
+other copies thereof may not be provided or otherwise made available
+to any other person. Title to, ownership of, and all rights in the
+software is retained by GrammaTech, Inc.
+
+The software is licensed, not sold, and remains the exclusive property
+of GrammaTech and, as applicable, its suppliers and licensors who retain
+the title, copyright, and all other intellectual property rights in the
+software.  This software License gives You no rights to the content of
+the software.  The software is protected by copyright and other intellectual
+property laws and treaties.
+
+GrammaTech grants to You a non-exclusive, non-transferable,
+non-sublicensable license to use, in the form delivered, the Software,
+including a right to make a reasonable number of copies of the Software
+only for backup and recovery purposes, for the term, as set forth herein,
+or until terminated.
+
+Upon notification by GrammaTech, Inc., your right to use and/or possession
+may be terminated for any reason.  GrammaTech, Inc. may elect to include
+license management functionality with or within the software.  You are
+expressly prohibited from modifing, tampering, or otherwise circumventing
+such license management funcationality or any other limitations provided
+with the software.
+
+You may not reverse engineer, decompile, disassemble, decipher, modify,
+create derivative works from the software.
+
+Neither the names of the GrammaTech, Inc. nor the names of its
+contributors may be used to endorse or promote products or results
+derived from this software without specific prior written permission
+of an authorized representative of GrammaTech, Inc.
+
+Redistribution of the source or binary code for the software is
+expressly prohibited without specific prior written permission
+of an authorized representative of GrammaTech, Inc.  Redistribution
+includes combination in any form, including, but not limited to
+static and dynamic linking with any other software. Disclosure of the
+output or results of the software is also prohibited ithout specific
+prior written permission of an authorized representative of GrammaTech, Inc.
+Any such redistribution or disclosure must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
