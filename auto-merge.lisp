@@ -47,14 +47,8 @@
      (mapc
       (lambda (ast)
         #+debug (format t "Replacing conflict at ~S~%" (ast-path ast))
-        (setf conflicted
-              (replace-ast conflicted ast
-                           (aget option (conflict-ast-child-alist ast))
-                           ;; Needs :literal t to avoid undefined
-                           ;; recontextualization invoked on JS
-                           ;; object.  Could also just define
-                           ;; recontextaulization for JS.
-                           :literal t))
+        (setf (get-ast conflicted (ast-path ast))
+              (aget option (conflict-ast-child-alist ast)))
         #+debug (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
         #+debug (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
         #+debug (incf counter)))
@@ -74,7 +68,8 @@ the strategies.")
   (:method ((conflicted software) (conflict ast) (strategy symbol)
             &key (fodder (resolve-to (copy conflicted) :old)) &allow-other-keys)
     (nest
-     (macrolet ((literal-replace (a b c) `(replace-ast ,a ,b ,c :literal t))))
+     (flet ((literal-replace (obj conflict replacement)
+              (replace-ast obj (ast-path conflict) replacement :literal t))))
      (setf conflicted)
      (literal-replace conflicted conflict)
      (let ((options (conflict-ast-child-alist conflict))))

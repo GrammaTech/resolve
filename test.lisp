@@ -1101,7 +1101,8 @@
     (with-fixture javascript-converge-conflict
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
-             (progn (replace-ast (copy *cnf*) (first (conflict-nodes *cnf*))
+             (progn (replace-ast (copy *cnf*)
+                                 (ast-path (first (conflict-nodes *cnf*)))
                                  (aget :my (conflict-ast-child-alist
                                             (first (conflict-nodes *cnf*))))
                                  :literal t)
@@ -1130,9 +1131,10 @@
                                       (asts *cnf*)))))
       (is (conflict-ast-p (get-ast *cnf* '(5 3 4)))
           "Path (5 3 4) is a conflict ast in the original.")
-      (let ((new (replace-ast
-                  (copy *cnf*) it (aget :my (conflict-ast-child-alist it))
-                  :literal t)))
+      (let ((new (replace-ast (copy *cnf*)
+                              (ast-path it)
+                              (aget :my (conflict-ast-child-alist it))
+                              :literal t)))
         (is (typep (get-ast new '(5 3 4)) 'javascript-ast)
             "Path (5 3 4) is a JavaScript ast in result of replace-ast.")
         (is (conflict-ast-p (get-ast *cnf* '(5 3 4)))

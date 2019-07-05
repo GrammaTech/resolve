@@ -36,5 +36,4 @@
       (declare (ignorable problems))
       (let ((converged (make-instance (class-of obj1)
                          :genome nil :ast-root merged-root)))
-        (update-paths converged)
         converged))))
