@@ -24,11 +24,6 @@
          *default-pathname-defaults*))
   "Path to directory holding RESOLVE.")
 
-(defvar +limit-program-path+
-  (make-pathname :name "limit"
-                 :directory (append +resolve-dir+ (list "bin")))
-  "Path to a program used to limit resources of subsequent commands.")
-
 (defvar +resolve-version+
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (current-git-commit +resolve-dir+))

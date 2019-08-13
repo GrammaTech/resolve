@@ -86,6 +86,11 @@
   :test #'equalp
   :documentation "Path to directory holding GCD test programs.")
 
+(define-constant +gcd-single-file-auto-merge-dir+
+    (append +etc-dir+ (list "gcd-single-file-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the GCD auto-merge test data.")
+
 (defvar *binary-search* nil "Holds the binary_search software object.")
 (defvar *forms*         nil "Forms used in tests.")
 (defvar *old*           nil "Software used in diff/merge tests.")
@@ -1186,11 +1191,39 @@
    (let* ((conflicted (converge my old your :conflict t))
           (chunks (remove-if-not #'conflict-ast-p (ast-to-list conflicted)))
           (*population* (populate conflicted))))
-   (is (= (length *population*) (expt 7 (length chunks)))
-       "Population has the expected size ~d = 7^|chunks| => ~d."
-       (length *population*) (expt 7 (length chunks)))
+   (is (= (length *population*) (expt 6 (length chunks)))
+       "Population has the expected size ~d = 6^|chunks| => ~d."
+       (length *population*) (expt 6 (length chunks)))
    (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
        "Population has no conflict ASTs remaining.")))
+
+(deftest (can-auto-merge-gcd :long-running) ()
+  (let ((*note-level* 0)
+        (my (from-file (make-instance 'clang)
+                       (make-pathname :name "gcd-1" :type "c"
+                                      :directory +gcd-single-file-auto-merge-dir+)))
+        (old (from-file (make-instance 'clang)
+                        (make-pathname :name "gcd-2" :type "c"
+                                       :directory +gcd-single-file-auto-merge-dir+)))
+        (your (from-file (make-instance 'clang)
+                         (make-pathname :name "gcd-3" :type "c"
+                                        :directory +gcd-single-file-auto-merge-dir+)))
+        (tests (mapcar
+                (lambda (test-num)
+                  (make-instance 'test-case :program-name
+                                 (namestring
+                                  (make-pathname :name "test" :type "sh"
+                                                 :directory +gcd-single-file-auto-merge-dir+))
+                                 :program-args (list :bin (write-to-string test-num))))
+                (iota 11))))
+    (flet ((fitness-test (obj)
+             (with-temp-file (bin)
+               (if (ignore-phenome-errors (phenome obj :bin bin))
+                   (mapcar {evaluate bin} tests)
+                   (make-list (length (test-cases tests))
+                              :initial-element most-positive-fixnum)))))
+      (is (every #'zerop (fitness (resolve my old your #'fitness-test)))
+          "auto-merge did not find a solution for the three-way GCD merge."))))
 
 
 ;;; Functions for interactive testing and experimentation.
@@ -1227,7 +1260,7 @@
           "Population should be nil to run `do-populate-and-resolve'.")
   (setf *fitness-evals* 0)
   (nest
-   (let ((*note-level* 3)))
+   (let ((*note-level* 0)))
    (with-fixture javascript-converge-conflict)
    (destructuring-bind (my old your)
        (mapcar {aget _ *variants*} (list my-name :orig your-name)))

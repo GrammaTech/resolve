@@ -10,6 +10,7 @@
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/command-line
+        :software-evolution-library/components/multi-objective
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
         :software-evolution-library/software/source
@@ -66,33 +67,30 @@ See the empirical study _On the Nature of Merge Conflicts: a Study of
 2,731 Open Source Java Projects Hosted by GitHub_ for the source of
 the strategies.")
   (:method ((conflicted software) (conflict ast) (strategy symbol)
-            &key (fodder (resolve-to (copy conflicted) :old)) &allow-other-keys)
-    (nest
-     (flet ((literal-replace (obj conflict replacement)
-              (replace-ast obj (ast-path conflict) replacement :literal t))))
-     (setf conflicted)
-     (literal-replace conflicted conflict)
-     (let ((options (conflict-ast-child-alist conflict))))
-     (flet ((generate-novel-code ()
-              (repeatedly (random (+ (length (aget :my options))
-                                     (length (aget :your options))))
-                (pick-good fodder)))))
-     ;; Six ways of resolving a conflict:
-     (case strategy
-       ;; 1. (V1) version 1
-       (:V1 (aget :my options))
-       ;; 2. (V2) version 2
-       (:V2 (aget :your options))
-       ;; 3. (CC) concatenate versions (either order)
-       (:C1 (append (aget :my options) (aget :your options)))
-       (:C2 (append (aget :your options) (aget :my options)))
-       ;; 4. (CB) interleaving subset of versions
-       (:CB (shuffle (append (aget :my options) (aget :your options))))
-       ;; 5. (NC) mix interleaving subset with novel code
-       (:NC (shuffle (append (generate-novel-code)
-                             (aget :my options) (aget :your options))))
-       ;; 6. (NN) select the base version
-       (:NN (aget :old options))))))
+            &key (fodder (resolve-to (copy conflicted) :old)) &allow-other-keys
+            &aux (options (conflict-ast-child-alist conflict)))
+    (flet ((generate-novel-code ()
+             (repeatedly (random (+ (length (aget :my options))
+                                    (length (aget :your options))))
+                         (pick-good fodder))))
+      (replace-ast conflicted
+                   (ast-path conflict)
+                   ;; Six ways of resolving a conflict:
+                   (case strategy
+                     ;; 1. (V1) version 1
+                     (:V1 (aget :my options))
+                     ;; 2. (V2) version 2
+                     (:V2 (aget :your options))
+                     ;; 3. (CC) concatenate versions (either order)
+                     (:C1 (append (aget :my options) (aget :your options)))
+                     (:C2 (append (aget :your options) (aget :my options)))
+                     ;; 4. (NC) mix interleaving subset with novel code
+                     (:NC (shuffle (append (generate-novel-code)
+                                           (aget :my options)
+                                           (aget :your options))))
+                     ;; 5. (NN) select the base version
+                     (:NN (aget :old options)))
+                   :literal t))))
 
 
 ;;; Actual population and evolution of resolution.
@@ -100,7 +98,7 @@ the strategies.")
   (:documentation "Build a population from MERGED and UNSTABLE chunks.
 NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:method ((conflicted software)
-            &key (strategies `(:V1 :V2 :C1 :C2 :CB :NC :NN))
+            &key (strategies `(:V1 :V2 :C1 :C2 :NC :NN))
             &aux (pop (list (copy conflicted))))
     ;; Initially population is just a list of the base object.
     (let ((chunks (remove-if-not #'conflict-ast-p (asts conflicted))))
@@ -122,27 +120,46 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
             (reverse chunks)))
     pop))
 
-(defgeneric resolve (my old your test &rest rest &key target &allow-other-keys)
+(defgeneric resolve (my old your test &rest rest
+                     &key evolve? target &allow-other-keys)
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.
+Keyword argument EVOLVE? is a boolean specifying whether to attempt evolution
 Keyword argument TARGET specifies the target fitness.
 Extra keys are passed through to EVOLVE.")
-  (:method (test (my software) (old software) (your software)
-            &rest rest &key (target nil target-supplied-p) &allow-other-keys)
-    (let ((*target-fitness-p* (when target-supplied-p
-                                {= target}
-                                (constantly nil))))
-      (note 2 "Populate")
-      (setf *population* (populate (converge my old your :conflict t)))
-      (setf *fitness-evals* 0)
-      (note 2 "Evaluate ~d population members" (length *population*))
+  (:method ((my software) (old software) (your software) test
+            &rest rest &key (evolve? nil) (target nil target-supplied-p)
+                         &allow-other-keys)
+    (note 2 "Populate candidate merge resolutions.")
+
+    (let ((*population* (populate (converge my old your :conflict t)))
+          (*target-fitness-p* (if target-supplied-p
+                                  [{equalp target} #'fitness]
+                                  [{every #'zerop} #'fitness]))
+          (*tournament-selector* #'pareto-selector)
+          (*tournament-tie-breaker* #'pick-least-crowded)
+          (*pareto-comparison-set-size* (max 1 (round
+                                                (/ (or *max-population-size* 0)
+                                                   10))))
+          (*fitness-evals* 0)
+          (*fitness-scalar-fn* #'multi-objective-scalar)
+          (*fitness-predicate* #'<))
+
+      (note 2 "Evaluate ~d population members." (length *population*))
       (mapc (lambda (variant)
               (incf *fitness-evals*)
               (evaluate test variant)
-              (when (funcall *target-fitness-p* (fitness variant))
-                (note 2 "Resolution found")
+              (when (funcall *target-fitness-p* variant)
+                (note 2 "Merge resolution found.")
                 (return-from resolve variant)))
             *population*)
-      (note 2 "Best fitness ~d" (extremum (mapcar #'fitness *population*) #'>))
-      (note 2 "Evolve conflict resolution")
-      (eval `(evolve test ,@rest)))))
+
+      (note 2 "Best fitness: ~a." (extremum (mapcar #'fitness *population*)
+                                            #'fitness-better-p))
+      (when evolve?
+        (note 2 "Evolve conflict resolution.")
+        (eval `(evolve ,test
+                       :filter [{every {equalp most-positive-fixnum}} #'fitness]
+                       ,@rest)))
+
+      (extremum *population* #'fitness-better-p :key #'fitness))))

@@ -28,12 +28,9 @@
 
 (defmethod converge ((obj2 parseable) (obj1 parseable) (obj3 parseable)
                      &rest args &key &allow-other-keys)
-  (let ((root1 (ast-root obj1))
-	(root2 (ast-root obj2))
-	(root3 (ast-root obj3)))
-    (multiple-value-bind (merged-root problems)
-	(apply #'converge root2 root1 root3 args)
-      (declare (ignorable problems))
-      (let ((converged (make-instance (class-of obj1)
-                         :genome nil :ast-root merged-root)))
-        converged))))
+  (make-instance (class-of obj1)
+    :genome nil
+    :ast-root (apply #'converge (ast-root obj2)
+                     (ast-root obj1)
+                     (ast-root obj3)
+                     args)))

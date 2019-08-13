@@ -34,15 +34,16 @@
         :named-readtables
         :curry-compose-reader-macros
         :iterate
-        :software-evolution-library
-        :software-evolution-library/utility
-        :software-evolution-library/command-line
+        :uiop/pathname
         :resolve/core
         :resolve/ast-diff
         :resolve/auto-merge
         :resolve/software/parseable
         :resolve/software/project
         :resolve/software/lisp
+        :software-evolution-library
+        :software-evolution-library/utility
+        :software-evolution-library/command-line
         :software-evolution-library/software/ast
         :software-evolution-library/software/simple
         :software-evolution-library/software/project
@@ -97,18 +98,24 @@
        "Generate conflict nodes rather than resolving conflicts"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter +auto-merge-only-command-line-options+
+    `((("evolve") :type boolean :optional t :initial-value nil
+       :documentation "attempt to use evolution to resolve conflicts")
+      (("num-tests") :type integer :optional t :initial-value 1
+       :documentation "number of test cases to execute"))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
     "Return a function to multiply command-line arguments across MULTIPLIERS.
 Every element of MULTIPLIERS results in a another multiple of the
 command-line options processed by the returned function."
     (lambda (arg-spec)
       (destructuring-bind
-            ((long short) &key type optional initial-value action documentation)
+            (name &key type optional initial-value action documentation)
           arg-spec
-        (declare (ignorable short))
         (mapcar (lambda (which)
                   (append
-                   (list (list (concatenate 'string which "-" long)))
+                   (list (list (concatenate 'string which "-" (car name))))
                    (when type (list :type type))
                    (when optional (list :optional optional))
                    (when action (list :action action))
@@ -139,11 +146,11 @@ command-line options processed by the returned function."
    (defparameter +auto-merge-command-line-options+)
    (append +command-line-options+
            +evolutionary-command-line-options+)
+   (append +auto-merge-only-command-line-options+)
    (mappend (argument-multiplier "my" "old" "your"))
    (append +clang-command-line-options+
            +project-command-line-options+
-           +clang-project-command-line-options+
-           )))
+           +clang-project-command-line-options+)))
 
 (defmacro expand-options-for-which-files (language which)
   "Expand the options for WHICH calling `create-software' appropriately."
@@ -207,7 +214,8 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable quiet verbose))
+  (declare (ignorable quiet verbose split-lines
+                      old-split-lines new-split-lines))
   #+drop-dead
   (drop-dead-date ()
     (exit-command ast-diff 2
@@ -261,7 +269,8 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable quiet verbose raw no-color edit-tree
-                      print-asts coherence))
+                      print-asts coherence split-lines
+                      my-split-lines your-split-lines old-split-lines))
   #+drop-dead
   (drop-dead-date ()
     (exit-command ast-merge 2
@@ -310,17 +319,26 @@ command-line options processed by the returned function."
     (exit-command ast-merge (if unstable 1 0) new-merged)))
 
 (defmethod test ((obj software) (tests test-suite))
-  "Direct fitness of OBJ against TESTS.
-If the tests fail then infinity, otherwise diversity."
+  "Determine the fitness of OBJ against TESTS."
   (with-temp-file (bin)
     (if (ignore-phenome-errors (phenome obj :bin bin))
-        (evaluate bin tests)
-        0)))
+        (mapcar {evaluate bin} (test-cases tests))
+        (make-list (length (test-cases tests))
+                   :initial-element most-positive-fixnum))))
 
 (define-command auto-merge (my-file old-file your-file test-script
                                     &spec +auto-merge-command-line-options+
                                     &aux tests)
-  "Merge MY-FILE and YOUR-FILE, from OLD-FILE, with TEST-SCRIPT passing."
+  "Merge MY-FILE and YOUR-FILE, from OLD-FILE, with TEST-SCRIPT.
+
+* MY-FILE, YOUR-FILE, OLD-FILE
+  Files or projects to compare and merge.
+* TEST-SCRIPT
+  The command line utilized to evaluate the success of the merge.  If substring
+  \"~~a\" is present it will be replaced with the name of the executable.
+  If substring \"~~d\" is present it will be replaced with the test number
+  and the test script will be invoked NUM-TESTS times for values 0 to
+  NUM-TESTS - 1."
   #.(format nil "~%Built from SEL ~a, Resolve ~a, and ~a ~a on ~a.~%"
             +software-evolution-library-version+
             +resolve-version+
@@ -330,7 +348,8 @@ If the tests fail then infinity, otherwise diversity."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color edit-tree
-                      print-asts coherence strings))
+                      print-asts coherence strings split-lines
+                      my-split-lines your-split-lines old-split-lines))
   #+drop-dead
   (drop-dead-date ()
     (exit-command auto-merge 2
@@ -340,17 +359,23 @@ If the tests fail then infinity, otherwise diversity."
   (when help (show-help-for-ast-merge))
   (unless (every #'resolve-file (list old-file my-file your-file))
     (exit-command auto-merge 2 (error "Missing source.")))
-  (setf out-dir (resolve-out-dir-from-source old-file)
+  (setf out-dir (or out-dir (resolve-out-dir-from-source old-file))
         old-file (truenamize old-file)
-	my-file (truenamize my-file)
-	your-file (truenamize your-file)
+        my-file (truenamize my-file)
+        your-file (truenamize your-file)
         language (or language (guess-language old-file my-file your-file))
-        tests (create-test test-script))
+        num-tests (resolve-num-tests-from-num-tests num-tests)
+        tests (create-test-suite test-script num-tests))
   (to-file (apply #'resolve
                   (expand-options-for-which-files language "MY")
                   (expand-options-for-which-files language "OLD")
                   (expand-options-for-which-files language "YOUR")
                   {test _ tests}
-                  (append (when max-evals (list max-evals))
-                          (when max-time (list max-time))))
-           (make-pathname :directory (append out-dir (list "auto-merged")))))
+                  (append (when evolve (list :evolve? evolve))
+                          (when max-evals (list :max-evals max-evals))
+                          (when max-time (list :max-time max-time))))
+           (if (directory-pathname-p my-file)
+               (make-pathname :directory (append out-dir (list "auto-merged")))
+               (make-pathname :directory out-dir
+                              :name "auto-merged"
+                              :type (pathname-type my-file)))))
