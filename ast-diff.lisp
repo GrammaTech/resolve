@@ -1073,11 +1073,11 @@ during calls to MAP-EDIT-TREE.")
             ;; No newlines, so print in a compact form on a single line
             (format t "~a ~s => ~s~%" per-line-prefix source-text target-text)
             ;; Otherwise, print as a text block, with indentation
-            (pprint-logical-block (*standard-output*
-                                   nil ; node
-                                   :per-line-prefix per-line-prefix)
-              (format t "~a~%---------------~%~a~&" source-text target-text)
-              ))
+            (let ((*print-pretty* t))
+              (pprint-logical-block (*standard-output*
+                                     nil ; node
+                                     :per-line-prefix per-line-prefix)
+                (format t "~a~%---------------~%~a~&" source-text target-text))))
         (when print-asts
           (format t "---------------~%")
           (format t "~s~%==>~%~s~%"
