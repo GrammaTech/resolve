@@ -322,7 +322,9 @@ command-line options processed by the returned function."
   "Determine the fitness of OBJ against TESTS."
   (with-temp-file (bin)
     (if (ignore-phenome-errors (phenome obj :bin bin))
-        (mapcar {evaluate bin} (test-cases tests))
+        (mapcar (lambda (test-case)
+                  (nth-value 2 (run-test bin test-case)))
+                (test-cases tests))
         (make-list (length (test-cases tests))
                    :initial-element most-positive-fixnum))))
 
