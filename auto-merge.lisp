@@ -85,9 +85,9 @@ the strategies.")
                      (:C1 (append (aget :my options) (aget :your options)))
                      (:C2 (append (aget :your options) (aget :my options)))
                      ;; 4. (NC) mix interleaving subset with novel code
-                     (:NC (shuffle (append (generate-novel-code)
-                                           (aget :my options)
-                                           (aget :your options))))
+                     (:NC (shuffle (copy-list (append (generate-novel-code)
+                                                      (aget :my options)
+                                                      (aget :your options)))))
                      ;; 5. (NN) select the base version
                      (:NN (aget :old options)))
                    :literal t))))
