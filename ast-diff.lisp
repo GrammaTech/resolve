@@ -1284,48 +1284,53 @@ A diff is a sequence of actions as returned by `ast-diff' including:
 Returns the conflict node and the list of remaining asts to
 process with the rest of the script."
   ;; Special case: one conflict action is :SAME, the other is :RECURSE
-  ;; In that case, we need to propagate the changes down the tree
-  (cond
-    ((and (eql (caaar args) :same)
-          (eql (caaadr args) :recurse))
-     (values (ast-patch-same-recurse (car asts) (cdaadr args) :your)
-             (cdr asts)))
-    ((and (eql (caaar args) :recurse)
-          (eql (caaadr args) :same))
-     (values (ast-patch-same-recurse (car asts) (cdaar args) :my)
-             (cdr asts)))
-    (t
-     (let ((consume nil)) ;; If set to true, consume an element of ASTS
-       (flet ((%process (action)
-                "Process an inner action.  Returns a list of asts"
-                (ecase (car action)
-                  ((nil) nil)
-                  (:insert (list (cdr action)))
-                  (:delete
-                   (setf consume t)
-                   nil)
-                  (:same (setf consume t)
-                         (list (car asts)))
-                  (:recurse (setf consume t)
-                            ;; Don't process recursive conflicts
-                            ;; In particular, this means :delete actions in the
-                            ;; conflict branch do not cause recording
-                            ;; of the original version in conflict nodes.
-                            ;; This is arguably wrong, but for now we do it this way.
-                            (list (ast-patch (car asts) (cdr action) :conflict nil))))))
-         (let ((child-alist
-                (iter (for script in args)
-                      (for i in '(:my :your))
-                      (let ((actions (%process (car script))))
-                        (when actions
-                          (collecting (cons i actions)))))))
-           (when consume
-             ;; :old is the key for the base version
-             (setf child-alist (cons (list :old (pop asts))
-                                     child-alist)))
-           (values
-            (make-conflict-ast :child-alist child-alist)
-            asts)))))))
+  ;; In that case, we need to propagate the changes down the tree IFF there
+  ;; is a nested conflict AST.
+  (let ((sc (cond ((and (eql (caaar args) :same)
+                        (eql (caaadr args) :recurse))
+                   (ast-patch-same-recurse (car asts) (cdaadr args)
+                                           :your))
+                  ((and (eql (caaar args) :recurse)
+                        (eql (caaadr args) :same))
+                   (ast-patch-same-recurse (car asts) (cdaar args)
+                                           :my)))))
+    (if (or (conflict-ast-p sc) (and (listp sc) (some #'conflict-ast-p sc)))
+        ;; Special case
+        (values sc (cdr asts))
+        ;; Base case
+        (let ((consume nil)) ;; If set to true, consume an element of ASTS
+          (flet ((%process (action)
+                   "Process an inner action.  Returns a list of asts"
+                   (ecase (car action)
+                     ((nil) nil)
+                     (:insert (list (cdr action)))
+                     (:delete
+                      (setf consume t)
+                      nil)
+                     (:same (setf consume t)
+                            (list (car asts)))
+                     (:recurse (setf consume t)
+                               ;; Don't process recursive conflicts
+                               ;; In particular, this means :delete actions in
+                               ;; the conflict branch do not cause recording
+                               ;; of the original version in conflict nodes.
+                               ;; This is arguably wrong, but for now we do it
+                               ;; this way.
+                               (list (ast-patch (car asts) (cdr action)
+                                                :conflict nil))))))
+            (let ((child-alist
+                   (iter (for script in args)
+                         (for i in '(:my :your))
+                         (let ((actions (%process (car script))))
+                           (when actions
+                             (collecting (cons i actions)))))))
+              (when consume
+                ;; :old is the key for the base version
+                (setf child-alist (cons (list :old (pop asts))
+                                        child-alist)))
+              (values
+               (make-conflict-ast :child-alist child-alist)
+               asts)))))))
 
 (defun ast-patch-same-recurse (asts script tag)
   "Perform actions in SCRIPT in ASTS in parallel with implicit :SAME operations"

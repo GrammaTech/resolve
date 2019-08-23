@@ -1134,16 +1134,16 @@
   (with-fixture javascript-converge-conflict
     (let ((it (lastcar (remove-if-not #'conflict-ast-p
                                       (asts *cnf*)))))
-      (is (conflict-ast-p (get-ast *cnf* '(5 3 4)))
-          "Path (5 3 4) is a conflict ast in the original.")
+      (is (conflict-ast-p (get-ast *cnf* '(5 3 3)))
+          "Path (5 3 3) is a conflict ast in the original.")
       (let ((new (replace-ast (copy *cnf*)
                               (ast-path it)
                               (aget :my (conflict-ast-child-alist it))
                               :literal t)))
-        (is (typep (get-ast new '(5 3 4)) 'javascript-ast)
-            "Path (5 3 4) is a JavaScript ast in result of replace-ast.")
-        (is (conflict-ast-p (get-ast *cnf* '(5 3 4)))
-            "Path (5 3 4) is STILL a conflict-ast in the original ~
+        (is (typep (get-ast new '(5 3 3)) 'javascript-ast)
+            "Path (5 3 3) is a JavaScript ast in result of replace-ast.")
+        (is (conflict-ast-p (get-ast *cnf* '(5 3 3)))
+            "Path (5 3 3) is STILL a conflict-ast in the original ~
              after replace-ast.")))))
 
 (deftest resolve-to-selects-alternatives-of-conflicts ()
