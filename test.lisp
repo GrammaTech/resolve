@@ -1006,7 +1006,7 @@
 
 
 ;;; Automatic merge tests
-(deftest merges-and-test-of-abacus-variants ()
+(deftest (merges-and-test-of-abacus-variants :long-running) ()
   (with-fixture javascript-abacus-variants
     (let ((orig (aget :orig *variants*))
           ;; Expected to work on a simple merge.
@@ -1060,7 +1060,7 @@
               my-name your-name)))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
-(deftest merges-of-abacus-variants-w-conflicts ()
+(deftest (merges-of-abacus-variants-w-conflicts :long-running) ()
   (with-fixture javascript-abacus-variants
     (let ((orig (aget :orig *variants*)))
       (mapcar
@@ -1083,7 +1083,7 @@
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
-(deftest resolve-to-single-equals-original/old ()
+(deftest (resolve-to-single-equals-original/old :long-running) ()
   (with-fixture javascript-converge-conflict
     (is (string= (genome (astyle (resolve-to (copy *cnf*) :old)))
                  (genome (astyle (aget :orig *variants*)))))))
