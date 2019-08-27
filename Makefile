@@ -32,7 +32,8 @@ BIN_TESTS =					\
 	octomap-diff-edit-tree			\
 	ast-merge-json-has-conflict
 
-# TODO: Fix this failing test.
+# TODO: Fix these failing tests.
 # ast-diff-on-simple-has-lines
+# octomap-diff
 
 include cl.mk

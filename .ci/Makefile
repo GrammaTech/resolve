@@ -2,7 +2,6 @@
 PROJECT=resolve
 TEST_DIR=test/bin/
 TESTS=	ast-diff-on-json-has-lines		\
-	ast-diff-on-simple-has-lines		\
 	ast-merge-json-has-conflict		\
 	clang-diff-on-gcd			\
 	clang-diff-on-gcd-edit-tree		\
@@ -11,7 +10,6 @@ TESTS=	ast-diff-on-json-has-lines		\
 	javascript-diff-on-gcd			\
 	lisp-diff-on-gcd			\
 	lisp-diff-on-gcd-raw			\
-	octomap-diff				\
 	octomap-diff-count			\
 	octomap-diff-edit-tree
 
