@@ -13,8 +13,10 @@
         :software-evolution-library/stefil-plus
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/project
         :software-evolution-library/software/source
         :software-evolution-library/software/clang
+        :software-evolution-library/software/clang-project
         :software-evolution-library/software/javascript
         :software-evolution-library/software/json
         :software-evolution-library/software/simple
@@ -86,8 +88,13 @@
   :test #'equalp
   :documentation "Path to directory holding GCD test programs.")
 
-(define-constant +gcd-single-file-auto-merge-dir+
+(define-constant +gcd-auto-merge-single-file-dir+
     (append +etc-dir+ (list "gcd-single-file-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the GCD auto-merge test data.")
+
+(define-constant +gcd-auto-merge-project-dir+
+    (append +etc-dir+ (list "gcd-project-auto-merge"))
   :test #'equalp
   :documentation "Path to the directory holding the GCD auto-merge test data.")
 
@@ -99,6 +106,7 @@
 (defvar *variants*      nil "List of software variants.")
 (defvar *cnf* nil)
 (defvar *new* nil)
+(defvar *tests* nil)
 
 
 ;;; Fixtures
@@ -194,6 +202,76 @@
                                 (aget :orig *variants*)
                                 (aget :min-lines *variants*) :conflict t)))
   (:teardown (setf *variants* nil *cnf* nil)))
+
+(defixture auto-merge-gcd-single-file
+  (:setup
+   (setf *my*
+         (from-file (make-instance 'clang)
+                    (make-pathname
+                     :name "gcd-1" :type "c"
+                     :directory +gcd-auto-merge-single-file-dir+))
+         *old*
+         (from-file (make-instance 'clang)
+                    (make-pathname
+                     :name "gcd-2" :type "c"
+                     :directory +gcd-auto-merge-single-file-dir+))
+         *your*
+         (from-file (make-instance 'clang)
+                    (make-pathname
+                     :name "gcd-3" :type "c"
+                     :directory +gcd-auto-merge-single-file-dir+))
+         *tests*
+         (mapcar
+          (lambda (test-num)
+            (make-instance 'test-case
+              :program-name
+              (namestring
+               (make-pathname :name "test" :type "sh"
+                              :directory
+                              +gcd-auto-merge-single-file-dir+))
+              :program-args
+              (list :bin (write-to-string test-num))))
+          (iota 11))))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
+
+(defixture auto-merge-gcd-project
+  (:setup
+   (flet ((load-and-parse (project-dir)
+            (with-temp-cwd-of (tmp) project-dir
+                              (let ((obj (from-file (make-instance 'clang-project
+                                                      :build-command "make"
+                                                      :artifacts '("gcd"))
+                                                    tmp)))
+                                (asts obj)
+                                obj))))
+     (setf *my*
+           (load-and-parse
+            (make-pathname :directory
+                           (append +gcd-auto-merge-project-dir+
+                                   (list "gcd-1"))))
+           *old*
+           (load-and-parse
+            (make-pathname :directory
+                           (append +gcd-auto-merge-project-dir+
+                                   (list "gcd-2"))))
+           *your*
+           (load-and-parse
+            (make-pathname :directory
+                           (append +gcd-auto-merge-project-dir+
+                                   (list "gcd-3"))))
+           *tests*
+           (mapcar
+            (lambda (test-num)
+              (make-instance 'test-case
+                :program-name
+                (namestring
+                 (make-pathname :name "test" :type "sh"
+                                :directory +gcd-auto-merge-project-dir+))
+                :program-args (list :bin (write-to-string test-num))))
+            (iota 11)))))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
 
 (defroot test)
 
@@ -1198,35 +1276,27 @@
    (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
        "Population has no conflict ASTs remaining.")))
 
-(deftest (can-auto-merge-gcd :long-running) ()
-  (let ((*note-level* 0)
-        (my (from-file (make-instance 'clang)
-                       (make-pathname :name "gcd-1" :type "c"
-                                      :directory +gcd-single-file-auto-merge-dir+)))
-        (old (from-file (make-instance 'clang)
-                        (make-pathname :name "gcd-2" :type "c"
-                                       :directory +gcd-single-file-auto-merge-dir+)))
-        (your (from-file (make-instance 'clang)
-                         (make-pathname :name "gcd-3" :type "c"
-                                        :directory +gcd-single-file-auto-merge-dir+)))
-        (tests (mapcar
-                (lambda (test-num)
-                  (make-instance 'test-case :program-name
-                                 (namestring
-                                  (make-pathname :name "test" :type "sh"
-                                                 :directory +gcd-single-file-auto-merge-dir+))
-                                 :program-args (list :bin (write-to-string test-num))))
-                (iota 11))))
-    (flet ((fitness-test (obj)
-             (with-temp-file (bin)
-               (if (ignore-phenome-errors (phenome obj :bin bin))
-                   (mapcar (lambda (test-case)
-                             (nth-value 2 (run-test bin test-case)))
-                           tests)
-                   (make-list (length tests)
-                              :initial-element most-positive-fixnum)))))
+(defun run-auto-merge-test (my old your tests)
+  (flet ((fitness-test (obj)
+           (with-temp-file (bin)
+             (if (ignore-phenome-errors (phenome obj :bin bin))
+                 (mapcar (lambda (test-case)
+                           (nth-value 2 (run-test bin test-case)))
+                         tests)
+                 (make-list (length tests)
+                            :initial-element most-positive-fixnum)))))
+    (let ((*note-level* 0))
       (is (every #'zerop (fitness (resolve my old your #'fitness-test)))
           "auto-merge did not find a solution for the three-way GCD merge."))))
+
+(deftest (can-auto-merge-gcd-single-file :long-running) ()
+  (with-fixture auto-merge-gcd-single-file
+    (run-auto-merge-test *my* *old* *your* *tests*)))
+
+(deftest (can-auto-merge-gcd-project :long-running) ()
+  (with-fixture auto-merge-gcd-project
+    (with-temp-dir (*build-dir*)
+      (run-auto-merge-test *my* *old* *your* *tests*))))
 
 
 ;;; Functions for interactive testing and experimentation.

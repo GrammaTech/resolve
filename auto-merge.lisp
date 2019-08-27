@@ -13,6 +13,8 @@
         :software-evolution-library/components/multi-objective
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/parseable-project
+        :software-evolution-library/software/project
         :software-evolution-library/software/source
         :software-evolution-library/software/clang
         :software-evolution-library/software/javascript
@@ -40,7 +42,7 @@
 ;;; Utility functions
 (defgeneric resolve-to (conflicted option)
   (:documentation "Resolve every conflict in CONFLICTED to OPTION.")
-  (:method ((conflicted software) option &aux #+debug (cp (copy conflicted)))
+  (:method ((conflicted parseable) option &aux #+debug (cp (copy conflicted)))
     (nest
      #+debug (let ((counter 0))
                (to-file cp (format nil "/tmp/resolve-original.c")))
@@ -66,7 +68,7 @@ Keyword argument FODDER may be used to provide a source of novel code.
 See the empirical study _On the Nature of Merge Conflicts: a Study of
 2,731 Open Source Java Projects Hosted by GitHub_ for the source of
 the strategies.")
-  (:method ((conflicted software) (conflict ast) (strategy symbol)
+  (:method ((conflicted parseable) (conflict ast) (strategy symbol)
             &key (fodder (resolve-to (copy conflicted) :old)) &allow-other-keys
             &aux (options (conflict-ast-child-alist conflict)))
     (flet ((generate-novel-code ()
@@ -97,7 +99,7 @@ the strategies.")
 (defgeneric populate (conflicted &key strategies &allow-other-keys)
   (:documentation "Build a population from MERGED and UNSTABLE chunks.
 NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
-  (:method ((conflicted software)
+  (:method ((conflicted parseable)
             &key (strategies `(:V1 :V2 :C1 :C2 :NC :NN))
             &aux (pop (list (copy conflicted))))
     ;; Initially population is just a list of the base object.
@@ -118,7 +120,18 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
                         strategies))
                      pop)))
             (reverse chunks)))
-    pop))
+    pop)
+  (:method ((conflicted parseable-project)
+            &key (strategies `(:V1 :V2 :C1 :C2 :NC :NN)))
+    (iter (for (file . obj) in (evolve-files conflicted))
+          (collect (if (some #'conflict-ast-p (asts obj))
+                       (mapcar {cons file} (populate obj))
+                       (list (cons file (copy obj)))) into resolutions)
+          (finally (return (mapcar (lambda (resolution &aux ret)
+                                     (setf ret (copy conflicted))
+                                     (setf (evolve-files ret) resolution)
+                                     ret)
+                                   (cartesian resolutions)))))))
 
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target &allow-other-keys)

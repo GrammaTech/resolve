@@ -161,6 +161,7 @@ command-line options processed by the returned function."
                       artifacts compilation-database))))
         (list* (caar pairs)
                :language language
+               :ignore-paths '(list #P"compile_commands.json")
                (mappend «list [#'make-keyword #'second] {cons 'or}»
                         (cdr pairs))))))
 
@@ -285,11 +286,10 @@ command-line options processed by the returned function."
         language (or language (guess-language old-file my-file your-file)))
   ;; Force OUT-DIR when running as a command line utility and merging
   ;; whole directories.  We can't write multiple files to STDOUT.
-  (when (and (not uiop/image:*lisp-interaction*)
-             (not out-dir)
-             (directory-p old-file))
+  (when (and (directory-p old-file) (not out-dir))
     (setf out-dir (resolve-out-dir-from-source old-file))
-    (note 0 "Merging directories, out-dir set to ~a." out-dir))
+    (note 0 "Merging directories, out-dir set to ~a."
+          (namestring (make-pathname :directory out-dir))))
   ;; Don't write notes when we're writing merge results to STDOUT.
   (unless out-dir (setf *note-level* 0))
 
