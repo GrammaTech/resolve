@@ -9,6 +9,7 @@ WORKDIR /root/quicklisp/local-projects/resolve
 
 ARG GT
 ARG REPORT
-ENV PATH=/usr/synth/bin:/root/quicklisp/local-projects/resolve/bin:$PATH
+ENV PATH=/usr/synth/bin:/root/quicklisp/local-projects/resolve/bin:$PATH \
+    LISP_STACK=129024
 RUN make
 CMD /bin/bash

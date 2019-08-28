@@ -62,7 +62,7 @@ build-arch-sbcl:
     - if [ "$CI_BUILD_REF_NAME" = "master" ];
       then
           docker run -e LOCAL_USER=root -e GT=yes -e REPORT=yes ${LOCAL_IMAGE_NAME}-${OS}-${LISP} /bin/bash -c "cd /root/quicklisp/local-projects/resolve && make check bin-check doc";
-          if [ "$LISP" = "ccl" ];
+          if [ "$LISP" = "sbcl" ];
           then
               docker tag ${LOCAL_IMAGE_NAME}-${OS}-${LISP} $DOCKER_REGISTRY/$CI_PROJECT_PATH/${OS};
               docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY;
