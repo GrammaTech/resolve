@@ -14,8 +14,12 @@ stages:
 .build-template: &build
   script:
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
-    - docker pull $DOCKER_REGISTRY/synthesis/sel/${OS}
-    - docker build --build-arg=GT=yes -f .ci/Dockerfile.${OS} -t ${LOCAL_IMAGE_NAME}-${OS}-${LISP} .
+    - docker pull $DOCKER_REGISTRY/synthesis/sel/${OS}-${LISP}:${CI_BUILD_REF_NAME} && export REF=${CI_BUILD_REF_NAME} || export REF=master
+    - if [ ${REF} = "master" ];then
+          docker pull $DOCKER_REGISTRY/synthesis/sel/${OS}-${LISP}:master;
+      fi
+    - echo "OS=${OS} LISP=${LISP} REF=${REF}"
+    - docker build --build-arg=GT=yes --build-arg=LISP=${LISP} --build-arg=REF=${REF} -f .ci/Dockerfile.${OS} -t ${LOCAL_IMAGE_NAME}-${OS}-${LISP} .
     - if [ ! "$CI_BUILD_REF_NAME" = "latest" ];
       then
           docker tag ${LOCAL_IMAGE_NAME}-${OS}-${LISP} $DOCKER_REGISTRY/$CI_PROJECT_PATH/${OS}-${LISP}:${CI_BUILD_REF_NAME};

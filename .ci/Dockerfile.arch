@@ -1,4 +1,6 @@
-FROM docker.grammatech.com/synthesis/sel/arch
+ARG REF=master
+ARG LISP=sbcl
+FROM docker.grammatech.com/synthesis/sel/arch-${LISP}:${REF}
 
 RUN pacman -Sy  --noconfirm archlinux-keyring
 RUN pacman -Syu --noconfirm expect
