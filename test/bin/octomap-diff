@@ -8,3 +8,12 @@ ast-diff $1 $2 \
   --new-flags="-I $DIR/test/etc/octomap/octomap-1.8.0/include,-I $DIR/test/etc/octomap/octomap-1.8.0/src" \
   test/etc/octomap/octomap-1.7.2/src/test_iterators.cpp \
   test/etc/octomap/octomap-1.8.0/src/test_iterators.cpp
+
+exit_code=$?
+if [ $exit_code -eq 1 ]; then
+    echo "PASS"
+    exit 0
+else
+    echo "FAIL - A diff should have been found in octomap"
+    exit 1
+fi

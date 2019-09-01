@@ -28,12 +28,12 @@ BIN_TESTS =					\
 	lisp-diff-on-gcd-raw			\
 	clang-diff-on-gcd-edit-tree		\
 	clang-diff-on-gcd-edit-tree-coherence	\
+	octomap-diff				\
 	octomap-diff-count			\
 	octomap-diff-edit-tree			\
 	ast-merge-json-has-conflict
 
 # TODO: Fix these failing tests.
 # ast-diff-on-simple-has-lines
-# octomap-diff
 
 include cl.mk

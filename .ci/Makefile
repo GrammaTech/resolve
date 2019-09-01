@@ -10,6 +10,7 @@ TESTS=	ast-diff-on-json-has-lines		\
 	javascript-diff-on-gcd			\
 	lisp-diff-on-gcd			\
 	lisp-diff-on-gcd-raw			\
+	octomap-diff				\
 	octomap-diff-count			\
 	octomap-diff-edit-tree
 
