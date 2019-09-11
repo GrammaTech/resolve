@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# A wrapper script for ast-diff to allow its invocation by as a git
+# external diff tool.  Git will pass 7 arguments to this tool,
+#
+#     old-file old-hex old-mode new-file new-hex new-mode
+#
+# where as ast-diff only wants the second and fifth arguments.
+#
+# To configure git to use ast-diff run the following in a repository:
+#
+#     git config diff.external /full/path/to/resolve/bin/git-ast-diff
+#
+# or run the following to configure its use globally.
+#
+#     git config --global diff.external /full/path/to/resolve/bin/git-ast-diff
+#
+ast-diff "$2" "$5"
