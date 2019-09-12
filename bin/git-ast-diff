@@ -15,4 +15,11 @@
 #
 #     git config --global diff.external /full/path/to/resolve/bin/git-ast-diff
 #
+
+# ## Debugging Support
+# echo "$@" >> /tmp/ast-diff.log
+# backup(){ cp $1 $(mktemp --suffix=".$(echo $1|sed 's/.*\.//')"); }
+# backup $2
+# backup $5
+
 ast-diff "$2" "$5"
