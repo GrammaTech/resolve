@@ -1102,7 +1102,7 @@
   ;; NOTE: This was fixed by replacing `nconc' with `append' in
   ;; `set-ast-siblings' in SEL/SW/AST.
   (flet ((conflict-nodes (obj)
-           (remove-if-not #'conflict-ast-p (ast-to-list obj))))
+           (remove-if-not #'conflict-ast-p (ast-to-list (ast-root obj)))))
     (with-fixture javascript-converge-conflict
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
@@ -1189,7 +1189,8 @@
    (destructuring-bind (my old your)
        (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
    (let* ((conflicted (converge my old your :conflict t))
-          (chunks (remove-if-not #'conflict-ast-p (ast-to-list conflicted)))
+          (chunks (remove-if-not #'conflict-ast-p
+                                 (ast-to-list (ast-root conflicted))))
           (*population* (populate conflicted))))
    (is (= (length *population*) (expt 6 (length chunks)))
        "Population has the expected size ~d = 6^|chunks| => ~d."
