@@ -3,6 +3,11 @@ Resolve
 
 Software difference display and resolution
 
+## Abstract
+Resolve implements multi-lingual semantic differencing of software
+source code and implements an automated technique of merge conflict
+resolution on top of merge conflicts over the resulting differences.
+
 ## Tools
 - command-line AST differencing
 - web-based AST differencing

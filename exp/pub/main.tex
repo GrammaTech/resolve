@@ -1,0 +1,75 @@
+\documentclass[letterpaper,twocolumn,10pt]{article}
+\usepackage{latexsym,amssymb,stmaryrd}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{colortbl}
+\usepackage{color} 
+\usepackage{graphics}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{arydshln}
+\usepackage{pgfplots}
+\usepackage{listings}
+\usepackage{todo}
+\usepackage{longtable}
+
+\usepgfplotslibrary{external}
+\tikzexternalize
+
+\let\labelindent\relax
+\usepackage{enumitem}
+
+\usepackage{ctable}
+\lstset{
+  frame=Ltb,
+  framerule=0pt,
+  %aboveskip=1em,
+  framextopmargin=0pt,
+  framexbottommargin=0pt,
+  framexleftmargin=0cm,
+  framesep=0pt,
+  rulesep=0pt,
+  % 
+  stringstyle=\small\ttfamily,
+  keepspaces=true,
+  basicstyle=\fontencoding{T1}\small\fontfamily{cmtt}\selectfont\upshape,
+  %basicstyle=\small\sffamily\upshape,
+  showstringspaces = false,
+  mathescape=true,
+  breaklines=true,
+  columns=fullflexible,
+  %language=Prolog
+}
+
+\begin{document}
+
+\title{Automated Merge-conflict Resolution with Semantic Differencing}
+
+\author{
+  {\rm Some People}\\
+  GrammaTech, Inc.\\
+  {\tt \{some,people\}@grammatech.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Resolve implements multi-lingual semantic differencing of software
+source code and implements an automated technique of merge conflict
+resolution on top of merge conflicts over the resulting differences.
+\end{abstract}
+
+\input{intro}
+\input{related}
+\input{methodology}
+\input{experiments}
+\input{conclusion}
+\input{acknowledgments}
+
+\bibliographystyle{plain}
+\bibliography{bibliography}
+
+\end{document}
