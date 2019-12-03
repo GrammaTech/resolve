@@ -17,6 +17,7 @@
         :software-evolution-library/software/source
         :software-evolution-library/software/clang
         :software-evolution-library/software/clang-project
+        :software-evolution-library/software/new-clang
         :software-evolution-library/software/javascript
         :software-evolution-library/software/json
         :software-evolution-library/software/simple
@@ -108,6 +109,9 @@
 (defvar *new* nil)
 (defvar *tests* nil)
 
+(defun make-clang-instance (&rest args)
+  (apply #'make-instance 'new-clang args))
+
 
 ;;; Fixtures
 (defixture resolve-asd-file-forms
@@ -123,7 +127,7 @@
   (:setup
    (setf *binary-search*
          (from-file
-          (make-instance 'clang
+          (make-clang-instance
             :flags (list
                     "-I"
                     (namestring (make-pathname :directory +etc-dir+))))
@@ -155,7 +159,7 @@
        (mapcar
         (lambda (name)
           (from-file
-           (make-instance 'clang)
+           (make-clang-instance)
            (make-pathname :directory +gcd-dir+
                           :type "c"
                           :name name)))
@@ -206,17 +210,17 @@
 (defixture auto-merge-gcd-single-file
   (:setup
    (setf *my*
-         (from-file (make-instance 'clang)
+         (from-file (make-clang-instance)
                     (make-pathname
                      :name "gcd-1" :type "c"
                      :directory +gcd-auto-merge-single-file-dir+))
          *old*
-         (from-file (make-instance 'clang)
+         (from-file (make-clang-instance)
                     (make-pathname
                      :name "gcd-2" :type "c"
                      :directory +gcd-auto-merge-single-file-dir+))
          *your*
-         (from-file (make-instance 'clang)
+         (from-file (make-clang-instance)
                     (make-pathname
                      :name "gcd-3" :type "c"
                      :directory +gcd-auto-merge-single-file-dir+))
@@ -309,6 +313,32 @@
 (deftest sexp-diff-equal-zero-cost ()
   (is (zerop (nth-value 1 (ast-diff '(1 2 3 4) '(1 2 3 4))))
       "Equal should have 0 cost."))
+
+(deftest sexp-diff-string.1 ()
+  (is (eql (nth-value 1 (ast-diff "a" "ab")) 1)
+      "Adding a character has cost 1"))
+
+(deftest sexp-diff-string.2 ()
+  (is (eql (nth-value 1 (ast-diff "ab" "a")) 1)
+      "Deleting a character has cost 1"))
+
+(deftest sexp-diff-string.3 ()
+  (is (eql (nth-value 1 (ast-diff "a" " a ")) 2)
+      "Add whitespace has cost 2"))
+
+(deftest sexp-diff-string.4 ()
+  (is (let ((*ignore-whitespace* t))
+        (eql (nth-value 1 (ast-diff "a" " a ")) 0))
+      "Adding whitespace costs nothing"))
+
+(deftest sexp-diff-string.5 ()
+  (is (eql (nth-value 1 (ast-diff " a " "a")) 2)
+      "Adding whitespace has cost 2"))
+
+(deftest sexp-diff-string.6 ()
+  (is (let ((*ignore-whitespace* t))
+        (eql (nth-value 1 (ast-diff " a " "a")) 0))
+      "Adding whitespace costs nothing"))
 
 (deftest sexp-diff-non-equal-first-element ()
   (is (not (zerop (nth-value 1 (ast-diff '(1 2 3 4) '(0 2 3 4)))))
@@ -470,19 +500,19 @@
 (deftest (diff-gets-back-on-track :long-running) ()
   (is (= 2 (nth-value
             1
-            (ast-diff (from-string (make-instance 'clang)
+            (ast-diff (from-string (make-clang-instance)
                                    "int a; int b; int c; int d;")
-                      (from-string (make-instance 'clang)
+                      (from-string (make-clang-instance)
                                    "int a; int z; int b; int c; int d;"))))))
 
 (deftest (diff-insert :long-running) ()
-  (let ((orig (from-string (make-instance 'clang)
+  (let ((orig (from-string (make-clang-instance)
                            "int x; int y; int z;"))
-        (a (from-string (make-instance 'clang)
+        (a (from-string (make-clang-instance)
                         "int a; int x; int y; int z;"))
-        (b (from-string (make-instance 'clang)
+        (b (from-string (make-clang-instance)
                         "int x; int b; int y; int z;"))
-        (c (from-string (make-instance 'clang)
+        (c (from-string (make-clang-instance)
                         "int x; int y; int z; int c;")))
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
@@ -509,13 +539,13 @@
                     :same :insert :insert :same))))))
 
 (deftest (diff-delete :long-running) ()
-  (let ((orig (from-string (make-instance 'clang)
+  (let ((orig (from-string (make-clang-instance)
                            "int x; int y; int z;"))
-        (a (from-string (make-instance 'clang)
+        (a (from-string (make-clang-instance)
                         "int y; int z;"))
-        (b (from-string (make-instance 'clang)
+        (b (from-string (make-clang-instance)
                         "int x; int z;"))
-        (c (from-string (make-instance 'clang)
+        (c (from-string (make-clang-instance)
                         "int x; int y;")))
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
@@ -540,9 +570,9 @@
                   '(:same :same :same :same :delete :delete :same))))))
 
 (deftest (diff-recursive :long-running) ()
-  (let* ((orig (from-string (make-instance 'clang)
+  (let* ((orig (from-string (make-clang-instance)
                             "int x = 1; int y = 2; int z = 3;"))
-         (new (from-string (make-instance 'clang)
+         (new (from-string (make-clang-instance)
                            "int x = 1; int y = 5; int z = 3;"))
          (diff (ast-diff orig new)))
     (is diff)
@@ -552,13 +582,13 @@
                 '(:same :same :same :recurse :same :same :same)))))
 
 (deftest (diff-text-changes :long-running) ()
-  (let ((orig (from-string (make-instance 'clang)
+  (let ((orig (from-string (make-clang-instance)
                            "/* 1 */ int x; /* 2 */ int y; int z; /* 3 */"))
-        (a (from-string (make-instance 'clang)
+        (a (from-string (make-clang-instance)
                         "/* X */ int x; /* 2 */ int y; int z; /* 3 */"))
-        (b (from-string (make-instance 'clang)
+        (b (from-string (make-clang-instance)
                         "/* 1 */ int x; /* X */ int y; int z; /* 3 */"))
-        (c (from-string (make-instance 'clang)
+        (c (from-string (make-clang-instance)
                         "/* 1 */ int x; /* 2 */ int y; int z; /* X */")))
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
@@ -599,7 +629,7 @@
 
 (deftest print-diff.1 ()
   (is (equalp (with-output-to-string (s)
-		(flet ((%f (s) (from-string (make-instance 'clang) s)))
+                (flet ((%f (s) (from-string (make-clang-instance) s)))
 		  (print-diff (ast-diff (%f "int a; int c;")
 					(%f "int a; int b; int c;"))
                               :no-color t
@@ -608,7 +638,7 @@
 
 (deftest print-diff.2 ()
   (is (equalp (with-output-to-string (s)
-		(flet ((%f (s) (from-string (make-instance 'clang) s)))
+                (flet ((%f (s) (from-string (make-clang-instance) s)))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
 					(%f "int a; int c;"))
                               :no-color t
@@ -618,7 +648,7 @@
 
 (deftest print-diff.3 ()
   (is (equalp (with-output-to-string (s)
-		(flet ((%f (s) (from-string (make-instance 'clang) s)))
+                (flet ((%f (s) (from-string (make-clang-instance) s)))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
 					(%f "int a; int d; int c;"))
                               :no-color t
@@ -628,7 +658,7 @@
 
 (deftest print-diff.4 ()
   (is (equalp (with-output-to-string (s)
-		(flet ((%f (s) (from-string (make-instance 'clang) s)))
+                (flet ((%f (s) (from-string (make-clang-instance) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
 					(%f "char *s = \"acd\";"))
                               :no-color t
@@ -638,7 +668,7 @@
 
 (deftest print-diff.5 ()
   (is (equalp (with-output-to-string (s)
-		(flet ((%f (s) (from-string (make-instance 'clang) s)))
+                (flet ((%f (s) (from-string (make-clang-instance) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
 					(%f "char *s = \"ad\";"))
                               :no-color t
@@ -650,7 +680,7 @@
 
 (deftest print-diff.6 ()
   (is (equalp (with-output-to-string (s)
-		(flet ((%f (s) (from-string (make-instance 'clang) s)))
+                (flet ((%f (s) (from-string (make-clang-instance) s)))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
 					(%f "char *s = \"abcd\";"))
                               :no-color t
@@ -660,7 +690,7 @@
 
 (deftest print-diff.7 ()
   (is (equalp (with-output-to-string (s)
-		(flet ((%f (s) (from-string (make-instance 'clang) s)))
+                (flet ((%f (s) (from-string (make-clang-instance) s)))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
 					(%f "char *s = \"abd\";"))
                               :no-color t
@@ -694,25 +724,25 @@
 
 ;;;; AST edit tree tests
 (deftest edit-tree.1 ()
-  (let* ((obj1 (from-string (make-instance 'clang) "int a,b,c,d,e;"))
-         (obj2 (from-string (make-instance 'clang) "int a,c,e;"))
+  (let* ((obj1 (from-string (make-clang-instance) "int a; int b; int c; int d; int e;"))
+         (obj2 (from-string (make-clang-instance) "int a; int c; int e;"))
          (edit-tree (create-edit-tree obj1 obj2 (ast-diff obj1 obj2))))
     (let ((count 0))
       (map-edit-tree edit-tree (lambda (x) (declare (ignore x)) (incf count)))
-      (is (= 4 count)
-          "Edit tree with two differences expect 4 nodes. (~a)"
-          count))))
+      (is (= 2 count)
+          "Edit tree with two differences expect 2 nodes. (~a) (~a)"
+          count edit-tree))))
 
 (deftest edit-tree.2 ()
-  (let* ((obj1 (from-string (make-instance 'clang) "int a;"))
-         (obj2 (from-string (make-instance 'clang) "int a;"))
+  (let* ((obj1 (from-string (make-clang-instance) "int a;"))
+         (obj2 (from-string (make-clang-instance) "int a;"))
          (edit-tree (create-edit-tree obj1 obj2 (ast-diff obj1 obj2))))
     (is (null edit-tree)
         "Empty diffs produce the null edit tree")))
 
 (deftest edit-tree.3 ()
-  (let* ((obj1 (from-string (make-instance 'clang) "char *a = \"abcde\";"))
-         (obj2 (from-string (make-instance 'clang) "char *a = \"ace\";"))
+  (let* ((obj1 (from-string (make-clang-instance) "char *a = \"abcde\";"))
+         (obj2 (from-string (make-clang-instance) "char *a = \"ace\";"))
          ;; :STRINGS nil means the diff does not descend into the
          ;; string constant.
          (edit-tree

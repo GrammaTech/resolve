@@ -1,6 +1,6 @@
 ;;; ast-diff.lisp --- diffs between ASTs and other tree structures
 ;;;
-;;; The @code{software-evolution-library/ast-diff} library provides
+;;; The @code{resolve/ast-diff} library provides
 ;;; for the differencing of software objects.  A general tree
 ;;; differencing algorithm (originally adopted from
 ;;; @url{http://thume.ca/2017/06/17/tree-diffing/#a-tree-diff-optimizer})
@@ -73,7 +73,8 @@
    :describe-edit-tree
    :map-edit-tree
    :ast-size
-   :ast-to-list-form))
+   :ast-to-list-form
+   :*ignore-whitespace*))
 (in-package :resolve/ast-diff)
 (in-readtable :curry-compose-reader-macros)
 ;;; Comments on further algorithm improvements
@@ -114,6 +115,9 @@
 
 (declaim (special *cost-table*))
 
+(defvar *ignore-whitespace* nil
+  "If true, inserting or removing whitespace in a string has zero cost")
+
 (defun clength (x) (iter (while (consp x)) (pop x) (summing 1)))
 
 ;; (defun make-costed (&key obj &allow-other-keys) obj)
@@ -129,9 +133,7 @@
             (incf cost (ccost (car (pop conses)))))
       cost)))
 
-(defmethod ccost (x)
-  (declare (ignorable x))
-  1)
+(defmethod ccost ((x t)) 1)
 
 ;; #+sbcl (declaim (optimize sb-cover:store-coverage-data))
 
@@ -148,7 +150,10 @@
 (defmethod ast-cost (ast) 1)
 
 (defmethod ast-cost ((ast string))
-  (length ast))
+  (let ((len (length ast)))
+    (if *ignore-whitespace*
+        (- len (count-if #'whitespacep ast))
+        len)))
 
 (defmethod ast-cost ((ast vector))
   (length ast))
@@ -167,13 +172,12 @@
 can be recursed on if STRINGS is true (defaults to true)"))
 
 (defmethod ast-can-recurse ((ast-a cons) (ast-b cons) &optional strings)
-  (declare (ignorable ast-a ast-b strings))
+  (declare (ignorable strings))
   t)
 (defmethod ast-can-recurse ((ast-a string) (ast-b string) &optional (strings t))
-  (declare (ignorable ast-a ast-b))
   strings)
-(defmethod ast-can-recurse (ast-a ast-b &optional strings)
-  (declare (ignorable ast-a ast-b strings))
+(defmethod ast-can-recurse ((ast-a t) (ast-b t) &optional strings)
+  (declare (ignorable strings))
   nil)
 (defmethod ast-can-recurse ((ast-a ast) (ast-b ast) &optional strings)
   (declare (ignore strings))
@@ -773,25 +777,36 @@ value that is used instead."
               (incf overall-cost tail-cost))))
       (values overall-diff overall-cost))))
 
-(defmethod ast-diff ((s1 string) (s2 string) &key (strings t) &allow-other-keys)
+(defmethod ast-diff ((s1 string) (s2 string) &key (strings t)
+                                               (ignore-whitespace *ignore-whitespace*)
+                                               &allow-other-keys)
   "special diff method for strings"
   #+debug (format t "ast-diff[STRING]~%")
-  (cond
+  (if strings
     ;; if STRINGS is true, descend into the strings for a fine-grained diff
-    (strings
-     (string-diff s1 s2))
-    ;; Otherwise, treat the strings as single objects and replace
-    ;; entirely if different
-    ((string= s1 s2)
-     `((:same-sequence ,s1)))
-    ((string= s1 "")
-     `((:insert-sequence . ,s2)))
-    ((string= s2 "")
-     `((:delete-sequence . ,s1)))
-    (t
-     `((:insert-sequence . ,s2)
-       (:delete-sequence . ,s1)))))
-
+      (string-diff s1 s2 :ignore-whitespace ignore-whitespace)
+      ;; Otherwise, treat the strings as single objects and replace
+      ;; entirely if different.  Empty strings are considered to not
+      ;; be present.  If whitespace is ignored, treat strings the same
+      ;; if
+      (let*
+          ((ns1 (if ignore-whitespace (remove-if #'whitespacep s1) s1))
+           (ns2 (if ignore-whitespace (remove-if #'whitespacep s2) s2))
+           (p (and ignore-whitespace (string= ns1 ns2))))
+        (cond
+          ((string= s1 s2)
+           (values `((:same-sequence ,s1))) 0)
+          ((string= s1 "")
+           (values `((:insert-sequence . ,s2)) (if p 0 1)))
+          ((string= s2 "")
+           (values `((:delete-sequence . ,s1))) (if p 0 1))
+          (t
+           (values `((:insert-sequence . ,s2)
+                     (:delete-sequence . ,s1))
+                   (cond (p 0)
+                         ((string= ns1 "") 1)
+                         ((string= ns2 "") 1)
+                         (t 2))))))))
 
 (defun simple-genome-pack (unpacked-g)
   "Converts list of pairs into a SIMPLE genome"
@@ -1201,7 +1216,6 @@ A diff is a sequence of actions as returned by `ast-diff' including:
 :recurse S : recursively apply script S to the current AST"))
 
 (defmethod ast-patch ((original null) (script null) &key &allow-other-keys)
-  (declare (ignorable original script))
   nil)
 
 (defun actual-ast-patch (ast script &rest keys
@@ -1789,14 +1803,11 @@ a tail of diff-a, and a tail of diff-b.")
 
   ;; sym-a is :insert
   (:method ((sym-a (eql :insert)) (sym-b (eql :insert)) o-a o-b)
-    (declare (ignorable sym-a sym-b))
     (handle-conflict o-a o-b))
   ;; default cases for :insert
   (:method ((sym-a (eql :insert)) (sym-b t) o-a o-b)
-    (declare (ignorable sym-a sym-b))
     (handle-conflict o-a o-b :unstable nil :leave-b t))
-  (:method (sym-a (sym-b (eql :insert)) o-a o-b)
-    (declare (ignorable sym-a sym-b))
+  (:method ((sym-a t) (sym-b (eql :insert)) o-a o-b)
     (handle-conflict o-a o-b :unstable nil :leave-a t))
   ;; sym-a is :delete
   (:method ((sym-a (eql :delete)) (sym-b (eql :delete)) o-a o-b)
@@ -1892,34 +1903,28 @@ a tail of diff-a, and a tail of diff-b.")
 
   ;; Unwind :*-sequence operations
 
-  (:method ((sym-a (eql :insert-sequence)) sym-b o-a o-b)
-    (declare (ignorable sym-b))
+  (:method ((sym-a (eql :insert-sequence)) (sym-b t) o-a o-b)
     (let ((new-o-a (nconc (map 'list (lambda (x) (cons :insert x)) (cdar o-a))
                           (cdr o-a))))
       (merge-diffs2 new-o-a o-b)))
-  (:method (sym-a (sym-b (eql :insert-sequence)) o-a o-b)
-    (declare (ignorable sym-a))
+  (:method ((sym-a t) (sym-b (eql :insert-sequence)) o-a o-b)
     (let ((new-o-b (nconc (map 'list (lambda (x) (cons :insert x)) (cdar o-b))
                           (cdr o-b))))
       (merge-diffs2 o-a new-o-b)))
 
-  (:method ((sym-a (eql :delete-sequence)) sym-b o-a o-b)
-    (declare (ignorable sym-b))
+  (:method ((sym-a (eql :delete-sequence)) (sym-b t) o-a o-b)
     (let ((new-o-a (nconc (map 'list (lambda (x) (cons :delete x)) (cdar o-a))
                           (cdr o-a))))
       (merge-diffs2 new-o-a o-b)))
-  (:method (sym-a (sym-b (eql :delete-sequence)) o-a o-b)
-    (declare (ignorable sym-a))
+  (:method ((sym-a t) (sym-b (eql :delete-sequence)) o-a o-b)
     (let ((new-o-b (nconc (map 'list (lambda (x) (cons :delete x)) (cdar o-b))
                           (cdr o-b))))
       (merge-diffs2 o-a new-o-b)))
 
-  (:method ((sym-a (eql :same-sequence)) sym-b o-a o-b)
-    (declare (ignorable sym-b))
+  (:method ((sym-a (eql :same-sequence)) (sym-b t) o-a o-b)
     (setf o-a (same-seq-to-list o-a))
     (merge-diffs2 (same-seq-to-sames o-a) o-b))
-  (:method (sym-a (sym-b (eql :same-sequence)) o-a o-b)
-    (declare (ignorable sym-a))
+  (:method ((sym-a t) (sym-b (eql :same-sequence)) o-a o-b)
     (setf o-b (same-seq-to-list o-b))
     (merge-diffs2 o-a (same-seq-to-sames o-b)))
   (:method ((sym-a (eql :same-sequence)) (sym-b (eql :same-sequence)) o-a o-b)
