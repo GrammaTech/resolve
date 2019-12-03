@@ -185,6 +185,9 @@ can be recursed on if STRINGS is true (defaults to true)"))
 
 (defgeneric ast-on-recurse (ast)
   (:documentation "Possibly AST on recursion."))
+;;; TODO: fix this for :COMBINED nodes from new-clang
+;;;   They have ast-children, but diff should not go down into
+;;;   them.  Instead, the node should be treated as a simple string.
 (defmethod ast-on-recurse ((ast ast)) (ast-children ast))
 (defmethod ast-on-recurse ((ast t)) ast)
 
