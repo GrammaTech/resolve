@@ -237,24 +237,24 @@ command-line options processed by the returned function."
       (let* ((old-sw (expand-options-for-which-files language "OLD"))
              (new-sw (expand-options-for-which-files language "NEW"))
              (softwares (list old-sw new-sw)))
-        (setf diff (resolve/ast-diff:ast-diff old-sw new-sw :strings strings)))
-      ;; Print according to the RAW option.
-      (cond
-        (raw (writeln (ast-diff-elide-same diff) :readably t))
-        (edit-tree
-         (when coherence
-           (let ((n (let ((*read-eval* nil))
-                      (read-from-string coherence))))
-             (unless (typep n '(real 0 1))
-               (error "coherence must be a number in range [0.0,1.0]"))
-             (setf coherence n)))
-         (create-and-print-edit-tree
-          softwares diff
-          :print-asts print-asts
-          :coherence coherence))
-        (t (print-diff diff :no-color no-color)))
-      ;; Only exit with 0 if the two inputs match.
-      (wait-on-manual manual))
+        (setf diff (resolve/ast-diff:ast-diff old-sw new-sw :strings strings))
+        ;; Print according to the RAW option.
+        (cond
+          (raw (writeln (ast-diff-elide-same diff) :readably t))
+          (edit-tree
+           (when coherence
+             (let ((n (let ((*read-eval* nil))
+                        (read-from-string coherence))))
+               (unless (typep n '(real 0 1))
+                 (error "coherence must be a number in range [0.0,1.0]"))
+               (setf coherence n)))
+           (create-and-print-edit-tree
+            softwares diff
+            :print-asts print-asts
+            :coherence coherence))
+          (t (print-diff diff :no-color no-color)))
+        ;; Only exit with 0 if the two inputs match.
+        (wait-on-manual manual)))
     (exit-command ast-diff
                   (if (every [{eql :same} #'car] diff) 0 1)
                   diff)))
@@ -353,7 +353,8 @@ command-line options processed by the returned function."
                       year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color edit-tree
                       print-asts coherence strings split-lines
-                      my-split-lines your-split-lines old-split-lines))
+                      my-split-lines your-split-lines old-split-lines
+                      fault-loc))
   #+drop-dead
   (drop-dead-date ()
     (exit-command auto-merge 2

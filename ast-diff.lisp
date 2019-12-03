@@ -246,6 +246,10 @@ can be recursed on if STRINGS is true (defaults to true)"))
 ;;; represents a piece of the tree that is being changed by the
 ;;; a part of the edit script.
 
+(defgeneric ast-size (node)
+  (:documentation "Number of nodes and leaves in an AST or
+ast-like thing"))
+
 (defclass size-mixin ()
   ((size :reader ast-size
          :documentation "Cache slot for AST-SIZE function"))
@@ -356,10 +360,6 @@ rewritten TO by part of the edit script"))
     (when (> (length s) bound)
       (setf s (concatenate 'string (subseq s 0 (- bound 3)) "...")))
     (format stream "#<EDIT-TREE-NODE ~s>" s)))
-
-(defgeneric ast-size (node)
-  (:documentation "Number of nodes and leaves in an AST or
-ast-like thing"))
 
 (defmethod ast-size ((node ast))
   (reduce #'+ (ast-children node) :key #'ast-size :initial-value 1))
