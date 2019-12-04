@@ -498,12 +498,13 @@
             (clang-mutate-available-p))
 
 (deftest (diff-gets-back-on-track :long-running) ()
-  (is (= 2 (nth-value
-            1
-            (ast-diff (from-string (make-clang-instance)
-                                   "int a; int b; int c; int d;")
-                      (from-string (make-clang-instance)
-                                   "int a; int z; int b; int c; int d;"))))))
+  (let ((obj1 (from-string (make-clang-instance)
+                           "int a; int b; int c; int d;"))
+        (obj2 (from-string (make-clang-instance)
+                           "int a; int z; int b; int c; int d;")))
+    (is (= 7 (nth-value 1 (ast-diff obj1 obj2))))
+    (is (= 5 (nth-value 1 (let ((*ignore-whitespace* t))
+                            (ast-diff obj1 obj2)))))))
 
 (deftest (diff-insert :long-running) ()
   (let ((orig (from-string (make-clang-instance)
@@ -627,6 +628,26 @@
             #'second]
            (ast-diff-elide-same (ast-diff *binary-search* var)))))))
 
+(deftest diff-wrap/unwrap.1 ()
+  (flet ((keys (d)
+           (sort (remove-if-not #'symbolp
+                                (copy-list (remove-duplicates (flatten d))))
+                 #'string< :key #'symbol-name)))
+    (let* ((s1 "int f() { return 1; }")
+           (s2 "int f() { return 1+2; }")
+           (obj1 (from-string (make-clang-instance) s1))
+           (obj2 (from-string (make-clang-instance) s2)))
+      (multiple-value-bind (diff cost)
+          (ast-diff obj1 obj2 :params (make-ast-diff-params
+                                       :wrap t :max-wrap-diff 1000))
+        (is (equal (keys diff) '(:recurse :same :wrap)))
+        (is (= cost 2)))
+      (multiple-value-bind (diff cost)
+          (ast-diff obj2 obj1 :params (make-ast-diff-params
+                                       :wrap t :max-wrap-diff 1000))
+        (is (equal (keys diff) '(:recurse :same :unwrap)))
+        (is (= cost 2))))))
+
 (deftest print-diff.1 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-clang-instance) s)))
@@ -746,7 +767,9 @@
          ;; :STRINGS nil means the diff does not descend into the
          ;; string constant.
          (edit-tree
-          (create-edit-tree obj1 obj2 (ast-diff obj1 obj2 :strings nil))))
+          (create-edit-tree obj1 obj2 (ast-diff obj1 obj2
+                                                :params (make-ast-diff-params
+                                                         :strings nil)))))
     (let ((count 0))
       (map-edit-tree edit-tree (lambda (x) (declare (ignore x)) (incf count)))
       (is (= 1 count)
@@ -1049,7 +1072,8 @@
         "7-conflict 2")))
 
 (deftest sexpr-converge.8-conflict ()
-  (let ((merged (converge '(a ("a") b) '(a (d) b) '(a ("b") b) :meld? nil :conflict t :strings nil)))
+  (let ((merged (converge '(a ("a") b) '(a (d) b) '(a ("b") b) :meld? nil :conflict t
+                          :params (make-ast-diff-params :strings nil))))
     (is (typep merged '(cons (eql a)
                         (cons (cons conflict-ast null)
                          (cons (eql b) null))))
@@ -1096,7 +1120,7 @@
       (is (search "minimist" (genome merged))) ; Something from my.
       (is (search "3\"," (genome merged))))))  ; Something from your.
 
-(deftest gcd-conflict-merge3 ()
+(deftest (gcd-conflict-merge3 :long-running) ()
   (with-fixture gcd-conflict-clang
     (multiple-value-bind (merged unstable)
         (converge *my* *old* *your* :conflict t)
