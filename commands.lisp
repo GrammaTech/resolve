@@ -74,9 +74,7 @@
             +clang-command-line-options+
             +project-command-line-options+
             +clang-project-command-line-options+
-            `((("language" #\L) :type string :optional t
-               :documentation "language to use for source")
-              (("raw" #\r) :type boolean :optional t
+            `((("raw" #\r) :type boolean :optional t
                :documentation "output diff as raw ASTs (default is as text)")
               (("no-color" #\C) :type boolean :optional t
                :documentation "inhibit color printing")
