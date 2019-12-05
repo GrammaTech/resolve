@@ -227,35 +227,34 @@ command-line options processed by the returned function."
   (when help (show-help-for-ast-diff))
   (setf *note-out* (list *error-output*))
   (let (diff)
-    (with-prof profile
-      (unless (every #'resolve-file (list old-file new-file))
-        (exit-command ast-diff 2 (error "Missing source.")))
-      (unless language
-        (setf language (guess-language old-file new-file)))
-      ;; Create the diff.
+    (unless (every #'resolve-file (list old-file new-file))
+      (exit-command ast-diff 2 (error "Missing source.")))
+    (unless language
+      (setf language (guess-language old-file new-file)))
+    ;; Create the diff.
 
-      (let* ((old-sw (expand-options-for-which-files language "OLD"))
-             (new-sw (expand-options-for-which-files language "NEW"))
-             (softwares (list old-sw new-sw)))
-        (setf diff (resolve/ast-diff:ast-diff
-                    old-sw new-sw :strings strings))
-        ;; Print according to the RAW option.
-        (cond
-          (raw (writeln (ast-diff-elide-same diff) :readably t))
-          (edit-tree
-           (when coherence
-             (let ((n (let ((*read-eval* nil))
-                        (read-from-string coherence))))
-               (unless (typep n '(real 0 1))
-                 (error "coherence must be a number in range [0.0,1.0]"))
-               (setf coherence n)))
-           (create-and-print-edit-tree
-            softwares diff
-            :print-asts print-asts
-            :coherence coherence))
-          (t (print-diff diff :no-color no-color)))
-        ;; Only exit with 0 if the two inputs match.
-        (wait-on-manual manual)))
+    (let* ((old-sw (expand-options-for-which-files language "OLD"))
+           (new-sw (expand-options-for-which-files language "NEW"))
+           (softwares (list old-sw new-sw)))
+      (setf diff (resolve/ast-diff:ast-diff
+                  old-sw new-sw :strings strings))
+      ;; Print according to the RAW option.
+      (cond
+        (raw (writeln (ast-diff-elide-same diff) :readably t))
+        (edit-tree
+         (when coherence
+           (let ((n (let ((*read-eval* nil))
+                      (read-from-string coherence))))
+             (unless (typep n '(real 0 1))
+               (error "coherence must be a number in range [0.0,1.0]"))
+             (setf coherence n)))
+         (create-and-print-edit-tree
+          softwares diff
+          :print-asts print-asts
+          :coherence coherence))
+        (t (print-diff diff :no-color no-color)))
+      ;; Only exit with 0 if the two inputs match.
+      (wait-on-manual manual)))
     (exit-command ast-diff
                   (if (every [{eql :same} #'car] diff) 0 1)
                   diff)))
