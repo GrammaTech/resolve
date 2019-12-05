@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# Due to a temporary bug, diff files did not have newlines.
+#
+left=$(mktemp)
+right=$(mktemp)
+port=$(shuf -i 9000-9200 -n 1)
+
+EXIT=0
+
+function exit_hook(){
+  rm -f $left $right;
+  exit $EXIT; }
+trap exit_hook SIGHUP SIGINT SIGTERM
+
+seq 10 > $left
+seq 10|sed 's/6/SIX/' > $right
+
+serve-ast-diff --port ${port} --debug &
+server_pid=$!
+
+sleep 1
+
+response=$(curl -s \
+                -X POST \
+                -H "Accept: application/json" \
+                -H "Content-Type: application/json" \
+                http://localhost:${port}/diff \
+                --data "{\"old-file\" : \"$left\", \"new-file\" : \"$right\"}")
+
+echo "${response}"|grep "^{.*}$"
+EXIT=$?
+
+kill -SIGINT ${server_pid}
+wait ${server_pid}
+exit_hook

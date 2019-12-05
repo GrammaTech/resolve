@@ -16,7 +16,7 @@ DOC_PACKAGES =				\
 LISP_DEPS =				\
 	$(wildcard *.lisp)
 
-BINS = ast-diff ast-merge auto-merge
+BINS = ast-diff ast-merge auto-merge serve-ast-diff
 
 BIN_TEST_DIR = test/bin
 BIN_TESTS =					\
@@ -31,7 +31,8 @@ BIN_TESTS =					\
 	octomap-diff				\
 	octomap-diff-count			\
 	octomap-diff-edit-tree			\
-	ast-merge-json-has-conflict
+	ast-merge-json-has-conflict		\
+	rest-ast-diff-returns-json
 
 # TODO: Fix these failing tests.
 # ast-diff-on-simple-has-lines
