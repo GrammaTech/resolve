@@ -281,7 +281,8 @@ command-line options processed by the returned function."
 (encode-json-to-string
  (destructuring-bind (&key old-file new-file language)
      (alist-plist (decode-json-from-string (payload-as-string)))
-   (let ((*standard-output* (make-broadcast-stream)))
+   (let ((*lisp-interaction* t)
+         (*standard-output* (make-broadcast-stream)))
      (ast-diff old-file new-file :language language)))))
 
 (define-command serve-ast-diff
@@ -305,8 +306,10 @@ command-line options processed by the returned function."
                          :port port :address address
                          :debug debug :silent silent))
           (unless *lisp-interaction*
-            (loop :for char := (read-char) :do
-                 (when (member char '(#\q #\Q)) (shutdown)))))
+            (loop :for char := (read-char *standard-input* nil #\p) :do
+                 (if (member char '(#\q #\Q))
+                     (shutdown)
+                     (sleep 1)))))
       ;; Catch a user's C-c.
       (#.interrupt-signal ()
         (shutdown "Shutting down server." 130))
