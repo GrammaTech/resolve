@@ -47,6 +47,7 @@
         (if-let* 1)
         (when-let 1)
         (when-let* 1)
+        (defroute 2)
         (defixture 1)))
 
 (defun define-feature-lisp-indent

@@ -23,6 +23,13 @@
   :build-pathname "bin/ast-diff"
   :entry-point "resolve/commands::run-ast-diff")
 
+(defsystem "resolve/run-serve-ast-diff"
+    :description "REST `ast-diff' server from resolve."
+    :depends-on (resolve/commands)
+    :build-operation "asdf:program-op"
+    :build-pathname "bin/serve-ast-diff"
+    :entry-point "resolve/commands::run-serve-ast-diff")
+
 (defsystem "resolve/run-ast-merge"
   :author "GrammaTech"
   :description "Merge two programs that diverge from a common ancestor."
