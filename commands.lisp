@@ -211,7 +211,8 @@ command-line options processed by the returned function."
   (drop-dead-method-all))
 
 (define-command-rest ast-diff
-    (old-file new-file &spec +ast-diff-command-line-options+)
+    (old-file new-file &spec +ast-diff-command-line-options+
+              &aux diff old-file-temp-path new-file-temp-path)
   "Compare source code in OLD-FILE and NEW-FILE by AST."
   #.(format nil
             "~%Built from SEL ~a, Resolve ~a, and ~a ~a on ~a.~%"
@@ -232,47 +233,80 @@ command-line options processed by the returned function."
                          (quit 2))))
   (when help (show-help-for-ast-diff))
   (setf *note-out* (list *error-output*))
-  (let (diff)
-    (unless (every #'resolve-file (list old-file new-file))
-      (exit-command ast-diff 2 (error "Missing source.")))
-    (unless language
-      (setf language (guess-language old-file new-file)))
-    ;; Create the diff.
+  (unwind-protect
+       (progn
+         (if (and (find #\Newline old-file) (find #\Newline new-file))
+             ;; We have text with newlines so it is probably the raw text.
+             (progn
+               (unless language
+                 (error "Must specify language when differencing strings."))
+               (setf language
+                     (resolve-language-from-language-and-source language))
+               (let ((type (case language
+                             (java "java")
+                             (javascript "js")
+                             (json "json")
+                             (clang "cxx")
+                             (lisp "lisp")
+                             (simple "txt"))))
+                 (setf old-file-temp-path (temp-file-name type)
+                       new-file-temp-path (temp-file-name type))
+                 (string-to-file old-file old-file-temp-path)
+                 (string-to-file new-file new-file-temp-path)
+                 (setf old-file old-file-temp-path
+                       new-file new-file-temp-path)))
+             ;; We have paths to resources, files, directories, or repositories.
+             (progn
+               (unless (every #'resolve-file (list old-file new-file))
+                 (exit-command ast-diff 2 (error "Missing source.")))
+               (unless language
+                 (setf language (guess-language old-file new-file)))))
+         ;; Create the diff.
+         (let* ((old-sw (expand-options-for-which-files language "OLD"))
+                (new-sw (expand-options-for-which-files language "NEW"))
+                (softwares (list old-sw new-sw)))
+           (setf diff (resolve/ast-diff:ast-diff
+                       old-sw new-sw :strings strings))
+           ;; Print according to the RAW option.
+           (cond
+             (raw (writeln (ast-diff-elide-same diff) :readably t))
+             (edit-tree
+              (when coherence
+                (let ((n (let ((*read-eval* nil))
+                           (read-from-string coherence))))
+                  (unless (typep n '(real 0 1))
+                    (error "coherence must be a number in range [0.0,1.0]"))
+                  (setf coherence n)))
+              (create-and-print-edit-tree
+               softwares diff
+               :print-asts print-asts
+               :coherence coherence))
+             (json (writeln (encode-json-to-string diff)))
+             (t (print-diff diff :no-color no-color)))
+           ;; Only exit with 0 if the two inputs match.
+           (wait-on-manual manual))
+         (exit-command ast-diff
+                       (if (every [{eql :same} #'car] diff) 0 1)
+                       diff))
+    (when old-file-temp-path (delete-file old-file-temp-path))
+    (when new-file-temp-path (delete-file new-file-temp-path))))
 
-    (let* ((old-sw (expand-options-for-which-files language "OLD"))
-           (new-sw (expand-options-for-which-files language "NEW"))
-           (softwares (list old-sw new-sw)))
-      (setf diff (resolve/ast-diff:ast-diff
-                  old-sw new-sw :strings strings))
-      ;; Print according to the RAW option.
-      (cond
-        (raw (writeln (ast-diff-elide-same diff) :readably t))
-        (edit-tree
-         (when coherence
-           (let ((n (let ((*read-eval* nil))
-                      (read-from-string coherence))))
-             (unless (typep n '(real 0 1))
-               (error "coherence must be a number in range [0.0,1.0]"))
-             (setf coherence n)))
-         (create-and-print-edit-tree
-          softwares diff
-          :print-asts print-asts
-          :coherence coherence))
-        (json (writeln (encode-json-to-string diff)))
-        (t (print-diff diff :no-color no-color)))
-      ;; Only exit with 0 if the two inputs match.
-      (wait-on-manual manual)))
-    (exit-command ast-diff
-                  (if (every [{eql :same} #'car] diff) 0 1)
-                  diff)))
+(defun rest-diff (&rest ast-diff-params)
+  (destructuring-bind (&key old-file new-file language)
+      (alist-plist (decode-json-from-string (payload-as-string)))
+    (let ((*lisp-interaction* t))
+      (handler-case (apply #'ast-diff old-file new-file :language language
+                           ast-diff-params)
+        (error (e) (http-condition 500 "Error: ~a" e))))))
+
+(defroute diff (:post :text/plain)
+  (with-output-to-string (*standard-output*)
+    (rest-diff)
+    (format t "~&")))                  ; Ensure we end with a newline.
 
 (defroute diff (:post :application/json)
-(encode-json-to-string
- (destructuring-bind (&key old-file new-file language)
-     (alist-plist (decode-json-from-string (payload-as-string)))
-   (let ((*lisp-interaction* t)
-         (*standard-output* (make-broadcast-stream)))
-     (ast-diff old-file new-file :language language)))))
+  (with-output-to-string (*standard-output*)
+    (rest-diff :json t)))
 
 (define-command ast-merge (my-file old-file your-file
                                    &spec +ast-merge-command-line-options+)
@@ -286,7 +320,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable quiet verbose raw no-color edit-tree
+  (declare (ignorable quiet verbose raw no-color edit-tree json
                       print-asts coherence split-lines
                       my-split-lines your-split-lines old-split-lines))
   #+drop-dead

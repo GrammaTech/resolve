@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# Due to a temporary bug, diff files did not have newlines.
+#
+port=$(shuf -i 9000-9200 -n 1)
+EXIT=0
+
+serve-ast-diff --port ${port} --debug &
+server_pid=$!
+sleep 1
+
+function exit_hook(){
+  kill -SIGINT ${server_pid};
+  wait ${server_pid};
+  exit $EXIT; }
+trap exit_hook SIGHUP SIGINT SIGTERM
+
+rest-ast-diff -a text/plain -l javascript \
+              test/etc/javascript/abacus/abacus-{orig,borders}.js \
+  |grep -i "\({+console.log\|\+}\)"
+EXIT=$?
+exit_hook

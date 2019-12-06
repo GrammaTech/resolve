@@ -32,7 +32,8 @@ BIN_TESTS =					\
 	octomap-diff-count			\
 	octomap-diff-edit-tree			\
 	ast-merge-json-has-conflict		\
-	rest-ast-diff-returns-json
+	rest-ast-diff-returns-json		\
+	rest-ast-diff-take-full-strings
 
 # TODO: Fix these failing tests.
 # ast-diff-on-simple-has-lines

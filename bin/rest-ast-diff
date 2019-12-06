@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Usage: rest-ast-diff [OPTIONS] old-file new-file
+#  Run AST-DIFF through the REST interface.
+#
+# OPTIONS:
+#   -h,--help ---------- show this help text
+#   -H,--host HOST ----- host to contact (default: localhost)
+#   -p,--port PORT ----- port to contact (default: 5000)
+#   -a,--accept MIME --- mime type accepted (default: application/json)
+#   -l,--language LANG - set the language (default: none)
+#
+# NOTE: If we find that at some point we want to release this utility,
+#       we should probably rewrite it as a simple C executable which
+#       is statically linked with CURL and JQ avoiding unnecessary
+#       dependencies on the user's system.  Should be straightforward.
+SCRIPT="$0"
+help(){
+    local HELP_TEXT=$(cat "$SCRIPT" \
+        |sed '/^[^#]/q' \
+        |head -n -1 \
+        |tail -n +3 \
+        |sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+        |cut -c3-)
+    echo "$HELP_TEXT"
+    exit 1
+}
+
+HOST=localhost
+PORT=5000
+ACCEPT=application/json
+LANGUAGE=
+
+eval set -- $(getopt -o hH:p:a:l: -l help,host:,port:,accept:,language: -- "$@" || help;)
+while [ $# -gt 0 ];do
+    case $1 in
+        -h|--help) help;;
+        -H|--host) HOST=$2; shift;;
+        -p|--port) PORT=$2; shift;;
+        -a|--accept) ACCEPT=$2; shift;;
+        -l|--language) LANGUAGE=", \"language\" : \"$2\""; shift;;
+        (--) shift; break;;
+        (-*) error "unrecognized option $1";;
+        (*)  break;;
+    esac
+    shift
+done
+if [ -z $1 ] || [ -z $2 ];then
+  help
+fi
+OLD_FILE=$1
+NEW_FILE=$2
+
+PAYLOAD="$(jq -n \
+       --arg OLD "$(cat $OLD_FILE)" \
+       --arg NEW "$(cat $NEW_FILE)" \
+       "{\"old-file\": \$OLD, \"new-file\": \$NEW ${LANGUAGE}}")"
+
+curl -X POST \
+     -H "Accept: application/json" \
+     -H "Content-Type: ${ACCEPT}" \
+     http://${HOST}:${PORT}/diff \
+     --data "${PAYLOAD}"
