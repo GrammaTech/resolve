@@ -44,6 +44,7 @@
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/command-line
+        :software-evolution-library/command-line-rest
         :software-evolution-library/software/ast
         :software-evolution-library/software/simple
         :software-evolution-library/software/project
@@ -56,10 +57,7 @@
         :software-evolution-library/software/json
         :software-evolution-library/software/lisp
         :software-evolution-library/components/test-suite)
-  (:import-from :uiop :writeln :truenamize :nest)
-  (:import-from :clack :clackup :stop)
-  (:import-from :snooze :make-clack-app :defroute :payload-as-string)
-  (:import-from :cl-json :decode-json-from-string :encode-json-to-string)
+  (:import-from :uiop :nest)
   (:shadow :merge :ast-diff)
   (:export :ast-diff :ast-merge))
 (in-package :resolve/commands)
@@ -109,17 +107,6 @@
        :documentation "number of test cases to execute"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter +clackup-command-line-options+
-    `((("port") :type integer :optional t :initial-value 5000
-       :documentation "Port to use when starting the clack server.")
-      (("address") :type string :optional t :initial-value "127.0.0.1"
-       :documentation "Address to which the clack server with bind.")
-      (("debug") :type boolean :optional t :initial-value nil
-       :documentation "Run the clack server in debug mode.")
-      (("silent") :type boolean :optional t :initial-value nil
-       :documentation "Run the clack server in silent mode."))))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
     "Return a function to multiply command-line arguments across MULTIPLIERS.
 Every element of MULTIPLIERS results in a another multiple of the
@@ -147,10 +134,6 @@ command-line options processed by the returned function."
    (append +clang-command-line-options+
            +project-command-line-options+
            +clang-project-command-line-options+))
-
-  (nest
-   (defparameter +server-command-line-options+)
-   (append +common-command-line-options+ +clackup-command-line-options+))
 
   (nest
    (defparameter +ast-merge-command-line-options+)
@@ -223,7 +206,8 @@ command-line options processed by the returned function."
                            map-edit-tree ast-patch merge-diffs-on-syms))))
   (drop-dead-method-all))
 
-(define-command ast-diff (old-file new-file &spec +ast-diff-command-line-options+)
+(define-command-rest ast-diff
+    (old-file new-file &spec +ast-diff-command-line-options+)
   "Compare source code in OLD-FILE and NEW-FILE by AST."
   #.(format nil
             "~%Built from SEL ~a, Resolve ~a, and ~a ~a on ~a.~%"
@@ -284,38 +268,6 @@ command-line options processed by the returned function."
    (let ((*lisp-interaction* t)
          (*standard-output* (make-broadcast-stream)))
      (ast-diff old-file new-file :language language)))))
-
-(define-command serve-ast-diff
-    (&spec +server-command-line-options+ &aux server)
-  "Serve AST-DIFF as a rest end point." ""
-  (declare (ignorable eval load language))
-  (when quiet (setf silent t))
-  (when help (show-help-for-serve-ast-diff) (exit-command serve-ast-diff 0))
-  ;; Install exit handler for User C-c.
-  (flet ((shutdown (&optional (message "Stopping server . . .") (errno 0))
-           (format t "~a" message)
-           (stop server)
-           (exit-command serve-ast-diff errno)))
-    ;; From https://github.com/LispCookbook/cl-cookbook/blob/master/scripting.md
-    (handler-case
-        ;; Run server, and wait for keyboard input to terminate.
-        ;; Borrowed from `sel/rest.lisp`.
-        (progn
-          (setf server
-                (clackup (make-clack-app)
-                         :port port :address address
-                         :debug debug :silent silent))
-          (unless *lisp-interaction*
-            (loop :for char := (read-char *standard-input* nil #\p) :do
-                 (if (member char '(#\q #\Q))
-                     (shutdown)
-                     (sleep 1)))))
-      ;; Catch a user's C-c.
-      (#.interrupt-signal ()
-        (shutdown "Shutting down server." 130))
-      (error (e)
-        (shutdown (format nil "unexpected error ~S" e) 1)))
-    (exit-command serve-ast-diff 0 server)))
 
 (define-command ast-merge (my-file old-file your-file
                                    &spec +ast-merge-command-line-options+)
