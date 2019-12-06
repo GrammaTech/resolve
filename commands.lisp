@@ -58,6 +58,8 @@
         :software-evolution-library/software/lisp
         :software-evolution-library/components/test-suite)
   (:import-from :uiop :nest)
+  (:import-from :uiop/stream :writeln)
+  (:import-from :uiop/filesystem :truenamize)
   (:shadow :merge :ast-diff)
   (:export :ast-diff :ast-merge))
 (in-package :resolve/commands)
@@ -84,6 +86,8 @@
                :documentation "inhibit color printing")
               (("edit-tree" #\T) :type boolean :optional t
                :documentation "Print edit tree")
+              (("json" #\J):type boolean :optional t
+               :documentation "Print results as JSON")
               (("print-asts") :type boolean :optional t
                :documentation
                "Also print a representation of the edit tree ASTs")
@@ -254,6 +258,7 @@ command-line options processed by the returned function."
           softwares diff
           :print-asts print-asts
           :coherence coherence))
+        (json (writeln (encode-json-to-string diff)))
         (t (print-diff diff :no-color no-color)))
       ;; Only exit with 0 if the two inputs match.
       (wait-on-manual manual)))
@@ -361,7 +366,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable manual quiet verbose raw no-color edit-tree
+  (declare (ignorable manual quiet verbose raw no-color json edit-tree
                       print-asts coherence strings split-lines
                       my-split-lines your-split-lines old-split-lines
                       fault-loc))
