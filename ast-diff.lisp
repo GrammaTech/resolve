@@ -481,7 +481,6 @@ of children leading down to the node."))
                (t
                 (multiple-value-bind (diff cost)
                     (ast-diff ast-a x :params sub-params)
-
                   (when (< cost best-cost)
                     (multiple-value-bind (left-wrap right-wrap classes)
                         (wraps-of-path ast-b (reverse path))
@@ -489,20 +488,20 @@ of children leading down to the node."))
                                            (cost-of-wrap left-wrap)
                                            (cost-of-wrap right-wrap))))
                         (when (< total-cost best-cost)
-                          #|
-                          (format t "Wrap candidate found~%")
-                          (format t "Cost = ~a~%" total-cost)
-                          (format t "ast-a = ~s~%" (ast-to-list-form ast-a))
-                          (format t "ast-b = ~s~%" (ast-to-list-form ast-b))
-                          (format t "diff = ~s~%" diff)
-                          (format t "path = ~s~%" path)
-                          (format t "left-wrap = ~s~%" left-wrap)
-                          (format t "right-wrap = ~s~%" right-wrap)
-                          (format t "classes = ~s~%" classes)
-                          |#
+                          #+ast-diff-debug
+                          (progn
+                            (format t "Wrap candidate found~%")
+                            (format t "Cost = ~a~%" total-cost)
+                            (format t "ast-a = ~s~%" (ast-to-list-form ast-a))
+                            (format t "ast-b = ~s~%" (ast-to-list-form ast-b))
+                            (format t "diff = ~s~%" diff)
+                            (format t "path = ~s~%" path)
+                            (format t "left-wrap = ~s~%" left-wrap)
+                            (format t "right-wrap = ~s~%" right-wrap)
+                            (format t "classes = ~s~%" classes))
                           (setf best-cost total-cost
-                                best-candidate (list (list :wrap diff path left-wrap right-wrap classes
-                                                           ast-b))))))))))))))
+                                best-candidate (list :wrap diff path left-wrap right-wrap classes
+                                                     ast-b)))))))))))))
     (when best-candidate
       (values best-candidate best-cost))))
 
@@ -558,7 +557,7 @@ out of one tree and turns it into another."))
 (defun wraps-of-path (ast path)
   "Computes lists of children that lie on the left and right sides of a path
 down from AST, as well as the classes of the nodes along the path."
-  (format t "Wraps of PATH = ~s in ~s~%" path (ast-to-list-form ast))
+  ;; (format t "Wraps of PATH = ~s in ~s~%" path (ast-to-list-form ast))
   (let (left right classes)
     (iter (while path)
           (assert (ast-p ast))
@@ -574,7 +573,7 @@ down from AST, as well as the classes of the nodes along the path."
     (setf left (reverse left)
           right (reverse right)
           classes (reverse classes))
-    (format t "Result: ~s ~s ~s~%" left right classes)
+    ;; (format t "Result: ~s ~s ~s~%" left right classes)
     (values left right classes)))
 
 (defun cost-of-wrap (wrap)
@@ -777,9 +776,10 @@ Prefix and postfix returned as additional values."
                     (cons :same (car a))))
               ((ast-can-recurse (car a) (car b) params) ; Recurse.
                #+ast-diff-debug (format t "  recurse~%")
-               (add (cons (cdr a) (cdr b))
-                    (cons  :recurse
-                           (%recursive a b))))))
+               (let ((rec (%recursive a b)))
+                 #+ast-diff-debug (format t "At ast-can-recurse:  rec = ~a~%" rec)
+                 (add (cons (cdr a) (cdr b))
+                      (cons :recurse rec))))))
           (if (consp b)                 ; Insert.
               (add (cons a (cdr b))
                    (cons :insert (car b)))
@@ -1432,7 +1432,7 @@ A diff is a sequence of actions as returned by `ast-diff' including:
    a tree of class <class> with left and right children along the path given
    by <left-wrap> and <right-wrap>
 :unwrap S <path> <left-wrap> <right-wrap> : Apply S to the subtree of given
-  by following <path> down from this tree"))
+  by following <path> down from this tree."))
 
 (defmethod ast-patch ((original null) (script null) &key &allow-other-keys)
   nil)
@@ -1450,14 +1450,18 @@ A diff is a sequence of actions as returned by `ast-diff' including:
            (iter (for new-children in new-child-lists)
                  (collect (copy ast :children new-children))))))
 
-(defmethod ast-patch ((ast ast) script &rest keys &key &allow-other-keys)
-  (apply #'actual-ast-patch ast script keys))
+(defmethod ast-patch ((ast ast) (script list) &rest keys &key &allow-other-keys)
+  (if (listp (car script))
+      (apply #'actual-ast-patch ast script keys)
+      (call-next-method)))
 
 (defmethod ast-patch ((original t) (script cons)
                       &rest keys &key (delete? t) &allow-other-keys)
   (declare (ignorable delete? keys))
   (if (ast-p original)
-      (apply #'actual-ast-patch original script keys)
+      (if (eql (car script) :wrap)
+          (apply #'ast-patch-wrap original (cdr script) keys)
+          (apply #'actual-ast-patch original script keys))
       (case (car script)
         (:recurse-tail
          (ast-patch original (cdr script)))
@@ -1592,7 +1596,7 @@ process with the rest of the script."
                         :class (pop classes)
                         :children (append (pop left-wrap) (list ast)
                                           (pop right-wrap)))))
-  ;; (format t "AST-WRAP returned:~%~s~%" (ast-text ast))
+  #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (ast-text ast))
   ast)
 
 (defmethod ast-patch ((original cons) (script list)
@@ -1724,7 +1728,9 @@ process with the rest of the script."
                  (edit asts (cdr script)))))))))
     ;; cause various unmerged subsequences to be combined before
     ;; returning, if meld? is true
-    (append-values meld? nil (edit original script))))
+    (if (listp (car script))
+        (append-values meld? nil (edit original script))
+        (call-next-method))))
 
 (defun meld-scripts (script1 script2)
   "Combine two edit scripts that process sequences of the same length.
@@ -1793,10 +1799,11 @@ and replicating the others."
 (defmethod ast-patch :around ((original sequence) (script list)
                               &key delete? meld? conflict &allow-other-keys)
   (declare (ignorable delete?))
-  (if (find :conflict script :key #'car)
+  (if (and (listp (car script))
+           (find :conflict script :key #'car))
       (if (or meld? conflict)
           (let ((result (call-next-method)))
-            ;; (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+            #+ast-diff-debug (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
             result)
           (let ((script1 (iter (for action in script)
                                (appending
@@ -1811,7 +1818,7 @@ and replicating the others."
             (values (ast-patch original script1)
                     (ast-patch original script2))))
       (let ((result (call-next-method)))
-        ;; (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+        #+ast-diff-debug (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
         result)))
 
 (defmethod ast-patch ((original vector) (script list)
