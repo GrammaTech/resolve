@@ -38,7 +38,7 @@
    :iterate
    :cl-heap)
   (:shadowing-import-from :software-evolution-library/view
-                          +color-RED+ +color-GRN+ +color-RST+)
+                          :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :software-evolution-library/software/new-clang
                           :map-ast-while)
   (:export
