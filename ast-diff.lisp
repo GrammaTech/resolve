@@ -483,16 +483,32 @@ of children leading down to the node."))
                     (ast-diff ast-a x :params sub-params)
 
                   (when (< cost best-cost)
-                    (multiple-value-bind (left-wrap right-wrap)
+                    (multiple-value-bind (left-wrap right-wrap classes)
                         (wraps-of-path ast-b (reverse path))
                       (let ((total-cost (+ cost
                                            (cost-of-wrap left-wrap)
                                            (cost-of-wrap right-wrap))))
                         (when (< total-cost best-cost)
+                          #|
+                          (format t "Wrap candidate found~%")
+                          (format t "Cost = ~a~%" total-cost)
+                          (format t "ast-a = ~s~%" (ast-to-list-form ast-a))
+                          (format t "ast-b = ~s~%" (ast-to-list-form ast-b))
+                          (format t "diff = ~s~%" diff)
+                          (format t "path = ~s~%" path)
+                          (format t "left-wrap = ~s~%" left-wrap)
+                          (format t "right-wrap = ~s~%" right-wrap)
+                          (format t "classes = ~s~%" classes)
+                          |#
                           (setf best-cost total-cost
-                                best-candidate (list :wrap diff path left-wrap right-wrap)))))))))))))
+                                best-candidate (list (list :wrap diff path left-wrap right-wrap classes
+                                                           ast-b))))))))))))))
     (when best-candidate
       (values best-candidate best-cost))))
+
+(defgeneric ast-diff-unwrap (ast-a ast-b &key &allow-other-keys)
+  (:documentation "Find a minimum cost 'unwrap' edit, which pulls a subast
+out of one tree and turns it into another."))
 
 (defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast) &key params &allow-other-keys)
   ;; search over the ASTs under ast-b that are the same class as ast-a,
@@ -541,15 +557,25 @@ of children leading down to the node."))
 
 (defun wraps-of-path (ast path)
   "Computes lists of children that lie on the left and right sides of a path
-down from AST."
-  (let (left right)
+down from AST, as well as the classes of the nodes along the path."
+  (format t "Wraps of PATH = ~s in ~s~%" path (ast-to-list-form ast))
+  (let (left right classes)
     (iter (while path)
           (assert (ast-p ast))
           (let ((c (ast-children ast))
                 (i (pop path)))
+            (assert (<= 0 i))
+            (assert (< i (length c)))
+            (push (ast-class ast) classes)
             (push (subseq c 0 i) left)
-            (push (subseq c (1+ i)) right)))
-    (values (reverse left) (reverse right))))
+            (push (subseq c (1+ i)) right)
+            (setf ast (elt c i))
+            (assert (ast-p ast))))
+    (setf left (reverse left)
+          right (reverse right)
+          classes (reverse classes))
+    (format t "Result: ~s ~s ~s~%" left right classes)
+    (values left right classes)))
 
 (defun cost-of-wrap (wrap)
   "Computes the sum of the costs of the objects in a wrap"
@@ -558,10 +584,6 @@ down from AST."
 
 (defmethod ast-diff-wrap ((ast-a t) (ast-b t) &key &allow-other-keys)
   nil)
-
-(defgeneric ast-diff-unwrap (ast-a ast-b &key &allow-other-keys)
-  (:documentation "Find a minimum cost 'unwrap' edit, which pulls a subast
-out of one tree and turns it into another."))
 
 (defmethod ast-diff-unwrap ((ast-a t) (ast-b t) &key &allow-other-keys)
   nil)
@@ -1082,7 +1104,16 @@ source, build the edit tree corresponding to the script."))
 
 (defun change-segments-on-seqs (source target script segment-fn recurse-fn
                                 source-node target-node)
-  "Traverses two sequences and finds the change segments."
+  "Traverses two sequences and finds the change segments.
+source -- AST being editted
+target -- AST that it is being turned into
+script -- the edit script that changes source to target
+segment-fn -- A function that is called on six arguments to construct
+  an edit tree node for a pair of child segments
+recurse-fn -- A function called on two children of source and target
+  in order to create an edit tree for that recursive edit.
+
+Returns a list of edit tree nodes for these nodes."
   (let ((source-position 0)
         (source-segment-start 0)
         (target-position 0)
@@ -1157,7 +1188,9 @@ source, build the edit tree corresponding to the script."))
                      (push node collected-recurse))
                  (incf changes)
                  (incf source-position)
-                 (incf target-position)))))
+                 (incf target-position)))
+              ;; :wrap and :unwrap should be changed into single edit tree nodes
+              ))
       (finish 0))
     (if (and (null (cdr collected-nodes))
              (listp (car collected-nodes)))
@@ -1322,6 +1355,9 @@ object of type edit-tree-segment"))
                     nil))
 
 (defun extend-list (list desired-length extension-value)
+  "If list is less than the designed length, return a fresh list
+that is padded to that length with the extension value.  Otherwise,
+return list itself, uncopied."
   (let ((len (length list)))
     (if (< len desired-length)
         (append list (make-list (- desired-length len)
@@ -1329,6 +1365,10 @@ object of type edit-tree-segment"))
         list)))
 
 (defun apply-values-fn (fn arg-lists replicate?)
+  "Map FN over the lists in arg-lists, where each list has been NIL extended
+to the same length.  If REPLICATE? is true then pad with the last element of
+the list, not with NIL.   Return the values produced by the mapping
+as multiple return values."
   (let* ((len (reduce #'max arg-lists :key #'length))
          (extended-arg-lists
           (iter (for arg-list in arg-lists)
@@ -1367,8 +1407,8 @@ is shorter, replicate the last value (or NIL if none)."
       (2
        (values
         (first list-vals)
-        (funcall (car vals) (cadr list-vals))
-        (funcall (car vals) (caddr list-vals)))))))
+        (funcall fn (car vals) (cadr list-vals))
+        (funcall fn (car vals) (caddr list-vals)))))))
 
 (defmacro cons-values (meld? &rest args)
   `(if ,meld?
@@ -1387,7 +1427,12 @@ A diff is a sequence of actions as returned by `ast-diff' including:
 :same A B  : keep the current AST
 :insert B  : insert B at the current position
 :delete A  : remove the current AST
-:recurse S : recursively apply script S to the current AST"))
+:recurse S : recursively apply script S to the current AST
+:wrap S <path> <left-wrap> <right-wrap> <class> : Apply S to current AST, then wrap it in
+   a tree of class <class> with left and right children along the path given
+   by <left-wrap> and <right-wrap>
+:unwrap S <path> <left-wrap> <right-wrap> : Apply S to the subtree of given
+  by following <path> down from this tree"))
 
 (defmethod ast-patch ((original null) (script null) &key &allow-other-keys)
   nil)
@@ -1525,6 +1570,31 @@ process with the rest of the script."
   ;; Should only happen when CONFLICT is true
   (ast-patch asts script :tag tag :conflict t))
 
+(defun ast-patch-same-wrap (ast args tag)
+  (declare (ignorable ast args tag))
+  (error "Not yet implemented"))
+
+(defun ast-patch-wrap (ast args &rest keys &key &allow-other-keys)
+  (destructuring-bind (sub-action path left-wrap right-wrap classes base-ast)
+      args
+    (assert (= (length path) (length left-wrap) (length right-wrap)))
+    (values-list
+     (mapcar
+      (lambda (a) (ast-wrap a left-wrap right-wrap classes base-ast))
+      (multiple-value-list (apply #'ast-patch (list ast) sub-action keys))))))
+
+(defun ast-wrap (ast left-wrap right-wrap classes base-ast)
+  (assert (= (length left-wrap) (length right-wrap) (length classes)))
+  (assert (= (length ast) 1))
+  (setf ast (car ast))
+  (iter (while left-wrap)
+        (setf ast (copy base-ast
+                        :class (pop classes)
+                        :children (append (pop left-wrap) (list ast)
+                                          (pop right-wrap)))))
+  ;; (format t "AST-WRAP returned:~%~s~%" (ast-text ast))
+  ast)
+
 (defmethod ast-patch ((original cons) (script list)
                       &rest keys &key (delete? t) (meld? t) conflict tag &allow-other-keys)
   ;; MELD? causes conflicts to be all placed into the list, if possible
@@ -1578,6 +1648,16 @@ process with the rest of the script."
                     (cons-values meld?
                                  (apply #'ast-patch (car asts) args keys)
                                  (edit (cdr asts) (cdr script)))))
+               (:wrap
+                ;; The desired patch is:  apply the sub action, then wrap
+                ;; the result term in the left and right wrap lists.
+                (if tag
+                    (cons (ast-patch-same-wrap (car asts) args tag)
+                          (edit (cdr asts) (cdr script)))
+                    (cons-values meld?
+                                 (apply #'ast-patch-wrap (car asts) args keys)
+                                 (edit (cdr asts) (cdr script)))))
+
                (:same (cons-values meld?
                                    (car asts)
                                    (edit (cdr asts) (cdr script))))
@@ -1715,7 +1795,9 @@ and replicating the others."
   (declare (ignorable delete?))
   (if (find :conflict script :key #'car)
       (if (or meld? conflict)
-          (call-next-method)
+          (let ((result (call-next-method)))
+            ;; (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+            result)
           (let ((script1 (iter (for action in script)
                                (appending
                                 (if (eql (car action) :conflict)
@@ -1728,7 +1810,9 @@ and replicating the others."
                                     (list action))))))
             (values (ast-patch original script1)
                     (ast-patch original script2))))
-      (call-next-method)))
+      (let ((result (call-next-method)))
+        ;; (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+        result)))
 
 (defmethod ast-patch ((original vector) (script list)
                       &rest keys &key (delete? t) meld? &allow-other-keys)
@@ -2030,7 +2114,7 @@ a tail of diff-a, and a tail of diff-b.")
 
   (:method ((sym-a null) (sym-b null) o-a o-b)
     (error "Bad diff merge: ~A, ~A" o-a o-b))
-  
+
   (:method ((sym-a null) sym-b o-a o-b)
     (handle-conflict o-a o-b :leave-a t))
 

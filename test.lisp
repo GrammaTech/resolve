@@ -640,13 +640,36 @@
       (multiple-value-bind (diff cost)
           (ast-diff obj1 obj2 :params (make-ast-diff-params
                                        :wrap t :max-wrap-diff 1000))
-        (is (equal (keys diff) '(:recurse :same :wrap)))
+        (is (equal (keys diff) '(:binaryoperator :recurse :same :wrap)))
         (is (= cost 2)))
       (multiple-value-bind (diff cost)
           (ast-diff obj2 obj1 :params (make-ast-diff-params
                                        :wrap t :max-wrap-diff 1000))
         (is (equal (keys diff) '(:recurse :same :unwrap)))
-        (is (= cost 2))))))
+        (is (= cost 2)))
+      (multiple-value-bind (diff cost)
+          (ast-diff obj1 obj2 :params (make-ast-diff-params
+                                       :wrap t :max-wrap-diff -100))
+        (is (equal (keys diff) '(:delete :insert :recurse :same)))
+        (is (= cost 4)))
+      (multiple-value-bind (diff cost)
+          (ast-diff obj2 obj1 :params (make-ast-diff-params
+                                       :wrap t :max-wrap-diff -100))
+        (is (equal (keys diff) '(:delete :insert :recurse :same)))
+        (is (= cost 4))))))
+
+(deftest diff-wrap-patch.1 ()
+  (let* ((s1 "int f() { return 1; }")
+         (s2 "int f() { return 1+2; }")
+         (obj1 (from-string (make-clang-instance) s1))
+         (obj2 (from-string (make-clang-instance) s2))
+         (diff (ast-diff obj1 obj2 :params (make-ast-diff-params :wrap t)))
+         (ast1 (ast-root obj1))
+         (ast2 (ast-root obj2))
+         (ast3 (ast-patch ast1 diff)))
+    ;; (format t "AST2:~%~a~%----------------~%~s~%" (ast-text ast2) (ast-to-list-form ast2))
+    ;; (format t "AST3:~%~a~%----------------~%~s~%" (ast-text ast3) (ast-to-list-form ast3))
+    (is (ast-equal-p ast2 ast3))))
 
 (deftest print-diff.1 ()
   (is (equalp (with-output-to-string (s)
