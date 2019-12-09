@@ -128,9 +128,7 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
                        (mapcar {cons file} (populate obj))
                        (list (cons file (copy obj)))) into resolutions)
           (finally (return (mapcar (lambda (resolution &aux ret)
-                                     (setf ret (copy conflicted))
-                                     (setf (evolve-files ret) resolution)
-                                     ret)
+                                     (copy conflicted :evolve-files resolution))
                                    (cartesian resolutions)))))))
 
 (defgeneric resolve (my old your test &rest rest
