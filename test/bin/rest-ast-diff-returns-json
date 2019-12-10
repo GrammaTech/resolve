@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Due to a temporary bug, diff files did not have newlines.
+# Ensure the REST ast-diff interface is able to return JSON
 #
 left=$(mktemp)
 right=$(mktemp)
