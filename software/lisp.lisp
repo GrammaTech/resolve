@@ -12,8 +12,7 @@
 (in-package :resolve/software/lisp)
 (in-readtable :curry-compose-reader-macros)
 
-(defmethod ast-can-recurse ((ast-a sel/sw/lisp::lisp-ast) (ast-b sel/sw/lisp::lisp-ast) &optional strings)
-  (declare (ignore strings))
+(defmethod ast-can-recurse ((ast-a sel/sw/lisp::lisp-ast) (ast-b sel/sw/lisp::lisp-ast))
   (and (eq (ast-class ast-a) (ast-class ast-b))
        (or (not (eql :expression (ast-class ast-a)))
            ;; Special handling for lisp expression ASTs.

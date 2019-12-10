@@ -11,10 +11,9 @@
 (in-package :resolve/software/parseable)
 (in-readtable :curry-compose-reader-macros)
 
-(defmethod ast-diff ((parseable-a parseable) (parseable-b parseable) &rest args
-                     &key &allow-other-keys)
+(defmethod ast-diff* ((parseable-a parseable) (parseable-b parseable))
   #+debug (format t "ast-diff[PARSEABLE]~%")
-  (apply #'ast-diff (ast-root parseable-a) (ast-root parseable-b) args))
+  (ast-diff* (ast-root parseable-a) (ast-root parseable-b)))
 
 (defmethod create-edit-tree ((source parseable) (target parseable) script
                              &rest args &key &allow-other-keys)

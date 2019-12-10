@@ -20,11 +20,10 @@
 (defun sort-file-alist (alist)
   (sort (copy-list alist) #'string< :key (lambda (x) (string (car x)))))
 
-(defmethod ast-diff ((project1 project) (project2 project) &rest args
-                     &key &allow-other-keys)
+(defmethod ast-diff* ((project1 project) (project2 project))
   #+debug (format t "ast-diff[PROJECT]~%")
   (flet ((%obj (proj) (make-instance 'alist-for-diff :alist (all-files proj))))
-    (apply #'ast-diff (%obj project1) (%obj project2) args)))
+    (ast-diff* (%obj project1) (%obj project2))))
 
 (defun make-table-for-alist (alist &key (test #'eql))
   (let ((tab (make-hash-table :test test)))

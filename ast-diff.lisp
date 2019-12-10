@@ -48,6 +48,7 @@
    :ast-on-recurse
    :ast-un-recurse
    :ast-diff
+   :ast-diff*
    :ast-diff-elide-same
    :ast-patch
    :print-diff
@@ -76,9 +77,8 @@
    :map-edit-tree
    :ast-size
    :ast-to-list-form
-   :*ignore-whitespace*
-   ;; :ast-diff-params
-   :make-ast-diff-params))
+   ;; :*ignore-whitespace*
+   ))
 (in-package :resolve/ast-diff)
 (in-readtable :curry-compose-reader-macros)
 ;;; Comments on further algorithm improvements
@@ -122,15 +122,15 @@
 (defvar *ignore-whitespace* nil
   "If true, inserting or removing whitespace in a string has zero cost")
 
-;;; TODO: move *ignore-whitespace* into this
-(defstruct ast-diff-params
-  ;; Structure holding key parameters to AST-DIFF
-  (strings t)
-  (wrap nil)
-  (max-wrap-diff 30) ;; Maximum difference in costs between wrapped/unwrapped things
-  )
+(defvar *strings* t
+  "If true, descend into strings when computing diffs.")
 
-(defparameter *default-ast-diff-params* (make-ast-diff-params))
+(defvar *wrap* nil
+  "If true, perform wrap/unwrap actions in diffs.")
+
+(defvar *max-wrap-diff* 30
+  "When *wrap* is true, this is the maximum size difference for
+wrapping and unwrapping to be considered.")
 
 (defun clength (x) (iter (while (consp x)) (pop x) (summing 1)))
 
@@ -181,21 +181,17 @@
      ;; cost of terminal NIL is 0
      (if ast (ast-cost ast) 0)))
 
-(defgeneric ast-can-recurse (ast-a ast-b &optional params)
+(defgeneric ast-can-recurse (ast-a ast-b)
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
 can be recursed on if STRINGS is true (defaults to true)"))
 
-(defmethod ast-can-recurse ((ast-a cons) (ast-b cons) &optional params)
-  (declare (ignorable params))
+(defmethod ast-can-recurse ((ast-a cons) (ast-b cons))
   t)
-(defmethod ast-can-recurse ((ast-a string) (ast-b string)
-                            &optional (params *default-ast-diff-params*))
-  (ast-diff-params-strings params))
-(defmethod ast-can-recurse ((ast-a t) (ast-b t) &optional params)
-  (declare (ignorable params))
+(defmethod ast-can-recurse ((ast-a string) (ast-b string))
+  *strings*)
+(defmethod ast-can-recurse ((ast-a t) (ast-b t))
   nil)
-(defmethod ast-can-recurse ((ast-a ast) (ast-b ast) &optional params)
-  (declare (ignore params))
+(defmethod ast-can-recurse ((ast-a ast) (ast-b ast))
   t)
 ;; (eq (ast-class ast-a) (ast-class ast-b)))
 
@@ -400,7 +396,18 @@ rewritten TO by part of the edit script"))
 
 
 ;;; Main interface to calculating ast differences.
-(defgeneric ast-diff (ast-a ast-b &key &allow-other-keys)
+
+(defun ast-diff (ast-a ast-b
+                 &key
+                   ((:ignore-whitespace *ignore-whitespace*)
+                    *ignore-whitespace*)
+                   ((:strings *strings*) *strings*)
+                   ((:wrap *wrap*) *wrap*)
+                   ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
+                   &allow-other-keys)
+  (ast-diff* ast-a ast-b))
+
+(defgeneric ast-diff* (ast-a ast-b)
   (:documentation
    "Return a least-cost edit script which transforms AST-A into AST-B.
 Also return a second value indicating the cost of the edit.
@@ -411,30 +418,26 @@ The following generic functions may be specialized to configure
 differencing of specialized AST structures.; `ast-equal-p',
 `ast-cost', `ast-can-recurse', and `ast-on-recurse'."))
 
-(defmethod ast-diff ((ast-a ast) (ast-b ast) &rest args &key (params *default-ast-diff-params*)
-                                                          &allow-other-keys)
+(defmethod ast-diff* ((ast-a ast) (ast-b ast))
   #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%" (ast-can-recurse ast-a ast-b))
   (let (diff cost)
-    (when (eql (ast-class ast-a) (ast-class ast-b)) ;; (ast-can-recurse ast-a ast-b params)
+    (when (eql (ast-class ast-a) (ast-class ast-b))
       (setf (values diff cost)
-            (apply #'ast-diff (ast-children ast-a) (ast-children ast-b) args)))
-    (when (ast-diff-params-wrap params)
+            (ast-diff* (ast-children ast-a) (ast-children ast-b))))
+    (when *wrap*
       (multiple-value-bind (wrap-diff wrap-cost)
-          (apply #'ast-diff-wrap ast-a ast-b args)
+          (ast-diff-wrap ast-a ast-b)
         (when (and wrap-cost (or (null cost) (< wrap-cost cost)))
           (setf diff wrap-diff
                 cost wrap-cost)))
       (multiple-value-bind (unwrap-diff unwrap-cost)
-          (apply #'ast-diff-unwrap ast-a ast-b args)
+          (ast-diff-unwrap ast-a ast-b)
         (when (and unwrap-cost (or (null cost) (< unwrap-cost cost)))
           (setf diff unwrap-diff
                 cost unwrap-cost))))
     (if diff
         (values diff cost)
         (call-next-method))))
-
-(defgeneric ast-diff-wrap (ast-a ast-b &key params &allow-other-keys)
-  (:documentation "Find a minimum cost 'wrap' edit, which wraps an AST in a larger ast"))
 
 (defgeneric map-ast-while-path (a fn &optional path)
   (:documentation "Apply FN to the nodes of AST A, stopping
@@ -448,20 +451,22 @@ of children leading down to the node."))
           (for i from 0)
           (when (ast-p c) (map-ast-while-path c fn (cons i path))))))
 
-(defmethod ast-diff-wrap ((ast-a ast) (ast-b ast) &key params &allow-other-keys)
+(defgeneric ast-diff-wrap (ast-a ast-b)
+  (:documentation "Find a minimum cost 'wrap' edit, which wraps an AST in a larger ast"))
+
+(defmethod ast-diff-wrap ((ast-a ast) (ast-b ast))
   ;; search over the ASTs under ast-b that are the same class as ast-a,
   ;; and for which the size difference is not too large
   (let* ((ast-a-cost (ast-cost ast-a))
          (a-class (ast-class ast-a))
-         (max-wrap-diff (ast-diff-params-max-wrap-diff params))
+         (max-wrap-diff *max-wrap-diff*)
          (max-cost (+ ast-a-cost max-wrap-diff))
          (min-cost (- ast-a-cost max-wrap-diff))
          (best-candidate nil)
          (best-cost most-positive-fixnum)
-         (sub-params (copy-structure params)))
+         ;; Do not also search for wraps in the recursive calls
+         (*wrap* nil))
     ;; (format t "(ast-class ast-a) = ~S~%" a-class)
-    ;; Do not also search for wraps in the recursive call
-    (setf (ast-diff-params-wrap sub-params) nil)
     (map-ast-while-path
      ast-b
      (lambda (x path)
@@ -480,7 +485,7 @@ of children leading down to the node."))
                ;; ast-class matches, do we try to insert here
                (t
                 (multiple-value-bind (diff cost)
-                    (ast-diff ast-a x :params sub-params)
+                    (ast-diff* ast-a x)
                   (when (< cost best-cost)
                     (multiple-value-bind (left-wrap right-wrap classes)
                         (wraps-of-path ast-b (reverse path))
@@ -505,24 +510,23 @@ of children leading down to the node."))
     (when best-candidate
       (values best-candidate best-cost))))
 
-(defgeneric ast-diff-unwrap (ast-a ast-b &key &allow-other-keys)
+(defgeneric ast-diff-unwrap (ast-a ast-b)
   (:documentation "Find a minimum cost 'unwrap' edit, which pulls a subast
 out of one tree and turns it into another."))
 
-(defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast) &key params &allow-other-keys)
+(defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast))
   ;; search over the ASTs under ast-b that are the same class as ast-a,
   ;; and for which the size difference is not too large
   (let* ((ast-b-cost (ast-cost ast-b))
          (b-class (ast-class ast-b))
-         (max-wrap-diff (ast-diff-params-max-wrap-diff params))
+         (max-wrap-diff *max-wrap-diff*)
          (max-cost (+ ast-b-cost max-wrap-diff))
          (min-cost (- ast-b-cost max-wrap-diff))
          (best-candidate nil)
          (best-cost most-positive-fixnum)
-         (sub-params (copy-structure params)))
+         ;; Do not also search for wraps in the recursive call
+         (*wrap* nil))
     ;; (format t "(ast-class ast-a) = ~S~%" a-class)
-    ;; Do not also search for wraps in the recursive call
-    (setf (ast-diff-params-wrap sub-params) nil)
     (map-ast-while-path
      ast-a
      (lambda (x path)
@@ -541,7 +545,7 @@ out of one tree and turns it into another."))
                ;; ast-class matches, do we try to insert here
                (t
                 (multiple-value-bind (diff cost)
-                    (ast-diff ast-b x :params sub-params)
+                    (ast-diff* ast-b x)
                   (when (< cost best-cost)
                     (multiple-value-bind (left-wrap right-wrap)
                         (wraps-of-path ast-a (reverse path))
@@ -581,10 +585,10 @@ down from AST, as well as the classes of the nodes along the path."
   (reduce #'+ wrap :initial-value 0
           :key (lambda (w) (reduce #'+ w :key #'ast-cost :initial-value 0))))
 
-(defmethod ast-diff-wrap ((ast-a t) (ast-b t) &key &allow-other-keys)
+(defmethod ast-diff-wrap ((ast-a t) (ast-b t))
   nil)
 
-(defmethod ast-diff-unwrap ((ast-a t) (ast-b t) &key &allow-other-keys)
+(defmethod ast-diff-unwrap ((ast-a t) (ast-b t))
   nil)
 
 (defun remove-common-prefix-and-suffix (list-a list-b)
@@ -640,8 +644,7 @@ Prefix and postfix returned as additional values."
   (push val (cdr sq)))
 
 (defun recursive-diff (total-a total-b &rest args
-                       &key (params *default-ast-diff-params*)
-                         (upper-bound most-positive-fixnum)
+                       &key (upper-bound most-positive-fixnum)
                        &allow-other-keys
                        &aux
                          (from (make-cache total-a total-b))
@@ -764,7 +767,7 @@ Prefix and postfix returned as additional values."
                      (j (%pos-b b)))
                  (or (aref r-cache i j)
                      (setf (aref r-cache i j)
-                           (apply #'ast-diff (car a) (car b) args))))))
+                           (ast-diff* (car a) (car b)))))))
 
           ;; Check neighbors: diagonal, recurse, insert, delete.
           (when (and (consp a) (consp b))
@@ -774,7 +777,7 @@ Prefix and postfix returned as additional values."
                #+ast-diff-debug (format t "  diagonal~%")
                (add (cons (cdr a) (cdr b))
                     (cons :same (car a))))
-              ((ast-can-recurse (car a) (car b) params) ; Recurse.
+              ((ast-can-recurse (car a) (car b)) ; Recurse.
                #+ast-diff-debug (format t "  recurse~%")
                (let ((rec (%recursive a b)))
                  #+ast-diff-debug (format t "At ast-can-recurse:  rec = ~a~%" rec)
@@ -820,7 +823,7 @@ Prefix and postfix returned as additional values."
 
 (defmethod diff-cost-car ((diff cons) (diff-car symbol)) 0)
 
-(defun ast-diff-on-lists (ast-a ast-b &rest args &key &allow-other-keys)
+(defun ast-diff-on-lists (ast-a ast-b)
   (assert (proper-list-p ast-a))
   (assert (proper-list-p ast-b))
   ;; Drop common prefix and postfix, just run the diff on different middle.
@@ -868,7 +871,7 @@ Prefix and postfix returned as additional values."
             (values (mapcar (lambda (el) (cons :delete el)) unique-a)
                     (1- (ccost unique-a)))))) ; 1- for trailing nil.
 
-      (let ((rdiff (apply #'recursive-diff unique-a unique-b args)))
+      (let ((rdiff (recursive-diff unique-a unique-b)))
         (add-common rdiff (diff-cost rdiff))))))
 
 (defun properize (list)
@@ -894,8 +897,7 @@ value that is used instead."
       (setf (gethash hash table) ast))
     hash))
 
-(defmethod ast-diff (ast-a ast-b &rest args &key (params *default-ast-diff-params*)
-                                              &allow-other-keys)
+(defmethod ast-diff* (ast-a ast-b)
   #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
   #+debug (format t "ast-diff[T] subtypep of parseable: ~S~%"
                   (mapcar {typep _ 'sel/sw/parseable:parseable}
@@ -903,15 +905,14 @@ value that is used instead."
   (cond
     ((and (ast-p ast-a)
           (ast-p ast-b)
-          (ast-can-recurse ast-a ast-b params))
-     (apply #'ast-diff (ast-children ast-a) (ast-children ast-b) args))
+          (ast-can-recurse ast-a ast-b))
+     (ast-diff* (ast-children ast-a) (ast-children ast-b)))
     ((equal ast-a ast-b)
      (values `((:same . ,ast-a)) 0))
     (t (values `((:delete . ,ast-a) (:insert . ,ast-b))
                (+ (ast-cost ast-a) (ast-cost ast-b))))))
 
-(defmethod ast-diff ((ast-a list) (ast-b list) &rest args &key &allow-other-keys
-                     &aux tail-a tail-b)
+(defmethod ast-diff* ((ast-a list) (ast-b list) &aux tail-a tail-b)
   #+debug (format t "ast-diff[LIST]~%")
   (let* ((new-ast-a (ast-on-recurse ast-a))
          (new-ast-b (ast-on-recurse ast-b)))
@@ -947,7 +948,7 @@ value that is used instead."
             ;; (for cb in (reverse (cons nil common-b)))
             ;; (assert (ast-equal-p ca cb))
             (multiple-value-bind (diff cost)
-                (apply #'ast-diff-on-lists da db args)
+                (ast-diff-on-lists da db)
               ;; get rid of this?
               #+nil
               (when (and overall-diff (equalp (lastcar diff) '(:same)))
@@ -966,19 +967,17 @@ value that is used instead."
           (progn
             #+ast-diff-debug (format t "Diff on non-nil tail~%")
             (multiple-value-bind (diff tail-cost)
-                (apply #'ast-diff tail-a tail-b args)
+                (ast-diff* tail-a tail-b)
               (setf overall-diff
                     (append overall-diff `((:recurse-tail . ,diff))))
               (incf overall-cost tail-cost))))
       (values overall-diff overall-cost))))
 
-(defmethod ast-diff ((s1 string) (s2 string) &key (params *default-ast-diff-params*)
-                                               (strings (ast-diff-params-strings params))
-                                               (ignore-whitespace *ignore-whitespace*)
-                                               &allow-other-keys)
+(defmethod ast-diff* ((s1 string) (s2 string)
+                      &aux (ignore-whitespace *ignore-whitespace*))
   "special diff method for strings"
   #+debug (format t "ast-diff[STRING]~%")
-  (if strings
+  (if *strings*
     ;; if STRINGS is true, descend into the strings for a fine-grained diff
       (string-diff s1 s2 :ignore-whitespace ignore-whitespace)
       ;; Otherwise, treat the strings as single objects and replace
@@ -1020,13 +1019,11 @@ value that is used instead."
             (cdar p))
           g))
 
-(defmethod ast-diff ((soft1 simple) (soft2 simple)
-                     &rest args &key &allow-other-keys)
+(defmethod ast-diff* ((soft1 simple) (soft2 simple))
   #+debug (format t "ast-diff[SIMPLE]~%")
-  (apply #'ast-diff
-         (simple-genome-unpack (genome soft1))
-         (simple-genome-unpack (genome soft2))
-         args))
+  (ast-diff
+   (simple-genome-unpack (genome soft1))
+   (simple-genome-unpack (genome soft2))))
 
 (defun split-into-subsequences (seq subseq-indices &aux (n (length seq)))
   "Return subsequences of SEQ delimited by SUBSEQ-INDICES.

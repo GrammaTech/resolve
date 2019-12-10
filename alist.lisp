@@ -30,8 +30,7 @@ elements of the alist."
 	  (setf (gethash (car p) table) p)))
   table)
 
-(defmethod ast-diff ((al1-obj alist-for-diff) (al2-obj alist-for-diff) &rest args
-                     &key &allow-other-keys)
+(defmethod ast-diff* ((al1-obj alist-for-diff) (al2-obj alist-for-diff))
   #+debug (format t "ast-diff[ALIST]~%")
   (let* ((test #'equal)
 	 (table1 (make-hash-table :test test))
@@ -65,7 +64,7 @@ elements of the alist."
 		      `(:same-alist . ,p)
 		      `(:recurse-alist
 			,(car p)
-			,@(apply #'ast-diff (cdr p) (cdr p2) args)))))
+                        ,@(ast-diff* (cdr p) (cdr p2))))))
 	      in-both)
       (mapcar (lambda (p) `(:insert-alist . ,p)) only-in-2)))))
 

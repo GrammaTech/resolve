@@ -324,8 +324,7 @@
       "Add whitespace has cost 2"))
 
 (deftest sexp-diff-string.4 ()
-  (is (let ((*ignore-whitespace* t))
-        (eql (nth-value 1 (ast-diff "a" " a ")) 0))
+  (is (eql (nth-value 1 (ast-diff "a" " a " :ignore-whitespace t)) 0)
       "Adding whitespace costs nothing"))
 
 (deftest sexp-diff-string.5 ()
@@ -333,8 +332,7 @@
       "Adding whitespace has cost 2"))
 
 (deftest sexp-diff-string.6 ()
-  (is (let ((*ignore-whitespace* t))
-        (eql (nth-value 1 (ast-diff " a " "a")) 0))
+  (is (eql (nth-value 1 (ast-diff " a " "a" :ignore-whitespace t)) 0)
       "Adding whitespace costs nothing"))
 
 (deftest sexp-diff-non-equal-first-element ()
@@ -500,8 +498,7 @@
         (obj2 (from-string (make-instance 'new-clang)
                            "int a; int z; int b; int c; int d;")))
     (is (= 7 (nth-value 1 (ast-diff obj1 obj2))))
-    (is (= 5 (nth-value 1 (let ((*ignore-whitespace* t))
-                            (ast-diff obj1 obj2)))))))
+    (is (= 5 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t))))))
 
 (deftest (diff-insert :long-running) ()
   (let ((orig (from-string (make-instance 'new-clang)
@@ -635,23 +632,19 @@
            (obj1 (from-string (make-instance 'new-clang) s1))
            (obj2 (from-string (make-instance 'new-clang) s2)))
       (multiple-value-bind (diff cost)
-          (ast-diff obj1 obj2 :params (make-ast-diff-params
-                                       :wrap t :max-wrap-diff 1000))
+          (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000)
         (is (equal (keys diff) '(:binaryoperator :recurse :same :wrap)))
         (is (= cost 2)))
       (multiple-value-bind (diff cost)
-          (ast-diff obj2 obj1 :params (make-ast-diff-params
-                                       :wrap t :max-wrap-diff 1000))
+          (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000)
         (is (equal (keys diff) '(:recurse :same :unwrap)))
         (is (= cost 2)))
       (multiple-value-bind (diff cost)
-          (ast-diff obj1 obj2 :params (make-ast-diff-params
-                                       :wrap t :max-wrap-diff -100))
+          (ast-diff obj1 obj2 :wrap t :max-wrap-diff -100)
         (is (equal (keys diff) '(:delete :insert :recurse :same)))
         (is (= cost 4)))
       (multiple-value-bind (diff cost)
-          (ast-diff obj2 obj1 :params (make-ast-diff-params
-                                       :wrap t :max-wrap-diff -100))
+          (ast-diff obj2 obj1 :wrap t :max-wrap-diff -100)
         (is (equal (keys diff) '(:delete :insert :recurse :same)))
         (is (= cost 4))))))
 
@@ -660,7 +653,7 @@
          (s2 "int f() { return 1+2; }")
          (obj1 (from-string (make-instance 'new-clang) s1))
          (obj2 (from-string (make-instance 'new-clang) s2))
-         (diff (ast-diff obj1 obj2 :params (make-ast-diff-params :wrap t)))
+         (diff (ast-diff obj1 obj2 :wrap t))
          (ast1 (ast-root obj1))
          (ast2 (ast-root obj2))
          (ast3 (ast-patch ast1 diff)))
@@ -787,9 +780,7 @@
          ;; :STRINGS nil means the diff does not descend into the
          ;; string constant.
          (edit-tree
-          (create-edit-tree obj1 obj2 (ast-diff obj1 obj2
-                                                :params (make-ast-diff-params
-                                                         :strings nil)))))
+          (create-edit-tree obj1 obj2 (ast-diff obj1 obj2 :strings nil))))
     (let ((count 0))
       (map-edit-tree edit-tree (lambda (x) (declare (ignore x)) (incf count)))
       (is (= 1 count)
@@ -1092,8 +1083,9 @@
         "7-conflict 2")))
 
 (deftest sexpr-converge.8-conflict ()
-  (let ((merged (converge '(a ("a") b) '(a (d) b) '(a ("b") b) :meld? nil :conflict t
-                          :params (make-ast-diff-params :strings nil))))
+  (let ((merged (converge '(a ("a") b) '(a (d) b) '(a ("b") b)
+                          :meld? nil :conflict t
+                          :strings nil)))
     (is (typep merged '(cons (eql a)
                         (cons (cons conflict-ast null)
                          (cons (eql b) null))))

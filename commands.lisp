@@ -238,8 +238,7 @@ command-line options processed by the returned function."
              (new-sw (expand-options-for-which-files language "NEW"))
              (softwares (list old-sw new-sw)))
         (setf diff (resolve/ast-diff:ast-diff
-                    old-sw new-sw
-                    :params (make-ast-diff-params :strings strings)))
+                    old-sw new-sw :strings strings))
         ;; Print according to the RAW option.
         (cond
           (raw (writeln (ast-diff-elide-same diff) :readably t))
