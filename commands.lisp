@@ -99,6 +99,14 @@
                "Also print a representation of the edit tree ASTs")
               (("strings" #\S) :type boolean :optional t
                :documentation "Diff descends into AST leaf strings")
+              (("wrap" #\W) :type boolean :optional t
+               :documentation
+               "diff searches for wrap/unwrap operations (UNTESTED)")
+              (("max-wrap") :type integer
+               :initial-value #.resolve/ast-diff::*max-wrap-diff*
+               :documentation
+               #.(format nil "max size diff (default ~d) of wrapping/unwrapping"
+                         resolve/ast-diff::*max-wrap-diff*))
               (("coherence") :type string :optional t
                :documentation
                "Bound used to find relevant nodes in the edit tree")))))
@@ -272,7 +280,9 @@ command-line options processed by the returned function."
                 (new-sw (expand-options-for-which-files language "NEW"))
                 (softwares (list old-sw new-sw)))
            (setf diff (resolve/ast-diff:ast-diff
-                       old-sw new-sw :strings strings))
+                       old-sw new-sw
+                       :wrap wrap :max-wrap-diff max-wrap
+                       :strings strings))
            ;; Special handling for SIMPLE diffs, which don't have newlines.
            (when (and (eql 'simple (type-of old-sw))
                       (eql 'simple (type-of new-sw)))
@@ -395,6 +405,7 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable quiet verbose raw no-color edit-tree json unified
+                      wrap max-wrap
                       print-asts coherence split-lines
                       my-split-lines your-split-lines old-split-lines))
   #+drop-dead
@@ -475,6 +486,7 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color json unified edit-tree
+                      wrap max-wrap
                       print-asts coherence strings split-lines
                       my-split-lines your-split-lines old-split-lines
                       fault-loc))

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# To start with lets just see if we can run without throwing an error.
+ast-diff --wrap test/etc/gcd/gcd.lisp test/etc/gcd/gcd-fix.lisp
