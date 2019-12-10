@@ -32,8 +32,13 @@ if [ ! -z ${GIT_AST_DIFF_DEBUG} ];then
   ast-diff "$2" "$5"
   EXIT=$?
   echo -e "Returned $EXIT\n" >> ${GIT_AST_DIFF_DEBUG}
-  exit $EXIT
 else
   ## Without debugging.
-  exec ast-diff "$2" "$5"
+  ast-diff "$2" "$5"
+  EXIT=$?
+fi
+if [ $EXIT == 1 ] || [ $EXIT == 0 ];then
+  exit 0
+else
+  exit $EXIT
 fi
