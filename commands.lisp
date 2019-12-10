@@ -273,13 +273,15 @@ command-line options processed by the returned function."
                 (softwares (list old-sw new-sw)))
            (setf diff (resolve/ast-diff:ast-diff
                        old-sw new-sw :strings strings))
-           ;; Special handling for SIMPLE differences, which don't have newlines.
-           (when (and (eql 'simple (type-of old-sw)) (eql 'simple (type-of new-sw)))
-             (setf diff (mapt (lambda (element)
-                                (if (stringp element)
-                                    (concatenate 'string element (list #\Newline))
-                                    element))
-                              diff)))
+           ;; Special handling for SIMPLE diffs, which don't have newlines.
+           (when (and (eql 'simple (type-of old-sw))
+                      (eql 'simple (type-of new-sw)))
+             (setf diff
+                   (mapt (lambda (element)
+                           (if (stringp element)
+                               (concatenate 'string element (list #\Newline))
+                               element))
+                         diff)))
            ;; Print according to the RAW option.
            (cond
              (raw (writeln (ast-diff-elide-same diff) :readably t))
@@ -295,61 +297,66 @@ command-line options processed by the returned function."
                :print-asts print-asts
                :coherence coherence))
              (json (println (encode-json-to-string diff)))
-             (t (if (zerop unified)
-                    (print-diff diff :no-color no-color)
-                    (let ((diff-lines
-                           (split-sequence
-                            #\Newline
-                            (with-output-to-string (str)
-                              (print-diff diff :no-color no-color :stream str))))
-                          (in-diff-p nil)
-                          (trailing-context 0)
-                          (context-buffer nil)
-                          (skipped-last-p nil)
-                          (line-counter 0))
-                      ;; TODO: Find a solution to noticing diff lines that doesn't
-                      ;;       rely on patterns in the text.
-                      (flet ((diff-start-p (line)
-                               (if no-color
-                                   (scan "({\\+|\\[-)" line)
-                                   (or (search +color-GRN+ line)
-                                       (search +color-RED+ line))))
-                             (diff-end-p (line)
-                               (if no-color
-                                   (scan "(\\+}|-])" line)
-                                   (search +color-RST+ line))))
-                        ;; Print with a buffer of size UNIFIED before/after every diff line.
-                        (dolist (line diff-lines)
-                          (incf line-counter)
-                          (cond
-                            ((diff-start-p line)
-                             (when skipped-last-p
-                               (println (format nil "~aline: ~d~a"
-                                                (if no-color "" +color-CYA+)
-                                                (- line-counter (min unified
-                                                                     (length context-buffer)))
-                                                (if no-color "" +color-RST+))))
-                             (setf skipped-last-p nil)
-                             (setf trailing-context unified)
-                             (when context-buffer
-                               (mapc #'println (nreverse (take unified context-buffer)))
-                               (setf context-buffer nil))
-                             (setf in-diff-p (let ((start-point (diff-start-p line))
-                                                   (end-point (diff-end-p line)))
-                                               (or (not end-point)
-                                                   (< end-point start-point))))
-                             (println line))
-                            ((diff-end-p line)
-                             (setf skipped-last-p nil)
-                             (setf in-diff-p nil)
-                             (println line))
-                            (in-diff-p
-                             (println line))
-                            ((> trailing-context 0)
-                             (decf trailing-context)
-                             (println line))
-                            (t (setf skipped-last-p t)
-                               (push line context-buffer)))))))))
+             (t
+              (if (zerop unified)
+                  (print-diff diff :no-color no-color)
+                  (let ((diff-lines
+                         (split-sequence
+                          #\Newline
+                          (with-output-to-string (str)
+                            (print-diff diff :no-color no-color :stream str))))
+                        (in-diff-p nil)
+                        (trailing-context 0)
+                        (context-buffer nil)
+                        (skipped-last-p nil)
+                        (line-counter 0))
+                    ;; TODO: Find a solution to noticing diff lines that doesn't
+                    ;;       rely on patterns in the text.
+                    (flet ((diff-start-p (line)
+                             (if no-color
+                                 (scan "({\\+|\\[-)" line)
+                                 (or (search +color-GRN+ line)
+                                     (search +color-RED+ line))))
+                           (diff-end-p (line)
+                             (if no-color
+                                 (scan "(\\+}|-])" line)
+                                 (search +color-RST+ line))))
+                      ;; Print with a buffer of size UNIFIED
+                      ;; before/after every diff line.
+                      (dolist (line diff-lines)
+                        (incf line-counter)
+                        (cond
+                          ((diff-start-p line)
+                           (when skipped-last-p
+                             (println
+                              (format nil "~aline: ~d~a"
+                                      (if no-color "" +color-CYA+)
+                                      (- line-counter
+                                         (min unified (length context-buffer)))
+                                      (if no-color "" +color-RST+))))
+                           (setf skipped-last-p nil)
+                           (setf trailing-context unified)
+                           (when context-buffer
+                             (mapc #'println
+                                   (nreverse (take unified context-buffer)))
+                             (setf context-buffer nil))
+                           (setf in-diff-p
+                                 (let ((start-point (diff-start-p line))
+                                       (end-point (diff-end-p line)))
+                                   (or (not end-point)
+                                       (< end-point start-point))))
+                           (println line))
+                          ((diff-end-p line)
+                           (setf skipped-last-p nil)
+                           (setf in-diff-p nil)
+                           (println line))
+                          (in-diff-p
+                           (println line))
+                          ((> trailing-context 0)
+                           (decf trailing-context)
+                           (println line))
+                          (t (setf skipped-last-p t)
+                             (push line context-buffer)))))))))
            ;; Only exit with 0 if the two inputs match.
            (wait-on-manual manual))
          (exit-command ast-diff
