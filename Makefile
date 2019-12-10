@@ -21,6 +21,7 @@ BINS = ast-diff ast-merge auto-merge serve-ast-diff
 BIN_TEST_DIR = test/bin
 BIN_TESTS =					\
 	ast-diff-on-json-has-lines		\
+	ast-diff-on-lisp-has-lines		\
 	clang-diff-on-gcd			\
 	java-diff-on-gcd			\
 	javascript-diff-on-gcd			\
