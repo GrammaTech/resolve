@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# A wrapper script for ast-diff to allow its invocation by as a git
-# external diff tool.  Git will pass 7 arguments to this tool,
+# A wrapper script for ast-diff to allow its invocation as a git
+# external diff tool.  Git will pass 6 arguments to this tool,
 #
 #     old-file old-hex old-mode new-file new-hex new-mode
 #
@@ -15,13 +15,14 @@
 #
 #     git config --global diff.external /full/path/to/resolve/bin/git-ast-diff
 #
-# If you have configured this script as your git-diff driver, and it
-# starts to act buggy, you can disable it for individual runs by
-# passing the --no-ext-diff option to git-diff.
+# If you have configured this script as your git-diff driver, and you
+# run into problems, you can disable it for individual runs by passing
+# the --no-ext-diff option to git-diff.
 #
 # NOTE: Define the environment variable GIT_AST_DIFF_DEBUG to a file
 # name to collect debug output into that file.  Unset that variable to
-# avoid collecting debug output.
+# avoid collecting debug output.  If you do this you will collect MANY
+# temporary files in your /tmp/ directory.
 bold=$(tput bold)
 normal=$(tput sgr0)
 
