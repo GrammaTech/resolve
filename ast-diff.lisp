@@ -37,6 +37,7 @@
    :metabang-bind
    :iterate
    :cl-heap)
+  (:import-from :cl-ppcre :regex-replace-all)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :software-evolution-library/software/new-clang
@@ -1923,14 +1924,24 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
     (labels ((%p (c) (if (null c)
                          (princ "()" stream)
                          (write (ast-text c) :stream stream)))
+             (red-after-newlines (string) ; Repaint red diff after newlines.
+               (if (stringp string)
+                   (regex-replace-all (string #\Newline) string
+                                      (format nil "~%~a" +color-RED+))
+                   string))
+             (green-after-newlines (string) ; Repaint green diff after newlines.
+               (if (stringp string)
+                   (regex-replace-all (string #\Newline) string
+                                      (format nil "~%~a" +color-GRN+))
+                   string))
              (purge-insert ()
                (when insert-buffer
-                 (mapc #'%p (reverse insert-buffer))
+                 (mapc [#'%p #'green-after-newlines] (reverse insert-buffer))
                  (write insert-end :stream stream)
                  (setf insert-buffer nil)))
              (purge-delete ()
                (when delete-buffer
-                 (mapc #'%p (reverse delete-buffer))
+                 (mapc [#'%p #'red-after-newlines] (reverse delete-buffer))
                  (write delete-end :stream stream)
                  (setf delete-buffer nil)))
              (push-insert (c)
