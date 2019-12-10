@@ -15,11 +15,25 @@
 #
 #     git config --global diff.external /full/path/to/resolve/bin/git-ast-diff
 #
+# If you have configured this script as your git-diff driver, and it
+# starts to act buggy, you can disable it for individual runs by
+# passing the --no-ext-diff option to git-diff.
+#
+# NOTE: Define the environment variable GIT_AST_DIFF_DEBUG to a file
+# name to collect debug output into that file.  Unset that variable to
+# avoid collecting debug output.
 
-# ## Debugging Support
-# echo "$@" >> /tmp/ast-diff.log
-# backup(){ cp $1 $(mktemp --suffix=".$(echo $1|sed 's/.*\.//')"); }
-# backup $2
-# backup $5
-
-ast-diff "$2" "$5"
+## With debugging.
+if [ ! -z ${GIT_AST_DIFF_DEBUG} ];then
+  echo "$@" >> "${GIT_AST_DIFF_DEBUG}"
+  backup(){ cp $1 $(mktemp --suffix=".$(echo $1|sed 's/.*\.//')"); }
+  backup $2
+  backup $5
+  ast-diff "$2" "$5"
+  EXIT=$?
+  echo -e "Returned $EXIT\n" >> ${GIT_AST_DIFF_DEBUG}
+  exit $EXIT
+else
+  ## Without debugging.
+  exec ast-diff "$2" "$5"
+fi
