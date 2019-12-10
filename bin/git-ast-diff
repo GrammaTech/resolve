@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 # A wrapper script for ast-diff to allow its invocation as a git
-# external diff tool.  Git will pass 6 arguments to this tool,
+# external diff tool.  Git will pass 7 arguments to this tool,
 #
-#     old-file old-hex old-mode new-file new-hex new-mode
+#     base-name old-file old-hex old-mode new-file new-hex new-mode
 #
 # where as ast-diff only wants the second and fifth arguments.
 #
@@ -26,7 +26,7 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 
-echo "${bold}ast-diff $2 $5"
+echo "${bold}ast-diff $1"
 if [ "$5" == "/dev/null" ];then
   echo "${bold}deleted file mode $4"
   diff --color=always "$2" "$5"
@@ -42,10 +42,13 @@ fi
 ## With debugging.
 if [ ! -z ${GIT_AST_DIFF_DEBUG} ];then
   echo "$@" >> "${GIT_AST_DIFF_DEBUG}"
-  backup(){ cp $1 $(mktemp --suffix=".$(echo $1|sed 's/.*\.//;s|^/||;s|[^/]*/||')"); }
-  backup $2
-  backup $5
-  ast-diff "$2" "$5"
+  SUFFIX=".$(echo $1|sed 's/.*\.//;s|^/||;s|[^/]*/||')"
+  BASE="$(basename $1 "${SUFFIX}")"
+  backup(){ cp $1 $(mktemp -t --suffix="${SUFFIX}" "${BASE}-$2-XXXX"); }
+  backup $2 "OLD"
+  backup $5 "NEW"
+  PROFILE=$(mktemp -t "${BASE}-prof-XXXX" --suffix=".data")
+  ast-diff --verbose 4 --eval "(setf *profile-flame-graph* t)" --profile "${PROFILE}" "$2" "$5"
   EXIT=$?
   echo -e "Returned $EXIT\n" >> ${GIT_AST_DIFF_DEBUG}
 else
