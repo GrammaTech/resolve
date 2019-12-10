@@ -267,6 +267,13 @@ command-line options processed by the returned function."
                 (softwares (list old-sw new-sw)))
            (setf diff (resolve/ast-diff:ast-diff
                        old-sw new-sw :strings strings))
+           ;; Special handling for SIMPLE differences, which don't have newlines.
+           (when (and (eql 'simple (type-of old-sw)) (eql 'simple (type-of new-sw)))
+             (setf diff (mapt (lambda (element)
+                                (if (stringp element)
+                                    (concatenate 'string element (list #\Newline))
+                                    element))
+                              diff)))
            ;; Print according to the RAW option.
            (cond
              (raw (writeln (ast-diff-elide-same diff) :readably t))

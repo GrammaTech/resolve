@@ -22,6 +22,7 @@ BIN_TEST_DIR = test/bin
 BIN_TESTS =					\
 	ast-diff-on-json-has-lines		\
 	ast-diff-on-lisp-has-lines		\
+	ast-diff-on-simple-has-lines		\
 	clang-diff-on-gcd			\
 	java-diff-on-gcd			\
 	javascript-diff-on-gcd			\
@@ -35,8 +36,5 @@ BIN_TESTS =					\
 	ast-merge-json-has-conflict		\
 	rest-ast-diff-returns-json		\
 	rest-ast-diff-take-full-strings
-
-# TODO: Fix these failing tests.
-# ast-diff-on-simple-has-lines
 
 include cl.mk
