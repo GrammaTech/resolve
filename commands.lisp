@@ -57,8 +57,12 @@
         :software-evolution-library/software/json
         :software-evolution-library/software/lisp
         :software-evolution-library/components/test-suite)
+  (:shadowing-import-from :software-evolution-library/view
+                          :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
+  (:import-from :cl-ppcre :scan)
+  (:import-from :split-sequence :split-sequence)
   (:import-from :uiop :nest)
-  (:import-from :uiop/stream :writeln)
+  (:import-from :uiop/stream :println :writeln)
   (:import-from :uiop/filesystem :truenamize)
   (:shadow :merge :ast-diff)
   (:export :ast-diff :ast-merge))
@@ -84,6 +88,8 @@
                :documentation "profile and write report to FILE")
               (("no-color" #\C) :type boolean :optional t
                :documentation "inhibit color printing")
+              (("unified" #\U) :type integer :initial-value 3
+               :documentation "output NUM (default 3) lines of unified context")
               (("edit-tree" #\T) :type boolean :optional t
                :documentation "Print edit tree")
               (("json" #\J):type boolean :optional t
@@ -289,7 +295,61 @@ command-line options processed by the returned function."
                :print-asts print-asts
                :coherence coherence))
              (json (writeln (encode-json-to-string diff)))
-             (t (print-diff diff :no-color no-color)))
+             (t (if (zerop unified)
+                    (print-diff diff :no-color no-color)
+                    (let ((diff-lines
+                           (split-sequence
+                            #\Newline
+                            (with-output-to-string (str)
+                              (print-diff diff :no-color no-color :stream str))))
+                          (in-diff-p nil)
+                          (trailing-context 0)
+                          (context-buffer nil)
+                          (skipped-last-p nil)
+                          (line-counter 0))
+                      ;; TODO: Find a solution to noticing diff lines that doesn't
+                      ;;       rely on patterns in the text.
+                      (flet ((diff-start-p (line)
+                               (if no-color
+                                   (scan "({\\+|\\[-)" line)
+                                   (or (search +color-GRN+ line)
+                                       (search +color-RED+ line))))
+                             (diff-end-p (line)
+                               (if no-color
+                                   (scan "(\\+}|-])" line)
+                                   (search +color-RST+ line))))
+                        ;; Print with a buffer of size UNIFIED before/after every diff line.
+                        (dolist (line diff-lines)
+                          (incf line-counter)
+                          (cond
+                            ((diff-start-p line)
+                             (when skipped-last-p
+                               (println (format nil "~aline: ~d~a"
+                                                (if no-color "" +color-CYA+)
+                                                (- line-counter (min unified
+                                                                     (length context-buffer)))
+                                                (if no-color "" +color-RST+))))
+                             (setf skipped-last-p nil)
+                             (setf trailing-context unified)
+                             (when context-buffer
+                               (mapc #'println (nreverse (take unified context-buffer)))
+                               (setf context-buffer nil))
+                             (setf in-diff-p (let ((start-point (diff-start-p line))
+                                                   (end-point (diff-end-p line)))
+                                               (or (not end-point)
+                                                   (< end-point start-point))))
+                             (println line))
+                            ((diff-end-p line)
+                             (setf skipped-last-p nil)
+                             (setf in-diff-p nil)
+                             (println line))
+                            (in-diff-p
+                             (println line))
+                            ((> trailing-context 0)
+                             (decf trailing-context)
+                             (println line))
+                            (t (setf skipped-last-p t)
+                               (push line context-buffer)))))))))
            ;; Only exit with 0 if the two inputs match.
            (wait-on-manual manual))
          (exit-command ast-diff
@@ -327,7 +387,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable quiet verbose raw no-color edit-tree json
+  (declare (ignorable quiet verbose raw no-color edit-tree json unified
                       print-asts coherence split-lines
                       my-split-lines your-split-lines old-split-lines))
   #+drop-dead
@@ -407,7 +467,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable manual quiet verbose raw no-color json edit-tree
+  (declare (ignorable manual quiet verbose raw no-color json unified edit-tree
                       print-asts coherence strings split-lines
                       my-split-lines your-split-lines old-split-lines
                       fault-loc))
