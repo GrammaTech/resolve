@@ -41,7 +41,7 @@ fi
 ## With debugging.
 if [ ! -z ${GIT_AST_DIFF_DEBUG} ];then
   echo "$@" >> "${GIT_AST_DIFF_DEBUG}"
-  backup(){ cp $1 $(mktemp --suffix=".$(echo $1|sed 's/.*\.//')"); }
+  backup(){ cp $1 $(mktemp --suffix=".$(echo $1|sed 's/.*\.//;s|^/||;s|[^/]*/||')"); }
   backup $2
   backup $5
   ast-diff "$2" "$5"
