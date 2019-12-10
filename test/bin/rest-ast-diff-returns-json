@@ -19,7 +19,7 @@ seq 10|sed 's/6/SIX/' > $right
 serve-ast-diff --port ${port} --debug &
 server_pid=$!
 
-sleep 1
+sleep 2
 
 response=$(curl -s \
                 -X POST \

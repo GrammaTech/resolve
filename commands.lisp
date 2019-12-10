@@ -294,7 +294,7 @@ command-line options processed by the returned function."
                softwares diff
                :print-asts print-asts
                :coherence coherence))
-             (json (writeln (encode-json-to-string diff)))
+             (json (println (encode-json-to-string diff)))
              (t (if (zerop unified)
                     (print-diff diff :no-color no-color)
                     (let ((diff-lines
