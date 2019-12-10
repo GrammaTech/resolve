@@ -1918,6 +1918,8 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
             (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
             (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
             (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+))))
+  "Return a string form of DIFF suitable for printing at the command line.
+Numerous options are provided to control presentation."
   (let ((*print-escape* nil)
         (*deletep* nil)
         (*insertp* nil)
