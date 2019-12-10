@@ -1,6 +1,11 @@
 #!/bin/bash
-
+#
 # Driver for octomap diff tests
+
+# NOTE: Add the following options to ast-diff to save profiling data:
+# --eval "(setf *profile-flame-graph* t)" \
+# --profile "/tmp/ast-diff-flame.data" \
+#
 
 DIR=`pwd`
 ast-diff $1 $2 \

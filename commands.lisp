@@ -275,6 +275,7 @@ command-line options processed by the returned function."
                  (exit-command ast-diff 2 (error "Missing source.")))
                (unless language
                  (setf language (guess-language old-file new-file)))))
+         (with-prof profile
          ;; Create the diff.
          (let* ((old-sw (expand-options-for-which-files language "OLD"))
                 (new-sw (expand-options-for-which-files language "NEW"))
@@ -368,7 +369,7 @@ command-line options processed by the returned function."
                           (t (setf skipped-last-p t)
                              (push line context-buffer)))))))))
            ;; Only exit with 0 if the two inputs match.
-           (wait-on-manual manual))
+           (wait-on-manual manual)))
          (exit-command ast-diff
                        (if (every [{eql :same} #'car] diff) 0 1)
                        diff))
