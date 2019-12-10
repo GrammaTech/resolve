@@ -1919,31 +1919,38 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
             (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
             (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+))))
   (let ((*print-escape* nil)
+        (*deletep* nil)
+        (*insertp* nil)
         (insert-buffer nil)
         (delete-buffer nil))
+    (declare (special *insertp* *deletep*))
     (labels ((%p (c) (if (null c)
                          (princ "()" stream)
-                         (write (ast-text c) :stream stream)))
-             (red-after-newlines (string) ; Repaint red diff after newlines.
-               (if (stringp string)
-                   (regex-replace-all (string #\Newline) string
-                                      (format nil "~%~a" +color-RED+))
-                   string))
-             (green-after-newlines (string) ; Repaint green diff after newlines.
-               (if (stringp string)
-                   (regex-replace-all (string #\Newline) string
-                                      (format nil "~%~a" +color-GRN+))
-                   string))
+                         (write (continue-color (ast-text c)) :stream stream)))
+             (continue-color (text)
+               (cond
+                 (no-color text)
+                 (*deletep*
+                  (regex-replace-all (string #\Newline) text
+                                     (format nil "~%~a" +color-RED+)))
+                 (*insertp*
+                  (regex-replace-all (string #\Newline) text
+                                     (format nil "~%~a" +color-GRN+)))
+                 (t text)))
              (purge-insert ()
+               (setf *insertp* t)
                (when insert-buffer
-                 (mapc [#'%p #'green-after-newlines] (reverse insert-buffer))
+                 (mapc #'%p (reverse insert-buffer))
                  (write insert-end :stream stream)
-                 (setf insert-buffer nil)))
+                 (setf insert-buffer nil))
+               (setf *insertp* nil))
              (purge-delete ()
+               (setf *deletep* t)
                (when delete-buffer
-                 (mapc [#'%p #'red-after-newlines] (reverse delete-buffer))
+                 (mapc #'%p (reverse delete-buffer))
                  (write delete-end :stream stream)
-                 (setf delete-buffer nil)))
+                 (setf delete-buffer nil))
+               (setf *deletep* nil))
              (push-insert (c)
                (purge-delete)
                (unless insert-buffer (write insert-start :stream stream))
