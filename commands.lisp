@@ -111,7 +111,7 @@
                :type integer
                :initial-value #.*base-cost*
                :documentation
-               #.(format nil "Base cost of an edit operation (default ~d"
+               #.(format nil "Base cost of an edit operation (default ~d)"
                          *base-cost*))
               (("coherence") :type string :optional t
                :documentation
