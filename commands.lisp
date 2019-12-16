@@ -103,10 +103,16 @@
                :documentation
                "diff searches for wrap/unwrap operations (UNTESTED)")
               (("max-wrap") :type integer
-               :initial-value #.resolve/ast-diff::*max-wrap-diff*
+               :initial-value #.*max-wrap-diff*
                :documentation
                #.(format nil "max size diff (default ~d) of wrapping/unwrapping"
-                         resolve/ast-diff::*max-wrap-diff*))
+                         *max-wrap-diff*))
+              (("base-cost")
+               :type integer
+               :initial-value #.*base-cost*
+               :documentation
+               #.(format nil "Base cost of an edit operation (default ~d"
+                         *base-cost*))
               (("coherence") :type string :optional t
                :documentation
                "Bound used to find relevant nodes in the edit tree")))))
@@ -283,6 +289,7 @@ command-line options processed by the returned function."
            (setf diff (resolve/ast-diff:ast-diff
                        old-sw new-sw
                        :wrap wrap :max-wrap-diff max-wrap
+                       :base-cost base-cost
                        :strings strings))
            ;; Special handling for SIMPLE diffs, which don't have newlines.
            (when (and (eql 'simple (type-of old-sw))
@@ -406,7 +413,6 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable quiet verbose raw no-color edit-tree json unified
-                      wrap max-wrap
                       print-asts coherence split-lines
                       my-split-lines your-split-lines old-split-lines))
   #+drop-dead
@@ -438,7 +444,10 @@ command-line options processed by the returned function."
        (expand-options-for-which-files language "OLD")
        (expand-options-for-which-files language "YOUR")
        :strings strings
-       :conflict conflict)
+       :conflict conflict
+       :wrap wrap
+       :max-wrap-diff max-wrap
+       :base-cost base-cost)
     ;; Write the result, either to out-dir or to STDOUT.
     (if out-dir
         (if (directory-p old-file)
@@ -487,7 +496,6 @@ command-line options processed by the returned function."
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
   (declare (ignorable manual quiet verbose raw no-color json unified edit-tree
-                      wrap max-wrap
                       print-asts coherence strings split-lines
                       my-split-lines your-split-lines old-split-lines
                       fault-loc))
@@ -512,6 +520,9 @@ command-line options processed by the returned function."
                   (expand-options-for-which-files language "OLD")
                   (expand-options-for-which-files language "YOUR")
                   {test _ tests}
+                  :wrap wrap
+                  :max-wrap-diff max-wrap
+                  :base-cost base-cost
                   (append (when evolve (list :evolve? evolve))
                           (when max-evals (list :max-evals max-evals))
                           (when max-time (list :max-time max-time))))

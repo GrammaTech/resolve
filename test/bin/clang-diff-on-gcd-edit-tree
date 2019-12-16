@@ -1,7 +1,7 @@
 #!/bin/bash
 
 C=`(ast-diff --edit-tree test/etc/gcd/gcd-wo-curlies.c test/etc/gcd/gcd-wo-curlies-fix.c|grep Coherence|wc -l)`
-if [ "$C" == "3" ];then
+if [ "$C" == "2" ];then
     echo PASS
     exit 0
 else

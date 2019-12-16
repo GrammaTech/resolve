@@ -201,7 +201,8 @@
   (:setup (setf *variants* (populate-js-abacus-variants)
                 *cnf* (converge (aget :borders *variants*)
                                 (aget :orig *variants*)
-                                (aget :min-lines *variants*) :conflict t)))
+                                (aget :min-lines *variants*) :conflict t
+                                :base-cost 5)))
   (:teardown (setf *variants* nil *cnf* nil)))
 
 (defixture auto-merge-gcd-single-file
@@ -296,7 +297,7 @@
       "List of one atom vs. empty list"))
 
 (deftest sexp-diff-numbers ()
-    (is (equalp (multiple-value-list (ast-diff 1 2))
+  (is (equalp (multiple-value-list (ast-diff 1 2 :base-cost 0))
 		'(((:delete . 1) (:insert . 2))
 		  2))
 	"Diff of two numbers"))
@@ -383,14 +384,21 @@
     (is (= 1 cost) "Cost of a single addition at the end is one.")
     (is (= 3 (length diff)))))
 
-(deftest ast-diff-recurses-into-subtree ()
+(deftest ast-diff-recurses-into-subtree.1 ()
   (multiple-value-bind (diff cost)
-      (ast-diff '(1 (1 2 3 4 5) 2) '(1 (1 2 4 5) 3))
+      (ast-diff '(1 (1 2 3 4 5) 2) '(1 (1 2 4 5) 3) :base-cost 0)
     (is (= 3 cost) "Cost of a sub-tree diff performed recursion.")
     (is (equalp '(:same :recurse :insert :delete) (mapcar #'car diff)))))
 
+(deftest ast-diff-recurses-into-subtree.2 ()
+  (multiple-value-bind (diff cost)
+      (ast-diff '(1 (1 2 3 4 5) 2) '(1 (1 2 4 5) 3) :base-cost 2)
+    (is (= 11 cost) "Cost of a sub-tree diff performed recursion.")
+    (is (equalp '(:same :recurse :insert :delete) (mapcar #'car diff)))))
+
 (deftest ast-diff-nested-recursion-into-subtree ()
-  (multiple-value-bind (diff cost) (ast-diff '(((1 nil 3)) 3) '(((1 2 3)) 3))
+  (multiple-value-bind (diff cost)
+      (ast-diff '(((1 nil 3)) 3) '(((1 2 3)) 3) :base-cost 0)
     (is (= 2 cost) "Cost of a nested sub-tree diff performed recursion.")
     (is (equalp '(:recurse :same) (mapcar #'car diff)))))
 
@@ -413,13 +421,16 @@
     (is (ast-diff-and-patch-equal-p '((1 "foo" 2)) '((3 "foo" 2)))))
 
 (deftest ast-diff-simple-dotted-list ()
-  (is (= 2 (nth-value 1 (ast-diff '(1 . 1) '(1 . 2))))))
+  (is (= 2 (nth-value 1 (ast-diff '(1 . 1) '(1 . 2) :base-cost 0))))
+  (is (= 4 (nth-value 1 (ast-diff '(1 . 1) '(1 . 2) :base-cost 2)))))
 
 (deftest ast-diff-nested-dotted-list ()
-  (is (= 2 (nth-value 1 (ast-diff '((1 . 2)) '((1 . 1)))))))
+  (is (= 2 (nth-value 1 (ast-diff '((1 . 2)) '((1 . 1)) :base-cost 0))))
+  (is (= 8 (nth-value 1 (ast-diff '((1 . 2)) '((1 . 1)) :base-cost 2)))))
 
 (deftest ast-diff-mixed-proper-improper-list ()
-  (is (= 2 (nth-value 1 (ast-diff (cons 1 nil) (cons 1 1))))))
+  (is (= 2 (nth-value 1 (ast-diff (cons 1 nil) (cons 1 1) :base-cost 0))))
+  (is (= 4 (nth-value 1 (ast-diff (cons 1 nil) (cons 1 1) :base-cost 2)))))
 
 (deftest ast-diff-double-insert ()
   (is (= 2 (nth-value 1 (ast-diff '(1 2 3 4) '(1 2 3 4 5 6))))))
@@ -497,8 +508,12 @@
                            "int a; int b; int c; int d;"))
         (obj2 (from-string (make-instance 'new-clang)
                            "int a; int z; int b; int c; int d;")))
-    (is (= 7 (nth-value 1 (ast-diff obj1 obj2))))
-    (is (= 5 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t))))))
+    (is (= 7 (nth-value 1 (ast-diff obj1 obj2 :base-cost 0))))
+    (is (= 11 (nth-value 1 (ast-diff obj1 obj2 :base-cost 2))))
+    (is (= 5 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t
+                                    :base-cost 0))))
+    (is (= 9 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t
+                                    :base-cost 2))))))
 
 (deftest (diff-insert :long-running) ()
   (let ((orig (from-string (make-instance 'new-clang)
@@ -632,19 +647,25 @@
            (obj1 (from-string (make-instance 'new-clang) s1))
            (obj2 (from-string (make-instance 'new-clang) s2)))
       (multiple-value-bind (diff cost)
-          (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000)
+          (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000 :base-cost 0)
         (is (equal (keys diff) '(:binaryoperator :recurse :same :wrap)))
-        (is (= cost 2)))
+        (is (= cost 2))
+        (is (equal (with-output-to-string (*standard-output*)
+                     (print-diff diff :no-color t))
+                   "int f() { return 1{++2+}; }")))
       (multiple-value-bind (diff cost)
-          (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000)
+          (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000 :base-cost 0)
         (is (equal (keys diff) '(:recurse :same :unwrap)))
-        (is (= cost 2)))
+        (is (= cost 2))
+        (is (equal (with-output-to-string (*standard-output*)
+                     (print-diff diff :no-color t))
+                   "int f() { return 1[-+2-]; }")))
       (multiple-value-bind (diff cost)
-          (ast-diff obj1 obj2 :wrap t :max-wrap-diff -100)
+          (ast-diff obj1 obj2 :wrap t :max-wrap-diff -100 :base-cost 0)
         (is (equal (keys diff) '(:delete :insert :recurse :same)))
         (is (= cost 4)))
       (multiple-value-bind (diff cost)
-          (ast-diff obj2 obj1 :wrap t :max-wrap-diff -100)
+          (ast-diff obj2 obj1 :wrap t :max-wrap-diff -100 :base-cost 0)
         (is (equal (keys diff) '(:delete :insert :recurse :same)))
         (is (= cost 4))))))
 
@@ -684,7 +705,8 @@
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'new-clang) s)))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
-					(%f "int a; int d; int c;"))
+                                        (%f "int a; int d; int c;")
+                                        :base-cost 2)
                               :no-color t
 			      :stream s)))
 	      "int a; int {+d+}[-b-]; int c;")
@@ -694,7 +716,8 @@
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'new-clang) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-					(%f "char *s = \"acd\";"))
+                                        (%f "char *s = \"acd\";")
+                                        :base-cost 2)
                               :no-color t
 			      :stream s)))
 	      "char *s = \"a[-b-]cd\";")
@@ -704,7 +727,8 @@
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'new-clang) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-					(%f "char *s = \"ad\";"))
+                                        (%f "char *s = \"ad\";")
+                                        :base-cost 2)
                               :no-color t
 			      :stream s)))
 	      "char *s = \"a[-bc-]d\";")
@@ -716,7 +740,8 @@
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'new-clang) s)))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
-					(%f "char *s = \"abcd\";"))
+                                        (%f "char *s = \"abcd\";")
+                                        :base-cost 2)
                               :no-color t
 			      :stream s)))
 	      "char *s = \"a{+bc+}d\";")
@@ -726,7 +751,8 @@
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'new-clang) s)))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
-					(%f "char *s = \"abd\";"))
+                                        (%f "char *s = \"abd\";")
+                                        :base-cost 2)
                               :no-color t
 			      :stream s)))
 	      "char *s = \"a{+b+}d\";")
@@ -748,9 +774,14 @@
 (deftest simple.ast-diff.3 ()
     (let ((obj1 (make-instance 'simple :genome '(((:code . "x")))))
           (obj2 (make-instance 'simple :genome '(((:code . "y"))))))
-      (is (equalp (multiple-value-list (ast-diff obj1 obj2))
-                  '(((:recurse (:insert . #\y) (:delete . #\x))) 2))
-          "AST-DIFF of two different one line simple objects")
+      (let ((*base-cost* 0))
+        (is (equalp (ast-diff obj1 obj2)
+                    '((:recurse (:insert . #\y) (:delete . #\x))))
+            "AST-DIFF of two different one line simple objects, base cost 0"))
+      (let ((*base-cost* 2))
+        (is (equalp (ast-diff obj1 obj2)
+                    '((:INSERT . "y") (:DELETE . "x")))
+            "AST-DIFF of two different one line simple objects, base cost 2"))
       (let ((obj3 (ast-patch obj1 '((:recurse (:insert . #\y) (:delete . #\x))))))
         (is (equalp (genome obj3) '(((:code . "y"))))
             "Patch correctly applies to a simple object"))))
@@ -873,14 +904,16 @@
       "Delete and insert in the same place, with improper list."))
 
 (deftest sexp-merge3-delete-insert-tail.2 ()
-  (is (equalp (multiple-value-list (merge3 '((a b . c)) '((a)) '((a b . c))))
+  (is (equalp (multiple-value-list (merge3 '((a b . c)) '((a)) '((a b . c))
+                                           :base-cost 0))
 	      '(((:recurse (:same . a) (:delete . b)
                   (:recurse-tail (:delete . c) (:insert))))
 		nil))
       "Delete including tail of improper list."))
 
 (deftest sexp-merge3-delete-insert-tail.3 ()
-  (is (equalp (multiple-value-list (merge3 '((a b . c)) '((a b . c)) '((a))))
+  (is (equalp (multiple-value-list (merge3 '((a b . c)) '((a b . c)) '((a))
+                                           :base-cost 0))
 	      '(((:recurse (:same . a) (:delete . b)
                   (:recurse-tail (:delete . c) (:insert))))
 		nil))
@@ -888,7 +921,8 @@
 
 (deftest sexp-merge3-delete-insert-tail.4 ()
   (is (equalp (multiple-value-list
-               (merge3 '((a b . c)) '((a . c)) '((a b . e))))
+               (merge3 '((a b . c)) '((a . c)) '((a b . e))
+                       :base-cost 2))
 	      '(((:recurse (:same . a) (:delete . b)
                   (:recurse-tail (:delete . c) (:insert . e))))
 		nil))
@@ -925,7 +959,8 @@
       "Two insertions at the same point"))
 
 (deftest sexp-merge3-unstable-recurse-insert/delete ()
-  (is (equalp (multiple-value-list (merge3 '(x (a) y) '(x (b) y) '(x c y)))
+  (is (equalp (multiple-value-list (merge3 '(x (a) y) '(x (b) y) '(x c y)
+                                           :base-cost 0))
 	      '(((:same . x)
 		 (:insert . c)
 		 (:conflict ((:recurse (:insert . b) (:delete . a)))
@@ -935,7 +970,8 @@
       "recurse and deletion at same point (unstable)"))
 
 (deftest sexp-merge3-unstable-insert/delete-recurse ()
-  (is (equalp (multiple-value-list (merge3 '(x (a) y) '(x c y) '(x (b) y)))
+  (is (equalp (multiple-value-list (merge3 '(x (a) y) '(x c y) '(x (b) y)
+                                           :base-cost 0))
 	      '(((:same . x)
 		 (:insert . c)
 		 (:conflict ((:delete a))
@@ -945,21 +981,24 @@
       "deletion and recurse at same point (unstable)"))
 
 (deftest sexp-merge3-insert/insert-tail1 ()
-  (is (equalp (multiple-value-list (merge3 '((a b)) '((a c)) '((a b . d))))
+  (is (equalp (multiple-value-list (merge3 '((a b)) '((a c)) '((a b . d))
+                                           :base-cost 0))
 	      '(((:recurse (:same . a) (:insert . c) (:delete . b)
 		  (:recurse-tail (:delete) (:insert . d))))
 		nil))
       "insert and insertion of a tail element"))
 
 (deftest sexp-merge3-insert/insert-tail2 ()
-  (is (equalp (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c))))
+  (is (equalp (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c))
+                                           :base-cost 0))
 	      '(((:recurse (:same . a) (:insert . c) (:delete . b)
 		  (:recurse-tail (:delete) (:insert . d))))
 		nil))
       "insert and insertion of a tail element"))
 
 (deftest sexp-merge3-insert/insert-tail3 ()
-  (is (equalp (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c . d))))
+  (is (equalp (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c . d))
+                                           :base-cost 0))
 	      '(((:recurse (:same . a) (:insert . c) (:delete . b)
 		  (:recurse-tail (:delete) (:insert . d))))
 		nil))
@@ -1073,7 +1112,8 @@
         "6a-conflict 2")))
 
 (deftest sexpr-converge.7-conflict ()
-  (let ((merged (converge '(a (c) b) '(a (d) b) '(a (e) b) :meld? nil :conflict t)))
+  (let ((merged (converge '(a (c) b) '(a (d) b) '(a (e) b) :meld? nil
+                          :conflict t :base-cost 0)))
     (is (typep merged '(cons (eql a)
                         (cons (cons conflict-ast null)
                          (cons (eql b) null))))
@@ -1085,7 +1125,7 @@
 (deftest sexpr-converge.8-conflict ()
   (let ((merged (converge '(a ("a") b) '(a (d) b) '(a ("b") b)
                           :meld? nil :conflict t
-                          :strings nil)))
+                          :strings nil :base-cost 0)))
     (is (typep merged '(cons (eql a)
                         (cons (cons conflict-ast null)
                          (cons (eql b) null))))
@@ -1095,7 +1135,8 @@
         "8-conflict 2")))
 
 (deftest sexpr-converge.9-conflict ()
-  (let ((merged (converge '(a b) '(a (d) b) '(a (e) b) :meld? nil :conflict t)))
+  (let ((merged (converge '(a b) '(a (d) b) '(a (e) b) :meld? nil
+                          :conflict t :base-cost 0)))
     (is (typep merged '(cons (eql a)
                         (cons conflict-ast
                          (cons (eql b) null))))
@@ -1105,7 +1146,8 @@
         "9-conflict 2")))
 
 (deftest sexpr-converge.10-conflict ()
-  (let ((merged (converge '(a (d) b) '(a (d) b) '(a (e) b) :meld? nil :conflict t)))
+  (let ((merged (converge '(a (d) b) '(a (d) b) '(a (e) b) :meld? nil
+                          :conflict t :base-cost 0)))
     (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
                                       (cons (eql b) null))))
         "10-conflict 1")
@@ -1115,7 +1157,8 @@
         "10-conflict 2")))
 
 (deftest sexpr-converge.11-conflict ()
-  (let ((merged (converge '(a (e) b) '(a (d) b) '(a (d) b) :meld? nil :conflict t)))
+  (let ((merged (converge '(a (e) b) '(a (d) b) '(a (d) b) :meld? nil
+                          :conflict t :base-cost 0)))
     (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
                                       (cons (eql b) null))))
         "11-conflict 1")
@@ -1182,7 +1225,7 @@
                                                       (list my-name your-name)))
                                         "-")))))
           (multiple-value-bind (merged unstable)
-              (converge my-obj orig your-obj)
+              (converge my-obj orig your-obj :base-cost 5)
             #-debug (declare (ignorable unstable))
             #+debug
             (format t "~&~12a~12a~12a~%" my-name your-name (length unstable))
@@ -1246,7 +1289,12 @@
   ;; NOTE: This was fixed by replacing `nconc' with `append' in
   ;; `set-ast-siblings' in SEL/SW/AST.
   (flet ((conflict-nodes (obj)
-           (remove-if-not #'conflict-ast-p (ast-to-list (ast-root obj)))))
+           (let ((result
+                  (remove-if-not #'conflict-ast-p
+                                 (ast-to-list (ast-root obj)))))
+             ;; (format t "Conflict nodes:~%")
+             ;; (dolist (cn result) (format t "~a~%" cn))
+             result)))
     (with-fixture javascript-converge-conflict
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
@@ -1278,6 +1326,17 @@
   (with-fixture javascript-converge-conflict
     (let ((it (lastcar (remove-if-not #'conflict-ast-p
                                       (asts *cnf*)))))
+      (is it "There is a conflict ast")
+      #+(or)
+      (labels ((to-list (x)
+                 (if (ast-p x)
+                     (cons (ast-class x)
+                           (mapcar #'to-list (ast-children x)))
+                     x)))
+        (iter
+         (for (k . a) in *variants*)
+         (format t "~A:~%~s~%" k (to-list (ast-root a))))
+        (format t "AST:~%~s~%" (to-list (ast-root *cnf*))))
       (is (conflict-ast-p (get-ast *cnf* '(5 3 3)))
           "Path (5 3 3) is a conflict ast in the original.")
       (let ((new (replace-ast (copy *cnf*)

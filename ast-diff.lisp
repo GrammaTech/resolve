@@ -78,6 +78,9 @@
    :map-edit-tree
    :ast-size
    :ast-to-list-form
+   :*base-cost*
+   :*max-wrap-diff*
+   :*wrap*
    ;; :*ignore-whitespace*
    ))
 (in-package :resolve/ast-diff)
@@ -120,6 +123,9 @@
 
 (declaim (special *cost-table*))
 
+(defparameter *base-cost* 2
+  "Basic cost of a diff, before adding costs of components.")
+
 (defvar *ignore-whitespace* nil
   "If true, inserting or removing whitespace in a string has zero cost")
 
@@ -129,7 +135,7 @@
 (defvar *wrap* nil
   "If true, perform wrap/unwrap actions in diffs.")
 
-(defvar *max-wrap-diff* 30
+(defvar *max-wrap-diff* 500
   "When *wrap* is true, this is the maximum size difference for
 wrapping and unwrapping to be considered.")
 
@@ -405,6 +411,7 @@ rewritten TO by part of the edit script"))
                    ((:strings *strings*) *strings*)
                    ((:wrap *wrap*) *wrap*)
                    ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
+                   ((:base-cost *base-cost*) *base-cost*)
                    &allow-other-keys)
   (ast-diff* ast-a ast-b))
 
@@ -644,7 +651,7 @@ Prefix and postfix returned as additional values."
 (defun simple-queue-enqueue (sq val)
   (push val (cdr sq)))
 
-(defun recursive-diff (total-a total-b &rest args
+(defun recursive-diff (total-a total-b
                        &key (upper-bound most-positive-fixnum)
                        &allow-other-keys
                        &aux
@@ -795,23 +802,24 @@ Prefix and postfix returned as additional values."
               (add (cons nil b)
                    (cons :delete a))))))))
 
-(defun diff-cost (diff)
+(defun diff-cost (diff &aux (base-cost *base-cost*))
   "Computes the cost of a diff"
   (cond
     ((not (consp diff)) 0)
     ((symbolp (car diff))
      (case (car diff)
-       (:insert (ast-cost (cdr diff)))
-       (:delete (if (cdr diff) (ast-cost (cdr diff)) 1))
-       (:recurse (diff-cost (cdr diff)))
-       (:recurse-tail (diff-cost (cdr diff)))
+       (:insert (+ base-cost (ast-cost (cdr diff))))
+       (:delete (+ base-cost (if (cdr diff) (ast-cost (cdr diff)) 1)))
+       ((:recurse-tail :recurse) (+ base-cost (diff-cost (cdr diff))))
        ((:insert-sequence :delete-sequence)
-        (if (consp (cdr diff))
-            (reduce #'+ (cdr diff) :key #'diff-cost :initial-value 0)
-            1))
+        (+ base-cost
+           (if (consp (cdr diff))
+               (reduce #'+ (cdr diff) :key #'diff-cost :initial-value base-cost)
+               1)))
        ((:same :same-tail :same-sequence) 0)
        ((:wrap :unwrap)
-        (+ (diff-cost (second diff))
+        (+ base-cost
+           (diff-cost (second diff))
            (cost-of-wrap (fourth diff))
            (cost-of-wrap (fifth diff))))
        (t (diff-cost-car diff (car diff)))))
@@ -911,7 +919,7 @@ value that is used instead."
     ((equal ast-a ast-b)
      (values `((:same . ,ast-a)) 0))
     (t (values `((:delete . ,ast-a) (:insert . ,ast-b))
-               (+ (ast-cost ast-a) (ast-cost ast-b))))))
+               (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b))))))
 
 (defmethod ast-diff* ((ast-a list) (ast-b list) &aux tail-a tail-b)
   #+debug (format t "ast-diff[LIST]~%")
@@ -975,7 +983,8 @@ value that is used instead."
       (values overall-diff overall-cost))))
 
 (defmethod ast-diff* ((s1 string) (s2 string)
-                      &aux (ignore-whitespace *ignore-whitespace*))
+                      &aux (ignore-whitespace *ignore-whitespace*)
+                        (base-cost *base-cost*))
   "special diff method for strings"
   #+debug (format t "ast-diff[STRING]~%")
   (if *strings*
@@ -993,16 +1002,19 @@ value that is used instead."
           ((string= s1 s2)
            (values `((:same-sequence ,s1))) 0)
           ((string= s1 "")
-           (values `((:insert-sequence . ,s2)) (if p 0 1)))
+           (values `((:insert-sequence . ,s2))
+                   (+ base-cost (if p 0 1))))
           ((string= s2 "")
-           (values `((:delete-sequence . ,s1))) (if p 0 1))
+           (values `((:delete-sequence . ,s1))
+                   (+ base-cost (if p 0 1))))
           (t
            (values `((:insert-sequence . ,s2)
                      (:delete-sequence . ,s1))
-                   (cond (p 0)
-                         ((string= ns1 "") 1)
-                         ((string= ns2 "") 1)
-                         (t 2))))))))
+                   (+ (* 2 base-cost)
+                      (cond (p 0)
+                            ((string= ns1 "") 1)
+                            ((string= ns2 "") 1)
+                            (t 2)))))))))
 
 (defun simple-genome-pack (unpacked-g)
   "Converts list of pairs into a SIMPLE genome"
@@ -1954,38 +1966,59 @@ Numerous options are provided to control presentation."
                  (setf delete-buffer nil))
                (setf *deletep* nil))
              (push-insert (c)
-               (purge-delete)
-               (unless insert-buffer (write insert-start :stream stream))
-               (push c insert-buffer))
+               (unless (equal c "")
+                 (purge-delete)
+                 (unless insert-buffer (write insert-start :stream stream))
+                 (push c insert-buffer)))
+             (push-inserts (l) (mapc #'push-insert l))
              (push-delete (c)
-               (purge-insert)
-               (unless delete-buffer (write delete-start :stream stream))
-               (push c delete-buffer))
+               (unless (equal c "")
+                 (purge-insert)
+                 (unless delete-buffer (write delete-start :stream stream))
+                 (push c delete-buffer)))
+             (push-deletes (l) (mapc #'push-delete l))
              (purge ()
                (purge-insert)
                (purge-delete))
              (pr (c) (purge) (%p c))
              (%print-diff (diff)
-               (mapc (lambda-bind ((type . content))
-                                  (ecase type
-                                    (:same (pr content))
-                                    (:delete (push-delete content))
-                                    (:insert (push-insert content))
-                                    (:recurse (%print-diff content))
-                                    (:same-sequence (map nil #'pr content))
-                                    (:insert-sequence
-                                     (map nil #'push-insert content))
-                                    (:delete-sequence
-                                     (map nil #'push-delete content))
-                                    (:same-tail (map nil #'pr content))
-                                    (:recurse-tail
-                                     (%print-diff
-                                      (remove-if
-                                       (lambda (e)
-                                         (or (equal e '(:delete))
-                                             (equal e '(:insert))))
-                                       content)))))
-                     diff)))
+               (case (car diff)
+                 (:wrap
+                  (destructuring-bind (sub-diff path left-wrap
+                                                right-wrap . rest)
+                      (cdr diff)
+                    (declare (ignore path rest))
+                    (mapc #'push-inserts left-wrap)
+                    (%print-diff sub-diff)
+                    (mapc #'push-inserts (reverse right-wrap))))
+                 (:unwrap
+                  (destructuring-bind (sub-diff path left-wrap right-wrap)
+                      (cdr diff)
+                    (declare (ignore path))
+                    (mapc #'push-deletes left-wrap)
+                    (%print-diff sub-diff)
+                    (mapc #'push-deletes (reverse right-wrap))))
+                 (t
+                  (mapc (lambda-bind ((type . content))
+                                     (ecase type
+                                       (:same (pr content))
+                                       (:delete (push-delete content))
+                                       (:insert (push-insert content))
+                                       (:recurse (%print-diff content))
+                                       (:same-sequence (map nil #'pr content))
+                                       (:insert-sequence
+                                        (map nil #'push-insert content))
+                                       (:delete-sequence
+                                        (map nil #'push-delete content))
+                                       (:same-tail (map nil #'pr content))
+                                       (:recurse-tail
+                                        (%print-diff
+                                         (remove-if
+                                          (lambda (e)
+                                            (or (equal e '(:delete))
+                                                (equal e '(:insert))))
+                                          content)))))
+                        diff)))))
       (%print-diff diff)
       (purge)
       (values))))
@@ -2004,7 +2037,8 @@ that were encountered, or NIL if no problems were found.  If CONFLICT
 is true then insert conflict objects into the result AST."))
 
 (defmethod converge ((branch-a t) (original t) (branch-b t)
-                     &key conflict &allow-other-keys)
+                     &key conflict ((:base-cost *base-cost*) *base-cost*)
+                       &allow-other-keys)
   "Assumes the arguments are things that can be treated as ASTs or SEXPRs."
   (multiple-value-bind (diff problems)
       (merge3 original branch-a branch-b :conflict conflict)
@@ -2022,7 +2056,9 @@ the deletions in that diff."
 
 (defvar *conflict* nil "Holds the CONFLICT parameter for MERGE3")
 
-(defun merge3 (original branch-a branch-b &rest args &key conflict &allow-other-keys)
+(defun merge3 (original branch-a branch-b &rest args
+               &key conflict ((:base-cost *base-cost*) *base-cost*)
+                 &allow-other-keys)
   "Find a version of that is a plausible combination of the changes from
 ORIGINAL -> BRANCH-A and ORIGINAL -> BRANCH-B.  Return the edit sequence
 from ORIGINAL to this merged version.   Also return a second value that

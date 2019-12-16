@@ -136,11 +136,12 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
     pop)
   (:method ((conflicted parseable-project)
             &key (strategies `(:V1 :V2 :C1 :C2 :NC :NN)))
+    (declare (ignore strategies))
     (iter (for (file . obj) in (evolve-files conflicted))
           (collect (if (some #'conflict-ast-p (asts obj))
                        (mapcar {cons file} (populate obj))
                        (list (cons file (copy obj)))) into resolutions)
-          (finally (return (mapcar (lambda (resolution &aux ret)
+          (finally (return (mapcar (lambda (resolution)
                                      (copy conflicted :evolve-files resolution))
                                    (cartesian resolutions)))))))
 
@@ -153,6 +154,9 @@ Keyword argument TARGET specifies the target fitness.
 Extra keys are passed through to EVOLVE.")
   (:method ((my software) (old software) (your software) test
             &rest rest &key (evolve? nil) (target nil target-supplied-p)
+                         ((:wrap *wrap*) *wrap*)
+                         ((:base-cost *base-cost*) *base-cost*)
+                         ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
                          &allow-other-keys)
     (note 2 "Populate candidate merge resolutions.")
 
