@@ -1411,7 +1411,8 @@
                  (make-list (length tests)
                             :initial-element most-positive-fixnum)))))
     (let ((*note-level* 0))
-      (is (every #'zerop (fitness (resolve my old your #'fitness-test)))
+      (is (every #'zerop (fitness (resolve my old your #'fitness-test
+                                           :base-cost 10)))
           "auto-merge did not find a solution for the three-way GCD merge."))))
 
 (deftest (can-auto-merge-gcd-single-file :long-running) ()
