@@ -35,6 +35,6 @@ BIN_TESTS =					\
 	octomap-diff-edit-tree			\
 	ast-merge-json-has-conflict		\
 	rest-ast-diff-returns-json		\
-	rest-ast-diff-take-full-strings
+	rest-ast-diff-takes-full-strings
 
 include cl.mk

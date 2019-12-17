@@ -15,7 +15,7 @@ function exit_hook(){
   exit $EXIT; }
 trap exit_hook SIGHUP SIGINT SIGTERM
 
-rest-ast-diff -a text/plain -l javascript \
+rest-ast-diff -p ${port} -a text/plain -l javascript \
               test/etc/javascript/abacus/abacus-{orig,borders}.js \
   |grep -i "\({+console.log\|\+}\)"
 EXIT=$?
