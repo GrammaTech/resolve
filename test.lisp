@@ -1292,8 +1292,8 @@
            (let ((result
                   (remove-if-not #'conflict-ast-p
                                  (ast-to-list (ast-root obj)))))
-             ;; (format t "Conflict nodes:~%")
-             ;; (dolist (cn result) (format t "~a~%" cn))
+             #+debug (format t "Conflict nodes:~%")
+             #+debug (dolist (cn result) (format t "~a~%" cn))
              result)))
     (with-fixture javascript-converge-conflict
       (is (= (length (aget :my (conflict-ast-child-alist
@@ -1327,7 +1327,7 @@
     (let ((it (lastcar (remove-if-not #'conflict-ast-p
                                       (asts *cnf*)))))
       (is it "There is a conflict ast")
-      #+(or)
+      #+debug
       (labels ((to-list (x)
                  (if (ast-p x)
                      (cons (ast-class x)
