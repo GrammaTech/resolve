@@ -38,6 +38,7 @@
    :iterate
    :cl-heap)
   (:import-from :cl-ppcre :regex-replace-all)
+  (:import-from :uiop :nest)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :software-evolution-library/software/new-clang
@@ -427,7 +428,8 @@ differencing of specialized AST structures.; `ast-equal-p',
 `ast-cost', `ast-can-recurse', and `ast-on-recurse'."))
 
 (defmethod ast-diff* ((ast-a ast) (ast-b ast))
-  #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%" (ast-can-recurse ast-a ast-b))
+  #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
+                  (ast-can-recurse ast-a ast-b))
   (let (diff cost)
     (when (eql (ast-class ast-a) (ast-class ast-b))
       (setf (values diff cost)
@@ -460,7 +462,8 @@ of children leading down to the node."))
           (when (ast-p c) (map-ast-while-path c fn (cons i path))))))
 
 (defgeneric ast-diff-wrap (ast-a ast-b)
-  (:documentation "Find a minimum cost 'wrap' edit, which wraps an AST in a larger ast"))
+  (:documentation
+   "Find a minimum cost 'wrap' edit, which wraps an AST in a larger ast"))
 
 (defmethod ast-diff-wrap ((ast-a ast) (ast-b ast))
   ;; search over the ASTs under ast-b that are the same class as ast-a,
@@ -474,47 +477,43 @@ of children leading down to the node."))
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive calls
          (*wrap* nil))
-    ;; (format t "(ast-class ast-a) = ~S~%" a-class)
-    (map-ast-while-path
-     ast-b
-     (lambda (x path)
-       ;; (format t "Path = ~A~%" path)
-       (if (null path)
-           t
-           (let ((x-cost (ast-cost x)))
-             (cond
-               ;; If X is too small, stop search down into it
-               ((< x-cost min-cost) nil)
-               ;; If X is too large, skip it but keep searching
-               ((> x-cost max-cost) t)
-               ;; If X is not the right class, also skip it
-               ((not (eql (ast-class x) a-class)) t)
-               ;; Only if the size is in the right range, and the
-               ;; ast-class matches, do we try to insert here
-               (t
-                (multiple-value-bind (diff cost)
-                    (ast-diff* ast-a x)
-                  (when (< cost best-cost)
-                    (multiple-value-bind (left-wrap right-wrap classes)
-                        (wraps-of-path ast-b (reverse path))
-                      (let ((total-cost (+ cost
-                                           (cost-of-wrap left-wrap)
-                                           (cost-of-wrap right-wrap))))
-                        (when (< total-cost best-cost)
-                          #+ast-diff-debug
-                          (progn
-                            (format t "Wrap candidate found~%")
-                            (format t "Cost = ~a~%" total-cost)
-                            (format t "ast-a = ~s~%" (ast-to-list-form ast-a))
-                            (format t "ast-b = ~s~%" (ast-to-list-form ast-b))
-                            (format t "diff = ~s~%" diff)
-                            (format t "path = ~s~%" path)
-                            (format t "left-wrap = ~s~%" left-wrap)
-                            (format t "right-wrap = ~s~%" right-wrap)
-                            (format t "classes = ~s~%" classes))
-                          (setf best-cost total-cost
-                                best-candidate (list :wrap diff path left-wrap right-wrap classes
-                                                     ast-b)))))))))))))
+    #+ast-diff-debug (format t "(ast-class ast-a) = ~S~%" a-class)
+    (nest
+     (map-ast-while-path ast-b)
+     (lambda (x path) #+ast-diff-debug (format t "Path = ~A~%" path))
+     (if (null path) t)
+     (let ((x-cost (ast-cost x))))
+     (cond
+       ;; If X is too small, stop search down into it
+       ((< x-cost min-cost) nil)
+       ;; If X is too large, skip it but keep searching
+       ((> x-cost max-cost) t)
+       ;; If X is not the right class, also skip it
+       ((not (eql (ast-class x) a-class)) t))
+     ;; Only if the size is in the right range, and the
+     ;; ast-class matches, do we try to insert here
+     (t) (multiple-value-bind (diff cost) (ast-diff* ast-a x))
+     (when (< cost best-cost))
+     (multiple-value-bind (left-wrap right-wrap classes)
+         (wraps-of-path ast-b (reverse path)))
+     (let ((total-cost (+ cost
+                          (cost-of-wrap left-wrap)
+                          (cost-of-wrap right-wrap))))
+       (when (< total-cost best-cost)
+         #+ast-diff-debug
+         (progn
+           (format t "Wrap candidate found~%")
+           (format t "Cost = ~a~%" total-cost)
+           (format t "ast-a = ~s~%" (ast-to-list-form ast-a))
+           (format t "ast-b = ~s~%" (ast-to-list-form ast-b))
+           (format t "diff = ~s~%" diff)
+           (format t "path = ~s~%" path)
+           (format t "left-wrap = ~s~%" left-wrap)
+           (format t "right-wrap = ~s~%" right-wrap)
+           (format t "classes = ~s~%" classes))
+         (setf best-cost total-cost
+               best-candidate (list :wrap diff path left-wrap right-wrap classes
+                                    ast-b)))))
     (when best-candidate
       (values best-candidate best-cost))))
 
@@ -534,35 +533,32 @@ out of one tree and turns it into another."))
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive call
          (*wrap* nil))
-    ;; (format t "(ast-class ast-a) = ~S~%" a-class)
-    (map-ast-while-path
-     ast-a
-     (lambda (x path)
-       ;; (format t "Path = ~A~%" path)
-       (if (null path)
-           t
-           (let ((x-cost (ast-cost x)))
-             (cond
-               ;; If X is too small, stop search down into it
-               ((< x-cost min-cost) nil)
-               ;; If X is too large, skip it but keep searching
-               ((> x-cost max-cost) t)
-               ;; If X is not the right class, also skip it
-               ((not (eql (ast-class x) b-class)) t)
-               ;; Only if the size is in the right range, and the
-               ;; ast-class matches, do we try to insert here
-               (t
-                (multiple-value-bind (diff cost)
-                    (ast-diff* ast-b x)
-                  (when (< cost best-cost)
-                    (multiple-value-bind (left-wrap right-wrap)
-                        (wraps-of-path ast-a (reverse path))
-                      (let ((total-cost (+ cost
-                                           (cost-of-wrap left-wrap)
-                                           (cost-of-wrap right-wrap))))
-                        (when (< total-cost best-cost)
-                          (setf best-cost total-cost
-                                best-candidate (list :unwrap diff path left-wrap right-wrap)))))))))))))
+    #+ast-diff-debug (format t "(ast-class ast-a) = ~S~%" a-class)
+    (nest
+     (map-ast-while-path ast-a)
+     (lambda (x path) #+ast-diff-debug (format t "Path = ~A~%" path))
+     (if (null path) t)
+     (let ((x-cost (ast-cost x))))
+     (cond
+       ;; If X is too small, stop search down into it
+       ((< x-cost min-cost) nil)
+       ;; If X is too large, skip it but keep searching
+       ((> x-cost max-cost) t)
+       ;; If X is not the right class, also skip it
+       ((not (eql (ast-class x) b-class)) t))
+     ;; Only if the size is in the right range, and the
+     ;; ast-class matches, do we try to insert here
+     (t) (multiple-value-bind (diff cost) (ast-diff* ast-b x))
+     (when (< cost best-cost)
+       (multiple-value-bind (left-wrap right-wrap)
+           (wraps-of-path ast-a (reverse path))
+         (let ((total-cost (+ cost
+                              (cost-of-wrap left-wrap)
+                              (cost-of-wrap right-wrap))))
+           (when (< total-cost best-cost)
+             (setf best-cost total-cost
+                   best-candidate
+                   (list :unwrap diff path left-wrap right-wrap)))))))
     (when best-candidate
       (values best-candidate best-cost))))
 
@@ -585,7 +581,7 @@ down from AST, as well as the classes of the nodes along the path."
     (setf left (reverse left)
           right (reverse right)
           classes (reverse classes))
-    ;; (format t "Result: ~s ~s ~s~%" left right classes)
+    #+ast-diff-debug (format t "Result: ~s ~s ~s~%" left right classes)
     (values left right classes)))
 
 (defun cost-of-wrap (wrap)
@@ -788,7 +784,8 @@ Prefix and postfix returned as additional values."
               ((ast-can-recurse (car a) (car b)) ; Recurse.
                #+ast-diff-debug (format t "  recurse~%")
                (let ((rec (%recursive a b)))
-                 #+ast-diff-debug (format t "At ast-can-recurse:  rec = ~a~%" rec)
+                 #+ast-diff-debug
+                 (format t "At ast-can-recurse:  rec = ~a~%" rec)
                  (add (cons (cdr a) (cdr b))
                       (cons :recurse rec))))))
           (if (consp b)                 ; Insert.
@@ -901,7 +898,7 @@ value that is used instead."
   (let* ((hash (ast-hash ast))
          (old-ast (gethash hash table)))
     (when (and old-ast (not (ast-equal-p ast old-ast)))
-      (iter (incf hash) ; this may be >= sel/sw/ast::+ast-hash-base+, but that's ok
+      (iter (incf hash) ; may be >= sel/sw/ast::+ast-hash-base+, but that's ok
             (while (gethash hash table)))
       (setf (gethash hash table) ast))
     hash))
@@ -1281,7 +1278,8 @@ during calls to MAP-EDIT-TREE.")
         (c2 (ast-size (ast-size node))))
     (/ (float c2) (float c1))))
 
-(defmethod print-edit-tree-node ((node edit-tree-node) &key print-asts coherence)
+(defmethod print-edit-tree-node
+    ((node edit-tree-node) &key print-asts coherence)
   (assert (typep node 'edit-tree-node))
   ;; If COHERENCE is specified, print only the highest edit tree
   ;; nodes whose coherence is >= this limit
@@ -1309,7 +1307,8 @@ during calls to MAP-EDIT-TREE.")
               (pprint-logical-block (*standard-output*
                                      nil ; node
                                      :per-line-prefix per-line-prefix)
-                (format t "~a~%---------------~%~a~&" source-text target-text))))
+                (format t "~a~%---------------~%~a~&"
+                        source-text target-text))))
         (when print-asts
           (format t "---------------~%")
           (format t "~s~%==>~%~s~%"
@@ -1438,9 +1437,9 @@ A diff is a sequence of actions as returned by `ast-diff' including:
 :insert B  : insert B at the current position
 :delete A  : remove the current AST
 :recurse S : recursively apply script S to the current AST
-:wrap S <path> <left-wrap> <right-wrap> <class> : Apply S to current AST, then wrap it in
-   a tree of class <class> with left and right children along the path given
-   by <left-wrap> and <right-wrap>
+:wrap S <path> <left-wrap> <right-wrap> <class> : Apply S to current AST,
+   then wrap it in a tree of class <class> with left and right children along
+   the path given by <left-wrap> and <right-wrap>
 :unwrap S <path> <left-wrap> <right-wrap> : Apply S to the subtree of given
   by following <path> down from this tree."))
 
@@ -1610,7 +1609,8 @@ process with the rest of the script."
   ast)
 
 (defmethod ast-patch ((original cons) (script list)
-                      &rest keys &key (delete? t) (meld? t) conflict tag &allow-other-keys)
+                      &rest keys
+                      &key (delete? t) (meld? t) conflict tag &allow-other-keys)
   ;; MELD? causes conflicts to be all placed into the list, if possible
   ;; CONFLICT causes conflict objects to be produced
   ;; Otherwise, multiple values are returned, one for each conflict
@@ -1677,19 +1677,15 @@ process with the rest of the script."
                                    (edit (cdr asts) (cdr script))))
                (:same-tail
                 (assert (null (cdr script))) ;; :same-tail always occurs last
-                (assert (ast-equal-p asts args)
-                        ()
-                        "AST-PATCH (CONS): :SAME-TAIL not as as in script: ~a, ~a"
-                        asts args)
+                (assert (ast-equal-p asts args) () "AST-PATCH (CONS): ~
+                        :SAME-TAIL not as as in script: ~a, ~a" asts args)
                 asts)
                (:recurse-tail
                 (assert (null (cdr script)))
                 (ast-patch asts args))
                (:delete
-                (assert (ast-equal-p (car asts) args)
-                        ()
-                        "AST-PATCH (CONS): :DELETE not same as in script: ~a,~a"
-                        (car asts) args)
+                (assert (ast-equal-p (car asts) args) () "AST-PATCH (CONS): ~
+                        :DELETE not same as in script: ~a,~a" (car asts) args)
                 (cond
                   (tag
                    ;; Conducting an implicit :SAME
@@ -1702,7 +1698,8 @@ process with the rest of the script."
                   (conflict
                    ;; Record this, since it conflicts with :old
                    (multiple-value-bind (conflict-node asts-rest)
-                       (ast-patch-conflict-action asts (list (list (car script))))
+                       (ast-patch-conflict-action
+                        asts (list (list (car script))))
                      (let ((rest (edit asts-rest (cdr script))))
                        (merge-conflict-ast conflict-node rest))))
                   ;; The key DELETE?, if NIL (default T) will
@@ -1713,7 +1710,8 @@ process with the rest of the script."
                   (delete?
                    (edit (cdr asts) (cdr script)))
                   (t
-                   (cons-values meld? (car asts) (edit (cdr asts) (cdr script))))))
+                   (cons-values meld?
+                                (car asts) (edit (cdr asts) (cdr script))))))
                (:insert
                 (if tag
                     (let ((alist `((,tag ,args))))
@@ -1728,9 +1726,9 @@ process with the rest of the script."
                  meld?
                  (iter (while (consp args))
                        (assert asts)
-                       (assert (ast-equal-p (car asts) (car args))
-                               ()
-                               "AST-PATCH (CONS): :DELETE-SEQUENCE not same as in script: ~a, ~a"
+                       (assert (ast-equal-p (car asts) (car args)) ()
+                               "AST-PATCH (CONS): ~
+                               :DELETE-SEQUENCE not same as in script: ~a, ~a"
                                (car asts) (car args))
                        (let ((a (pop asts)))
                          (when delete? (collect a)))
@@ -1763,10 +1761,8 @@ and replicating the others."
               ;; Don't do :same-tail, :recurse-tail here
               (let ((val (list action1 action2)))
                 (flet ((%check (s1 s2)
-                         (assert (ast-equal-p s1 s2)
-                                 ()
-                                 "MELD-SCRIPTS ~a: should have been the same: ~a, ~a"
-                                 val s1 s2)))
+                         (assert (ast-equal-p s1 s2) () "MELD-SCRIPTS ~a: ~
+                                 should have been the same: ~a, ~a" val s1 s2)))
                   (switch (val :test #'equal)
                     ('(:same :same)
                       (%check (cdar script1) (cdar script2))
@@ -1813,7 +1809,8 @@ and replicating the others."
            (find :conflict script :key #'car))
       (if (or meld? conflict)
           (let ((result (call-next-method)))
-            #+ast-diff-debug (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+            #+ast-diff-debug
+            (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
             result)
           (let ((script1 (iter (for action in script)
                                (appending
@@ -1828,7 +1825,8 @@ and replicating the others."
             (values (ast-patch original script1)
                     (ast-patch original script2))))
       (let ((result (call-next-method)))
-        #+ast-diff-debug (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+        #+ast-diff-debug
+        (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
         result)))
 
 (defmethod ast-patch ((original vector) (script list)
@@ -2085,7 +2083,8 @@ unstable differences.  CONFLICT controls how merge conflicts are handled."
        (progn
          (record-unstable o-a o-b)
          (flet ((%f (x) (when x `(,(car x)))))
-           `((:conflict ,(unless leave-a (%f o-a)) ,(unless leave-b (%f o-b)))))))
+           `((:conflict ,(unless leave-a (%f o-a))
+                        ,(unless leave-b (%f o-b)))))))
    (if leave-a o-a (cdr o-a))
    (if leave-b o-b (cdr o-b))))
 
