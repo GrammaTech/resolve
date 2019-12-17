@@ -31,7 +31,7 @@ declare -a OPTIONS
 # Collect all options to pass to ast-diff.
 while [ $# -gt 6 ];do
   case $1 in
-    -*) OPTIONS+=$1;OPTIONS+=$2; shift; shift;;
+    -*) OPTIONS+=($1); OPTIONS+=($2); shift; shift;;
     *) break;;
   esac
 done
@@ -51,19 +51,19 @@ fi
 
 ## With debugging.
 if [ ! -z ${GIT_AST_DIFF_DEBUG} ];then
-  echo "$@" >> "${GIT_AST_DIFF_DEBUG}"
+  echo -e "ast-diff ${OPTIONS[@]}\n$@" >> "${GIT_AST_DIFF_DEBUG}"
   SUFFIX=".$(echo $1|sed 's/.*\.//;s|^/||;s|[^/]*/||')"
   BASE="$(basename $1 "${SUFFIX}")"
   backup(){ cp $1 $(mktemp -t --suffix="${SUFFIX}" "${BASE}-$2-XXXX"); }
   backup $2 "OLD"
   backup $5 "NEW"
   PROFILE=$(mktemp -t "${BASE}-prof-XXXX" --suffix=".data")
-  ast-diff --verbose 4 --eval "(setf *profile-flame-graph* t)" --profile "${PROFILE}" "$2" "$5"
+  ast-diff ${OPTIONS[@]} --verbose 4 --eval "(setf *profile-flame-graph* t)" --profile "${PROFILE}" "$2" "$5"
   EXIT=$?
   echo -e "Returned $EXIT\n" >> ${GIT_AST_DIFF_DEBUG}
 else
   ## Without debugging.
-  ast-diff "$2" "$5"
+  ast-diff ${OPTIONS[@]} "$2" "$5"
   EXIT=$?
 fi
 if [ $EXIT == 1 ] || [ $EXIT == 0 ];then
