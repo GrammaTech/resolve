@@ -26,6 +26,16 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 
+declare -a OPTIONS
+
+# Collect all options to pass to ast-diff.
+while [ $# -gt 6 ];do
+  case $1 in
+    -*) OPTIONS+=$1;OPTIONS+=$2; shift; shift;;
+    *) break;;
+  esac
+done
+
 echo "${bold}ast-diff $1"
 if [ "$5" == "/dev/null" ];then
   echo "${bold}deleted file mode $4"
