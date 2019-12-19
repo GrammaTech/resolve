@@ -2,7 +2,7 @@ ARG REF=master
 ARG LISP=sbcl
 FROM docker.grammatech.com/synthesis/sel/ubuntu-${LISP}:${REF}
 
-RUN apt-get -y update && apt-get -y install python3 expect curl
+RUN apt-get -y update && apt-get -y install python3 expect curl jq
 
 COPY . /root/quicklisp/local-projects/resolve
 WORKDIR /root/quicklisp/local-projects/resolve
