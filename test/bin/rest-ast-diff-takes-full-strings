@@ -7,7 +7,7 @@ EXIT=0
 
 serve-ast-diff --port ${port} --debug &
 server_pid=$!
-sleep 1
+sleep 10
 
 function exit_hook(){
   kill -SIGINT ${server_pid};
