@@ -2,7 +2,7 @@
 
 ;;; TODO: Move as much of this as reasonable into sel/test.lisp.
 
-(in-package :sel/ast-diff)
+(in-package :resolve/ast-diff)
 
 (defun make-test-input (n f l)
   (append (list f)
@@ -147,7 +147,7 @@ a valid patch.  Return :FAIL (and other values) if not."
        (list s1 s2 triples)))))
 
 ;;; Testing of ast-diff/lisp
-
+#|
 (defun lisp-patch-test (f1 f2 out)
   ;; After this, the contents of OUT should be the same as the contents of F2
   (let ((resolve/lisp::*lisp-forms1*)
@@ -168,3 +168,4 @@ a valid patch.  Return :FAIL (and other values) if not."
 			 :if-does-not-exist :create)
 	(mapcar (lambda (x) (let ((str (resolve/lisp::source x))) (princ str s) str))
 		result)))))
+|#

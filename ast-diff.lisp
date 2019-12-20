@@ -46,13 +46,15 @@
   (:export
    :ast-equal-p
    :ast-cost
+   :ast-size
    :ast-can-recurse
-   :ast-on-recurse
-   :ast-un-recurse
    :ast-diff
    :ast-diff*
    :ast-diff-elide-same
    :ast-patch
+   :ast-patch*
+   :astify
+   :unastify
    :print-diff
    ;; Merge functions
    :chunk
@@ -167,7 +169,8 @@ wrapping and unwrapping to be considered.")
   (:documentation "Return cost of AST."))
 
 (defmethod ast-cost ((ast ast))
-  (reduce #'+ (ast-children ast) :initial-value 0 :key #'ast-cost))
+  (let ((c (ast-children ast)))
+    (if c (reduce #'+ (ast-children ast) :key #'ast-cost) 1)))
 
 (defmethod ast-cost (ast) 1)
 
@@ -193,8 +196,8 @@ wrapping and unwrapping to be considered.")
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
 can be recursed on if STRINGS is true (defaults to true)"))
 
-(defmethod ast-can-recurse ((ast-a cons) (ast-b cons))
-  t)
+;; (defmethod ast-can-recurse ((ast-a cons) (ast-b cons))
+;;  t)
 (defmethod ast-can-recurse ((ast-a string) (ast-b string))
   *strings*)
 (defmethod ast-can-recurse ((ast-a t) (ast-b t))
@@ -203,26 +206,6 @@ can be recursed on if STRINGS is true (defaults to true)"))
   t)
 ;; (eq (ast-class ast-a) (ast-class ast-b)))
 
-(defgeneric ast-on-recurse (ast)
-  (:documentation "Possibly AST on recursion."))
-;;; TODO: fix this for :COMBINED nodes from new-clang
-;;;   They have ast-children, but diff should not go down into
-;;;   them.  Instead, the node should be treated as a simple string.
-(defmethod ast-on-recurse ((ast ast)) (ast-children ast))
-(defmethod ast-on-recurse ((ast t)) ast)
-
-(defgeneric ast-un-recurse (ast sub-ast)
-  (:documentation
-   "Reverse the effect of `ast-on-recurse' recombining SUB-AST into AST."))
-(defmethod ast-un-recurse ((ast t) (sub-ast t))
-  sub-ast)
-(defmethod ast-un-recurse ((ast ast) sub-asts)
-  (copy ast :children sub-asts))
-
-(defmethod ast-equal-op ((s1 simple) (s2 simple))
-  "Useful to treat simple objects as ASTs when calculating differences."
-  (ast-equal-p (genome s1) (genome s2)))
-
 (defmethod ast-text ((ast string))
   ast)
 
@@ -230,7 +213,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (let ((strings (iter (while (consp ast))
                        (collecting (ast-text (pop ast))))))
     (if ast
-        (concatenate-strings (list strings "." (ast-text ast)))
+        (concatenate-strings (nconc strings (list "." (ast-text ast))))
         (concatenate-strings strings))))
 
 (defun concatenate-strings (strings)
@@ -254,6 +237,107 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (actual-ast-to-list-form ast))
 
 (defmethod ast-to-list-form (ast) ast)
+
+(defgeneric ast-size (node)
+  (:documentation "Number of nodes and leaves in an AST or ast-like thing")
+  (:method ((node ast))
+    (reduce #'+ (ast-children node) :key #'ast-size :initial-value 1))
+  (:method ((node t)) 1))
+
+
+;;; Wrapper for Lisp lists in simple ASTs
+;;; This is so we don't need to confuse the ast-diff machinery
+;;; by making it handle raw lisp lists, and so information
+;;; like size and cost can be cached in the ast nodes
+;;;
+
+;;; Each SIMPLE-LISP-AST is a list (either proper or improper)
+;;; The elements of CHILDREN are the proper elements of the list,
+;;; and either the tail value (if the list is improper) or :NIL
+;;; (if the list is proper).   This will collide on improper lists
+;;; that end in :NIL, but there is nothing special about :NIL, so fix
+;;; this up later.
+(defstruct (simple-lisp-ast (:include ast))
+  (children nil :type list :read-only t)
+  (original nil :read-only t)
+  ;; Slots for caching
+  (hash nil :type (or null integer))
+  (cost nil :type (or null integer))
+  (size nil :type (or null integer)))
+
+(defmethod ast-class ((ast simple-lisp-ast)) :list)
+(defmethod ast-children ((ast simple-lisp-ast)) (simple-lisp-ast-children ast))
+(defmethod ast-stored-hash ((ast simple-lisp-ast)) (simple-lisp-ast-hash ast))
+(defmethod (setf ast-stored-hash) ((hash integer) (ast simple-lisp-ast))
+  (setf (simple-lisp-ast-hash ast) hash))
+(defmethod copy ((ast simple-lisp-ast)
+                 &key
+                   (children (simple-lisp-ast-children ast))
+                   &allow-other-keys)
+  (make-simple-lisp-ast :children children))
+(defmethod ast-cost :around ((ast simple-lisp-ast))
+  (or (simple-lisp-ast-cost ast)
+      (setf (simple-lisp-ast-cost ast) (call-next-method))))
+(defmethod ast-size :around ((ast simple-lisp-ast))
+  (or (simple-lisp-ast-size ast)
+      (setf (simple-lisp-ast-size ast) (call-next-method))))
+(defmethod ast-text ((ast simple-lisp-ast))
+  (let ((v (unastify ast)))
+    (if v
+        (with-output-to-string (s) (format s "~a" (unastify v)))
+        "()")))
+(defmethod ast-equal-p ((a simple-lisp-ast) (b simple-lisp-ast))
+  (equalp (unastify a) (unastify b)))
+
+(defgeneric astify (x)
+  (:documentation "Convert a Lisp data structure to a SIMPLE-LISP-AST"))
+(defgeneric unastify (x)
+  (:documentation "Convert a SIMPLE-LISP-AST to a Lisp data structure"))
+
+(let ((end-marker :nil))
+  (defmethod ast-text ((x (eql end-marker))) "")
+  (defmethod astify ((x list))
+    (if (proper-list-p x)
+        ;; Add an end marker to represent the NIL
+        ;; (because AST-DIFF treats NIL as a list)
+        (make-simple-lisp-ast
+         :children (nconc (mapcar #'astify x) (list end-marker))
+         :original x)
+        ;; Properize the list
+        (let ((original-x x)
+              (properized-x
+               (iter (collecting
+                      (if (consp x)
+                          (car x)
+                          (progn
+                            (assert (not (eql x end-marker)) ()
+                                    "End marker ~s found"
+                                    x)
+                            x)))
+                     (while (consp x))
+                     (pop x))))
+          (make-simple-lisp-ast
+           :children (mapcar #'astify properized-x)
+           :original original-x))))
+  (defmethod astify (x) x)
+  (defmethod unastify ((ast simple-lisp-ast))
+    (or (simple-lisp-ast-original ast)
+        (unastify-list (simple-lisp-ast-children ast))))
+  (defmethod unastify (val) val)
+
+  (defun unastify-list (c)
+    (and c
+         (let ((last-c (car (last c))))
+           (if (eql last-c end-marker)
+               (mapcar #'unastify (butlast c))
+               (nconc (mapcar #'unastify (butlast c))
+                      last-c))))))
+
+(defmethod print-object ((obj simple-lisp-ast) stream)
+  (if *print-readably*
+      (call-next-method)
+      (print-unreadable-object (obj stream :type t)
+        (format stream ":VALUE ~s" (unastify obj)))))
 
 ;;; Classes for "edit trees"
 ;;;
@@ -265,10 +349,6 @@ can be recursed on if STRINGS is true (defaults to true)"))
 ;;; tree to another edit segment in the target tree.  An edit segment
 ;;; represents a piece of the tree that is being changed by the
 ;;; a part of the edit script.
-
-(defgeneric ast-size (node)
-  (:documentation "Number of nodes and leaves in an AST or
-ast-like thing"))
 
 (defclass size-mixin ()
   ((size :reader ast-size
@@ -381,10 +461,6 @@ rewritten TO by part of the edit script"))
       (setf s (concatenate 'string (subseq s 0 (- bound 3)) "...")))
     (format stream "#<EDIT-TREE-NODE ~s>" s)))
 
-(defmethod ast-size ((node ast))
-  (reduce #'+ (ast-children node) :key #'ast-size :initial-value 1))
-(defmethod ast-size (node) 1)
-
 (defmethod slot-unbound (class (node edit-tree-node) (slot (eql 'size)))
   (let ((value (reduce #'+ (edit-tree-node-children node)
                        :key #'ast-size :initial-value 1)))
@@ -414,7 +490,9 @@ rewritten TO by part of the edit script"))
                    ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
                    ((:base-cost *base-cost*) *base-cost*)
                    &allow-other-keys)
-  (ast-diff* ast-a ast-b))
+  ;; Convert raw lisp data to asts
+  (ast-diff* (astify ast-a)
+             (astify ast-b)))
 
 (defgeneric ast-diff* (ast-a ast-b)
   (:documentation
@@ -521,8 +599,10 @@ of children leading down to the node."))
   (:documentation "Find a minimum cost 'unwrap' edit, which pulls a subast
 out of one tree and turns it into another."))
 
+;; (defmethod ast-diff-unwrap ((ast-a list) (ast-b t)) (error "Not implemented"))
+
 (defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast))
-  ;; search over the ASTs under ast-b that are the same class as ast-a,
+  ;; search over the ASTs under ast-a that are the same class as ast-b,
   ;; and for which the size difference is not too large
   (let* ((ast-b-cost (ast-cost ast-b))
          (b-class (ast-class ast-b))
@@ -548,17 +628,19 @@ out of one tree and turns it into another."))
        ((not (eql (ast-class x) b-class)) t))
      ;; Only if the size is in the right range, and the
      ;; ast-class matches, do we try to insert here
-     (t) (multiple-value-bind (diff cost) (ast-diff* ast-b x))
+     (t)
+     (multiple-value-bind (diff cost) (ast-diff* x ast-b))
      (when (< cost best-cost)
        (multiple-value-bind (left-wrap right-wrap)
            (wraps-of-path ast-a (reverse path))
          (let ((total-cost (+ cost
+                              *base-cost*
                               (cost-of-wrap left-wrap)
                               (cost-of-wrap right-wrap))))
            (when (< total-cost best-cost)
              (setf best-cost total-cost
                    best-candidate
-                   (list :unwrap diff path left-wrap right-wrap)))))))
+                   (list :unwrap diff (reverse path) left-wrap right-wrap)))))))
     (when best-candidate
       (values best-candidate best-cost))))
 
@@ -587,7 +669,7 @@ down from AST, as well as the classes of the nodes along the path."
 (defun cost-of-wrap (wrap)
   "Computes the sum of the costs of the objects in a wrap"
   (reduce #'+ wrap :initial-value 0
-          :key (lambda (w) (reduce #'+ w :key #'ast-cost :initial-value 0))))
+          :key (lambda (w) (reduce #'+ w :key #'ast-cost :initial-value *base-cost*))))
 
 (defmethod ast-diff-wrap ((ast-a t) (ast-b t))
   nil)
@@ -804,7 +886,7 @@ Prefix and postfix returned as additional values."
   (cond
     ((not (consp diff)) 0)
     ((symbolp (car diff))
-     (case (car diff)
+     (ecase (car diff)
        (:insert (+ base-cost (ast-cost (cdr diff))))
        (:delete (+ base-cost (if (cdr diff) (ast-cost (cdr diff)) 1)))
        ((:recurse-tail :recurse) (+ base-cost (diff-cost (cdr diff))))
@@ -818,24 +900,16 @@ Prefix and postfix returned as additional values."
         (+ base-cost
            (diff-cost (second diff))
            (cost-of-wrap (fourth diff))
-           (cost-of-wrap (fifth diff))))
-       (t (diff-cost-car diff (car diff)))))
+           (cost-of-wrap (fifth diff))))))
     (t
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
-
-(defgeneric diff-cost-car (diff diff-car)
-  (:documentation
-   "Cost of DIFF, where DIFF is a cons cells with car DIFF-CAR, a symbol."))
-
-(defmethod diff-cost-car ((diff cons) (diff-car symbol)) 0)
 
 (defun ast-diff-on-lists (ast-a ast-b)
   (assert (proper-list-p ast-a))
   (assert (proper-list-p ast-b))
   ;; Drop common prefix and postfix, just run the diff on different middle.
   (multiple-value-bind (unique-a unique-b prefix postfix)
-      (remove-common-prefix-and-suffix (ast-on-recurse ast-a)
-                                       (ast-on-recurse ast-b))
+      (remove-common-prefix-and-suffix ast-a ast-b)
     ;; NOTE: We assume that the top level is a list (not a cons tree).
     ;; This is true for any ASTs parsed from a source file as a
     ;; sequence of READs.
@@ -880,17 +954,6 @@ Prefix and postfix returned as additional values."
       (let ((rdiff (recursive-diff unique-a unique-b)))
         (add-common rdiff (diff-cost rdiff))))))
 
-(defun properize (list)
-  "Returns the proper part of list and the CDR of the last element"
-  (if (proper-list-p list)
-      (values list nil)
-      (let (tail (e list))
-        (values
-         (iter (setf tail e)
-               (while (consp e))
-               (when (consp e) (collect (pop e))))
-         tail))))
-
 (defun ast-hash-with-check (ast table)
   "Calls AST-HASH, but checks that if two ASTs have the same hash value,
 they are actually equal.  If not, the second one gets a new, fresh hash
@@ -909,6 +972,7 @@ value that is used instead."
                   (mapcar {typep _ 'sel/sw/parseable:parseable}
                           (list ast-a ast-b)))
   (cond
+    ;; Get rid of this?
     ((and (ast-p ast-a)
           (ast-p ast-b)
           (ast-can-recurse ast-a ast-b))
@@ -918,15 +982,11 @@ value that is used instead."
     (t (values `((:delete . ,ast-a) (:insert . ,ast-b))
                (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b))))))
 
-(defmethod ast-diff* ((ast-a list) (ast-b list) &aux tail-a tail-b)
-  #+debug (format t "ast-diff[LIST]~%")
-  (let* ((new-ast-a (ast-on-recurse ast-a))
-         (new-ast-b (ast-on-recurse ast-b)))
-    (setf (values ast-a tail-a) (properize new-ast-a))
-    (setf (values ast-b tail-b) (properize new-ast-b)))
-  #+ast-diff-debug
-  (format t "ast-a = ~a, tail-a = ~a~%ast-b = ~a, tail-b = ~a~%"
-          ast-a tail-a ast-b tail-b)
+(defmethod ast-diff* ((ast-a list) (ast-b list))
+  #+ast-diff-debug (format t "ast-diff LIST LIST~%")
+  (iter (for a in (list ast-a ast-b))
+        (assert (proper-list-p a) () "Not a proper list: ~a" a))
+  #+ast-diff-debug (format t "ast-a = ~a~%ast-b = ~a~%" ast-a ast-b)
   (let* ((table (make-hash-table))
          (hashes-a (mapcar (lambda (ast) (ast-hash-with-check ast table)) ast-a))
          (hashes-b (mapcar (lambda (ast) (ast-hash-with-check ast table)) ast-b))
@@ -955,28 +1015,10 @@ value that is used instead."
             ;; (assert (ast-equal-p ca cb))
             (multiple-value-bind (diff cost)
                 (ast-diff-on-lists da db)
-              ;; get rid of this?
-              #+nil
-              (when (and overall-diff (equalp (lastcar diff) '(:same)))
-                 (assert (>= cost 1))
-                 (decf cost)
-                 (setf diff (butlast diff)))
               (setf overall-diff (append diff overall-diff))
               (incf overall-cost cost))
             (setf overall-diff
                   (append (mapcar (lambda (it) (cons :same it)) ca) overall-diff)))
-      ;; Now splice in the tails, if needed
-      (if (equalp tail-a tail-b)
-          (setf overall-diff
-                (if tail-a (append overall-diff `((:same-tail . ,tail-a)))
-                    overall-diff))
-          (progn
-            #+ast-diff-debug (format t "Diff on non-nil tail~%")
-            (multiple-value-bind (diff tail-cost)
-                (ast-diff* tail-a tail-b)
-              (setf overall-diff
-                    (append overall-diff `((:recurse-tail . ,diff))))
-              (incf overall-cost tail-cost))))
       (values overall-diff overall-cost))))
 
 (defmethod ast-diff* ((s1 string) (s2 string)
@@ -997,7 +1039,7 @@ value that is used instead."
            (p (and ignore-whitespace (string= ns1 ns2))))
         (cond
           ((string= s1 s2)
-           (values `((:same-sequence ,s1))) 0)
+           (values `((:same-sequence . ,s1)) 0))
           ((string= s1 "")
            (values `((:insert-sequence . ,s2))
                    (+ base-cost (if p 0 1))))
@@ -1031,7 +1073,7 @@ value that is used instead."
 
 (defmethod ast-diff* ((soft1 simple) (soft2 simple))
   #+debug (format t "ast-diff[SIMPLE]~%")
-  (ast-diff
+  (ast-diff*
    (simple-genome-unpack (genome soft1))
    (simple-genome-unpack (genome soft2))))
 
@@ -1429,7 +1471,12 @@ is shorter, replicate the last value (or NIL if none)."
        (apply-values-meld #'append ,@args)
        (apply-values-extend #'append ,@args)))
 
-(defgeneric ast-patch (original diff &rest keys &key conflict &allow-other-keys)
+(defun ast-patch (original diff &rest keys)
+  (if (consp original)
+      (unastify (apply #'ast-patch* (astify original) diff keys))
+      (apply #'ast-patch* original diff keys)))
+
+(defgeneric ast-patch* (original diff &rest keys &key conflict &allow-other-keys)
   (:documentation "Create an edited AST by applying DIFF to ORIGINAL.
 
 A diff is a sequence of actions as returned by `ast-diff' including:
@@ -1443,7 +1490,7 @@ A diff is a sequence of actions as returned by `ast-diff' including:
 :unwrap S <path> <left-wrap> <right-wrap> : Apply S to the subtree of given
   by following <path> down from this tree."))
 
-(defmethod ast-patch ((original null) (script null) &key &allow-other-keys)
+(defmethod ast-patch* ((original null) (script null) &key &allow-other-keys)
   nil)
 
 (defun actual-ast-patch (ast script &rest keys
@@ -1454,30 +1501,38 @@ A diff is a sequence of actions as returned by `ast-diff' including:
          ;; This may not give valid ASTs, but fix later
          (new-child-lists
           (multiple-value-list
-           (apply #'ast-patch children script :meld? meld? keys))))
+           (apply #'ast-patch* children script :meld? meld? keys))))
     (apply #'values
            (iter (for new-children in new-child-lists)
                  (collect (copy ast :children new-children))))))
 
-(defmethod ast-patch ((ast ast) (script list) &rest keys &key &allow-other-keys)
+(defmethod ast-patch* ((ast ast) (script list) &rest keys &key &allow-other-keys)
   (if (listp (car script))
       (apply #'actual-ast-patch ast script keys)
       (call-next-method)))
 
-(defmethod ast-patch ((original t) (script cons)
-                      &rest keys &key (delete? t) &allow-other-keys)
+(defmethod ast-patch* ((original t) (script cons)
+                       &rest keys &key (delete? t) &allow-other-keys)
   (declare (ignorable delete? keys))
   (if (ast-p original)
-      (if (eql (car script) :wrap)
-          (apply #'ast-patch-wrap original (cdr script) keys)
-          (apply #'actual-ast-patch original script keys))
       (case (car script)
+        (:wrap
+         (apply #'ast-patch-wrap original (cdr script) keys))
+        (:unwrap
+         (apply #'ast-patch-unwrap original (cdr script) keys))
+        (t
+         (apply #'actual-ast-patch original script keys)))
+      (case (car script)
+        (:wrap
+         (apply #'ast-patch-wrap original (cdr script) keys))
+        (:unwrap
+         (apply #'ast-patch-unwrap original (cdr script) keys))
         (:recurse-tail
-         (ast-patch original (cdr script)))
+         (ast-patch* original (cdr script)))
         (:same
          (assert (ast-equal-p original (cdr script))
                  ()
-                 "AST-PATCH: :SAME not same as in script: ~a, ~a"
+                 "AST-PATCH*: :SAME not same as in script: ~a, ~a"
                  original
                  (cdr script))
          (cdr script))
@@ -1488,42 +1543,28 @@ A diff is a sequence of actions as returned by `ast-diff' including:
              ((equal keys '(:same))
               (assert (ast-equal-p original (cdar script))
                       ()
-                      "AST-PATCH: :SAME not same as in script(2): ~a, ~a"
+                      "AST-PATCH*: :SAME not same as in script(2): ~a, ~a"
                       original
                       (cdar script))
               (cdar script))
              ((equal keys '(:insert :delete))
               (assert (ast-equal-p original (cdadr script))
                       ()
-                      "AST-PATCH: ~a not same as in script(2): ~a, ~a"
+                      "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
                       keys
                       original (cdadr script))
               (cdar script))
              ((equal keys '(:delete :insert))
               (assert (ast-equal-p original (cdar script))
                       ()
-                      "AST-PATCH: ~a not same as in script(2): ~a, ~a"
+                      "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
                       keys
                       original (cdar script))
               (cdadr script))
              ((member :conflict keys)
               (values-list (iter (for s in (cdr script))
-                                 (collect (ast-patch original s)))))
+                                 (collect (ast-patch* original s)))))
              (t (error "Invalid diff on atom: ~a" script))))))))
-
-#|
-(defun create-conflict-node (ast args keys)
-  ;; (:conflict . args) being applied to AST
-  ;; Create a conflict node with option keys 1, 2, etc.
-  (let ((alist
-         (iter (for script in args)
-               (for i from 1)
-               (when script
-                 (collecting
-                   (list i
-                         (apply #'ast-patch ast script keys)))))))
-    (make-conflict-ast :children-alist alist)))
-|#
 
 (defun ast-patch-conflict-action (asts args)
   "Perform a patch of the action (:conflict . args) on ASTS.
@@ -1562,8 +1603,8 @@ process with the rest of the script."
                                ;; of the original version in conflict nodes.
                                ;; This is arguably wrong, but for now we do it
                                ;; this way.
-                               (list (ast-patch (car asts) (cdr action)
-                                                :conflict nil))))))
+                               (list (ast-patch* (car asts) (cdr action)
+                                                 :conflict nil))))))
             (let ((child-alist
                    (iter (for script in args)
                          (for i in '(:my :your))
@@ -1587,30 +1628,56 @@ process with the rest of the script."
   (declare (ignorable ast args tag))
   (error "Not yet implemented"))
 
-(defun ast-patch-wrap (ast args &rest keys &key &allow-other-keys)
+(defgeneric ast-patch-wrap (ast args &key &allow-other-keys))
+
+(defmethod ast-patch-wrap ((ast ast) (args list) &rest keys &key &allow-other-keys)
   (destructuring-bind (sub-action path left-wrap right-wrap classes base-ast)
       args
     (assert (= (length path) (length left-wrap) (length right-wrap)))
     (values-list
      (mapcar
       (lambda (a) (ast-wrap a left-wrap right-wrap classes base-ast))
-      (multiple-value-list (apply #'ast-patch (list ast) sub-action keys))))))
+      (multiple-value-list (apply #'ast-patch* ast sub-action keys))))))
+
+(defmethod ast-patch-wrap ((ast list) (args list) &rest keys &key &allow-other-keys)
+  (destructuring-bind (sub-action path left-wrap right-wrap classes base-ast)
+      args
+    (assert (= (length path) (length left-wrap) (length right-wrap)))
+    (values-list
+     (mapcar
+      (lambda (a) (ast-wrap (list a) left-wrap right-wrap classes base-ast))
+      (multiple-value-list (apply #'ast-patch* ast sub-action keys))))))
+
+(defgeneric ast-patch-unwrap (ast args &key &allow-other-keys))
+
+(defmethod ast-patch-unwrap ((ast ast) (args list) &rest keys &key &allow-other-keys)
+  (destructuring-bind (sub-action path left-wrap right-wrap)
+      args
+    (assert (= (length path) (length left-wrap) (length right-wrap)))
+    (iter (while path)
+          (setf ast (nth (pop path) (ast-children ast))))
+    (apply #'ast-patch* ast sub-action keys)))
 
 (defun ast-wrap (ast left-wrap right-wrap classes base-ast)
   (assert (= (length left-wrap) (length right-wrap) (length classes)))
-  (assert (= (length ast) 1))
-  (setf ast (car ast))
+  ;; (assert (= (length ast) 1))
+  ;; (setf ast (car ast))
+  (setf left-wrap (reverse left-wrap))
+  (setf right-wrap (reverse right-wrap))
   (iter (while left-wrap)
-        (setf ast (copy base-ast
-                        :class (pop classes)
-                        :children (append (pop left-wrap) (list ast)
-                                          (pop right-wrap)))))
+        (let ((class (pop classes)))
+          (if class
+              (setf ast (copy base-ast
+                              :class class
+                              :children (append (pop left-wrap) (list ast)
+                                                (pop right-wrap))))
+              (setf ast (append (pop left-wrap) (list ast) (pop right-wrap))))))
   #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (ast-text ast))
   ast)
 
-(defmethod ast-patch ((original cons) (script list)
-                      &rest keys
-                      &key (delete? t) (meld? t) conflict tag &allow-other-keys)
+(defmethod ast-patch* ((original cons) (script list)
+                       &rest keys
+                       &key (delete? t) (meld? t) conflict tag &allow-other-keys)
   ;; MELD? causes conflicts to be all placed into the list, if possible
   ;; CONFLICT causes conflict objects to be produced
   ;; Otherwise, multiple values are returned, one for each conflict
@@ -1623,6 +1690,8 @@ process with the rest of the script."
   ;;
   ;; This desperately needs to be cleaned up.
   (declare (ignorable delete?))
+  (when (member (car script) '(:wrap :unwrap))
+    (return-from ast-patch* (call-next-method)))
   (labels
       ((merge-conflict-ast (conflict-node rest)
          (if (and (conflict-ast-p (car rest))
@@ -1660,7 +1729,7 @@ process with the rest of the script."
                     (cons (ast-patch-same-recurse (car asts) args tag)
                           (edit (cdr asts) (cdr script)))
                     (cons-values meld?
-                                 (apply #'ast-patch (car asts) args keys)
+                                 (apply #'ast-patch* (car asts) args keys)
                                  (edit (cdr asts) (cdr script)))))
                (:wrap
                 ;; The desired patch is:  apply the sub action, then wrap
@@ -1677,14 +1746,14 @@ process with the rest of the script."
                                    (edit (cdr asts) (cdr script))))
                (:same-tail
                 (assert (null (cdr script))) ;; :same-tail always occurs last
-                (assert (ast-equal-p asts args) () "AST-PATCH (CONS): ~
+                (assert (ast-equal-p asts args) () "AST-PATCH* (CONS): ~
                         :SAME-TAIL not as as in script: ~a, ~a" asts args)
                 asts)
                (:recurse-tail
                 (assert (null (cdr script)))
-                (ast-patch asts args))
+                (ast-patch* asts args))
                (:delete
-                (assert (ast-equal-p (car asts) args) () "AST-PATCH (CONS): ~
+                (assert (ast-equal-p (car asts) args) () "AST-PATCH* (CONS): ~
                         :DELETE not same as in script: ~a,~a" (car asts) args)
                 (cond
                   (tag
@@ -1727,7 +1796,7 @@ process with the rest of the script."
                  (iter (while (consp args))
                        (assert asts)
                        (assert (ast-equal-p (car asts) (car args)) ()
-                               "AST-PATCH (CONS): ~
+                               "AST-PATCH* (CONS): ~
                                :DELETE-SEQUENCE not same as in script: ~a, ~a"
                                (car asts) (car args))
                        (let ((a (pop asts)))
@@ -1802,15 +1871,15 @@ and replicating the others."
       (error
        "Could not meld scripts: different number of fixed location actions"))))
 
-(defmethod ast-patch :around ((original sequence) (script list)
-                              &key delete? meld? conflict &allow-other-keys)
+(defmethod ast-patch* :around ((original sequence) (script list)
+                               &key delete? meld? conflict &allow-other-keys)
   (declare (ignorable delete?))
   (if (and (listp (car script))
            (find :conflict script :key #'car))
       (if (or meld? conflict)
           (let ((result (call-next-method)))
             #+ast-diff-debug
-            (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+            (format t "AST-PATCH* returned:~%~a~%" (mapcar #'ast-text result))
             result)
           (let ((script1 (iter (for action in script)
                                (appending
@@ -1822,15 +1891,15 @@ and replicating the others."
                                 (if (eql (car action) :conflict)
                                     (third action)
                                     (list action))))))
-            (values (ast-patch original script1)
-                    (ast-patch original script2))))
+            (values (ast-patch* original script1)
+                    (ast-patch* original script2))))
       (let ((result (call-next-method)))
         #+ast-diff-debug
-        (format t "AST-PATCH returned:~%~a~%" (mapcar #'ast-text result))
+        (format t "AST-PATCH* returned:~%~a~%" (mapcar #'ast-text result))
         result)))
 
-(defmethod ast-patch ((original vector) (script list)
-                      &rest keys &key (delete? t) meld? &allow-other-keys)
+(defmethod ast-patch* ((original vector) (script list)
+                       &rest keys &key (delete? t) meld? &allow-other-keys)
   ;; Specialized method for patching vectors
   ;; we require that the elements inserted must be compatible
   ;; with the element type of the original vector
@@ -1863,7 +1932,7 @@ and replicating the others."
            (:recurse
             (assert (< i len))
             (let ((vals (multiple-value-list
-                         (apply #'ast-patch (elt original i) args keys))))
+                         (apply #'ast-patch* (elt original i) args keys))))
               (dolist (v vals) (vector-push-extend v result)))
             (incf i))
            (:insert-sequence
@@ -1894,22 +1963,10 @@ and replicating the others."
     ;; Make the result simple again
     (copy-seq result)))
 
-#|
-(defmethod ast-patch ((ast ast) script
-                      &rest keys &key (delete? t) &allow-other-keys)
-  (declare (ignorable delete?))
-  (let* ((children (ast-children ast)))
-    (let ((children-versions
-           (multiple-value-list (apply #'ast-patch children script keys))))
-      (apply #'values
-             (iter (for patched-children in children-versions)
-                   (collect (copy ast :children patched-children)))))))
-|#
-
-(defmethod ast-patch ((original simple) script
-                      &rest keys &key &allow-other-keys)
+(defmethod ast-patch* ((original simple) script
+                       &rest keys &key &allow-other-keys)
   (let ((new-unpacked-genome
-         (apply #'ast-patch (simple-genome-unpack (genome original))
+         (apply #'ast-patch* (simple-genome-unpack (genome original))
                 script :meld? t keys)))
     (let ((patched (copy original)))
       (setf (genome patched) (simple-genome-pack new-unpacked-genome))
@@ -2038,10 +2095,13 @@ is true then insert conflict objects into the result AST."))
                      &key conflict ((:base-cost *base-cost*) *base-cost*)
                        &allow-other-keys)
   "Assumes the arguments are things that can be treated as ASTs or SEXPRs."
-  (multiple-value-bind (diff problems)
-      (merge3 original branch-a branch-b :conflict conflict)
-    (values (ast-patch original diff :meld? (not conflict) :conflict conflict)
-            problems)))
+  (let ((original (astify original))
+        (branch-a (astify branch-a))
+        (branch-b (astify branch-b)))
+    (multiple-value-bind (diff problems)
+        (merge3 original branch-a branch-b :conflict conflict)
+      (values (unastify (ast-patch original diff :meld? (not conflict) :conflict conflict))
+              problems))))
 
 (declaim (special *unstable*))
 

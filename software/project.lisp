@@ -36,11 +36,11 @@
   (let ((ntab (make-table-for-alist files2 :test #'equal)))
     (remove-if-not (lambda (p) (gethash (car p) ntab)) files1)))
 
-(defmethod ast-patch ((project project) (diff t)
-                      &rest args &key &allow-other-keys)
+(defmethod ast-patch* ((project project) (diff t)
+                       &rest args &key &allow-other-keys)
   (let* ((files-obj (make-instance 'alist-for-diff
 		      :alist (all-files project)))
-	 (new-files-obj (apply #'ast-patch files-obj diff args))
+         (new-files-obj (apply #'ast-patch* files-obj diff args))
 	 (new-project (copy project))
 	 (evolve-files-table (make-table-for-alist (evolve-files new-project)
                                                    :test #'equal))

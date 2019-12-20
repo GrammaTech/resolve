@@ -19,10 +19,10 @@
                              &rest args &key &allow-other-keys)
   (apply #'create-edit-tree (ast-root source) (ast-root target) script args))
 
-(defmethod ast-patch ((obj parseable) (diff list)
-                      &rest keys &key &allow-other-keys)
+(defmethod ast-patch* ((obj parseable) (diff list)
+                       &rest keys &key &allow-other-keys)
   (setf obj (copy obj))
-  (setf (ast-root obj) (apply #'ast-patch (ast-root obj) diff keys))
+  (setf (ast-root obj) (apply #'ast-patch* (ast-root obj) diff keys))
   obj)
 
 (defmethod converge ((obj2 parseable) (obj1 parseable) (obj3 parseable)

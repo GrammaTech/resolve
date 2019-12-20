@@ -277,23 +277,31 @@
 
 (defroot test)
 
+(defun unastify-lisp-diff (d)
+  (typecase d
+    (resolve/ast-diff::simple-lisp-ast (resolve/ast-diff::unastify d))
+    (cons
+     (cons (unastify-lisp-diff (car d))
+           (unastify-lisp-diff (cdr d))))
+    (t d)))
+
 
 ;;;; AST Diff tests
 (defsuite ast-diff-tests "AST-level diffs of Sexprs.")
 
 (deftest sexp-diff-empty ()
   (is (equalp (multiple-value-list (ast-diff nil nil))
-	      '(nil 0))
+              '(((:same . :nil)) 0))
       "Simplest case -- empty list to itself."))
 
 (deftest sexp-diff-empty-to-nonempty ()
-  (is (equalp (multiple-value-list (ast-diff nil '(1)))
-	      '(((:insert . 1)) 1))
+  (is (equalp (unastify-lisp-diff (multiple-value-list (ast-diff nil '(1))))
+              '(((:insert . 1) (:same . :nil)) 1))
       "Empty list vs. list of one atom"))
 
 (deftest sexp-diff-nonempty-to-empty ()
-  (is (equalp (multiple-value-list (ast-diff '(1) nil))
-	      '(((:delete . 1)) 1))
+  (is (equalp (unastify-lisp-diff (multiple-value-list (ast-diff '(1) nil)))
+              '(((:delete . 1) (:same . :nil)) 1))
       "List of one atom vs. empty list"))
 
 (deftest sexp-diff-numbers ()
@@ -335,6 +343,58 @@
 (deftest sexp-diff-string.6 ()
   (is (eql (nth-value 1 (ast-diff " a " "a" :ignore-whitespace t)) 0)
       "Adding whitespace costs nothing"))
+
+(deftest sexp-diff-string.7 ()
+  (is (equal (multiple-value-list (ast-diff "a" "b" :strings nil))
+             '(((:insert-sequence . "b") (:delete-sequence . "a"))
+               6))))
+
+(deftest sexp-diff-string.8 ()
+  (is (equal (ast-diff '("a") '("b") :strings nil)
+             '((:insert . "b") (:delete . "a") (:same . :nil)))))
+
+(deftest sexp-diff-string.9 ()
+  (is (equal (ast-diff "" "b" :strings nil)
+             '((:insert-sequence . "b")))))
+
+(deftest sexp-diff-string.10 ()
+  (is (equal (ast-diff "a" "" :strings nil)
+             '((:delete-sequence . "a")))))
+
+(deftest sexp-diff-string.11 ()
+  (is (equal (multiple-value-list
+              (ast-diff " " "" :strings nil :ignore-whitespace t))
+             '(((:delete-sequence . " ")) 2))))
+
+(deftest sexp-diff-string.12 ()
+  (is (equal (multiple-value-list
+              (ast-diff "" " " :strings nil :ignore-whitespace t))
+             '(((:insert-sequence . " ")) 2))))
+
+(deftest sexp-diff-string.13 ()
+  (is (equal (multiple-value-list
+              (ast-diff " " "a" :strings nil :ignore-whitespace t))
+             '(((:insert-sequence . "a") (:delete-sequence . " ")) 5))))
+
+(deftest sexp-diff-string.14 ()
+  (is (equal (multiple-value-list
+              (ast-diff "a" " " :strings nil :ignore-whitespace t))
+             '(((:insert-sequence . " ") (:delete-sequence . "a")) 5))))
+
+(deftest sexp-diff-string.15 ()
+  (is (equal (multiple-value-list
+              (ast-diff "abc" "abc" :strings nil))
+             '(((:same-sequence . "abc")) 0))))
+
+(deftest sexp-diff-string.16 ()
+  (is (equal (multiple-value-list
+              (ast-diff " abc " "  abc  " :strings nil :ignore-whitespace t))
+             '(((:insert-sequence . "  abc  ") (:delete-sequence . " abc ")) 4))))
+
+(deftest sexp-diff-vector.1 ()
+  (is (equalp (multiple-value-list
+               (ast-diff '(#(1 2)) '(#(1 2))))
+              '(((:same . #(1 2)) (:same . :nil)) 0))))
 
 (deftest sexp-diff-non-equal-first-element ()
   (is (not (zerop (nth-value 1 (ast-diff '(1 2 3 4) '(0 2 3 4)))))
@@ -382,28 +442,28 @@
 (deftest ast-diff-one-added-at-the-end ()
   (multiple-value-bind (diff cost) (ast-diff '(1 2) '(1 2 3))
     (is (= 1 cost) "Cost of a single addition at the end is one.")
-    (is (= 3 (length diff)))))
+    (is (= 4 (length diff)))))
 
 (deftest ast-diff-recurses-into-subtree.1 ()
   (multiple-value-bind (diff cost)
       (ast-diff '(1 (1 2 3 4 5) 2) '(1 (1 2 4 5) 3) :base-cost 0)
     (is (= 3 cost) "Cost of a sub-tree diff performed recursion.")
-    (is (equalp '(:same :recurse :insert :delete) (mapcar #'car diff)))))
+    (is (equalp '(:same :recurse :insert :delete :same) (mapcar #'car diff)))))
 
 (deftest ast-diff-recurses-into-subtree.2 ()
   (multiple-value-bind (diff cost)
       (ast-diff '(1 (1 2 3 4 5) 2) '(1 (1 2 4 5) 3) :base-cost 2)
     (is (= 11 cost) "Cost of a sub-tree diff performed recursion.")
-    (is (equalp '(:same :recurse :insert :delete) (mapcar #'car diff)))))
+    (is (equalp '(:same :recurse :insert :delete :same) (mapcar #'car diff)))))
 
 (deftest ast-diff-nested-recursion-into-subtree ()
   (multiple-value-bind (diff cost)
       (ast-diff '(((1 nil 3)) 3) '(((1 2 3)) 3) :base-cost 0)
     (is (= 2 cost) "Cost of a nested sub-tree diff performed recursion.")
-    (is (equalp '(:recurse :same) (mapcar #'car diff)))))
+    (is (equalp '(:recurse :same :same) (mapcar #'car diff)))))
 
-(defun ast-diff-and-patch-equal-p (orig new)
-  (ast-equal-p new (ast-patch orig (ast-diff orig new))))
+(defun ast-diff-and-patch-equal-p (orig new &rest args &key &allow-other-keys)
+  (ast-equal-p new (ast-patch orig (apply #'ast-diff orig new args))))
 
 (deftest ast-diff-and-patch-is-equal-simple ()
   (is (ast-diff-and-patch-equal-p '(1 2 3 4) '(1 2 z 4))))
@@ -418,11 +478,17 @@
   (is (ast-diff-and-patch-equal-p '(1 2 3 . 4) '(1 2 3 . 5))))
 
 (deftest ast-diff-with-string ()
-    (is (ast-diff-and-patch-equal-p '((1 "foo" 2)) '((3 "foo" 2)))))
+  (is (ast-diff-and-patch-equal-p '((1 "foo" 2)) '((3 "foo" 2)))))
+
+(deftest ast-diff-patch-wrap.1 ()
+  (is (ast-diff-and-patch-equal-p '((1)) '(2 ((1)) 3) :wrap t)))
+
+(deftest ast-diff-patch-unwrap.1 ()
+  (is (ast-diff-and-patch-equal-p '(2 ((1)) 3) '((1)) :wrap t)))
 
 (deftest ast-diff-simple-dotted-list ()
   (is (= 2 (nth-value 1 (ast-diff '(1 . 1) '(1 . 2) :base-cost 0))))
-  (is (= 4 (nth-value 1 (ast-diff '(1 . 1) '(1 . 2) :base-cost 2)))))
+  (is (= 6 (nth-value 1 (ast-diff '(1 . 1) '(1 . 2) :base-cost 2)))))
 
 (deftest ast-diff-nested-dotted-list ()
   (is (= 2 (nth-value 1 (ast-diff '((1 . 2)) '((1 . 1)) :base-cost 0))))
@@ -430,7 +496,7 @@
 
 (deftest ast-diff-mixed-proper-improper-list ()
   (is (= 2 (nth-value 1 (ast-diff (cons 1 nil) (cons 1 1) :base-cost 0))))
-  (is (= 4 (nth-value 1 (ast-diff (cons 1 nil) (cons 1 1) :base-cost 2)))))
+  (is (= 6 (nth-value 1 (ast-diff (cons 1 nil) (cons 1 1) :base-cost 2)))))
 
 (deftest ast-diff-double-insert ()
   (is (= 2 (nth-value 1 (ast-diff '(1 2 3 4) '(1 2 3 4 5 6))))))
@@ -828,94 +894,99 @@
 
 (deftest sexp-merge3-empty ()
   (is (equalp (multiple-value-list (merge3 nil nil nil))
-	      '(nil nil))
+              '(((:same . :nil)) nil))
       "Simplest case"))
 
 (deftest sexp-merge3-empty-conflict ()
   (is (equalp (multiple-value-list (merge3 nil nil nil :conflict t))
-	      '(nil nil))
+              '(((:same . :nil)) nil))
       "Simplest case, conflict enabled"))
 
 (deftest sexp-merge3-insert-first ()
-  (is (equalp (multiple-value-list (merge3 nil '(a) nil))
-	      '(((:insert . a)) nil))
+  (is (equalp (unastify-lisp-diff (multiple-value-list (merge3 nil '(a) nil)))
+              '(((:insert . a) (:same . :nil)) nil))
       "Adding one element in first change"))
 
 (deftest sexp-merge3-insert-first-conflict ()
   (is (equalp (multiple-value-list (merge3 nil '(a) nil :conflict t))
-              '(((:conflict ((:insert . a)) nil)) nil))
+              '(((:conflict ((:insert . a)) nil) (:same . :nil))
+                (((:insert . a) (:same . :nil)))))
       "Adding one element in first change, conflict enabled"))
 
 (deftest sexp-merge3-insert-second ()
   (is (equalp (multiple-value-list (merge3 nil nil '(a)))
-	      '(((:insert . a)) nil))
+              '(((:insert . a) (:same . :nil)) nil))
       "Adding one element in second change"))
 
 (deftest sexp-merge3-insert-both ()
   (is (equalp (multiple-value-list (merge3 nil '(a) '(a)))
-	      '(((:insert . a)) nil))
+              '(((:insert . a) (:same . :nil)) nil))
       "Adding one element in both changes"))
 
 (deftest sexp-merge3-delete-first ()
   (is (equalp (multiple-value-list (merge3 '(a) nil '(a)))
-	      '(((:delete . a)) nil))
+              '(((:delete . a) (:same . :nil)) nil))
       "Deleting one element in first change"))
 
 (deftest sexp-merge3-delete-second ()
   (is (equalp (multiple-value-list (merge3 '(a) '(a) nil))
-	      '(((:delete . a)) nil))
+              '(((:delete . a) (:same . :nil)) nil))
       "Deleting one element in second change"))
 
 (deftest sexp-merge3-delete-second-2 ()
   (is (equalp (multiple-value-list (merge3 '(a) nil nil))
-	      '(((:delete . a)) nil))
+              '(((:delete . a) (:same . :nil)) nil))
       "Deleting one element in both changes"))
 
 (deftest sexp-merge3-recursive-first ()
   (is (equalp (multiple-value-list (merge3 '((a)) '((a b)) '((a))))
-	      '(((:recurse (:same . a) (:insert . b))) nil))
+              '(((:recurse (:same . a) (:insert . b) (:same . :nil)) (:same . :nil)) nil))
       "Recurse in first change"))
 
 (deftest sexp-merge3-recursive-second ()
   (is (equalp (multiple-value-list (merge3 '((a)) '((a)) '((a b))))
-	      '(((:recurse (:same . a) (:insert . b))) nil))
+              '(((:recurse (:same . a) (:insert . b) (:same . :nil)) (:same . :nil)) nil))
       "Recurse in first change"))
 
 (deftest sexp-merge3-recursive-both ()
   (is (equalp (multiple-value-list (merge3 '((a)) '((a b)) '((a b))))
-	      '(((:recurse (:same . a) (:insert . b))) nil))
+              '(((:recurse (:same . a) (:insert . b) (:same . :nil)) (:same . :nil)) nil))
       "Recurse in both changes"))
 
 (deftest sexp-merge3-insert-delete ()
   (is (equalp (multiple-value-list (merge3 '(a) '(a b) ()))
-	      '(((:delete . a) (:insert . b)) nil))
+              '(((:delete . a) (:insert . b) (:same . :nil)) nil))
       "Insert and delete in the same place."))
 
 (deftest sexp-merge3-delete-insert ()
   (is (equalp (multiple-value-list (merge3 '(a) '() '(a b)))
-	      '(((:delete . a) (:insert . b)) nil))
+              '(((:delete . a) (:insert . b) (:same . :nil)) nil))
       "Delete and insert in the same place."))
 
 (deftest sexp-merge3-delete-insert-tail ()
   (is (equalp (multiple-value-list (merge3 '(a b . c) '(a) '(a e . c)))
-              '(((:same . a) (:insert . e) (:delete . b)
-                 (:recurse-tail (:delete . c) (:insert)))
-	        (((:delete . b) (:insert . e)))))
+              '(((:same . a)
+                 (:conflict ((:insert . :nil)) ((:insert . e)))
+                 (:delete . b)
+                 (:delete . c))
+                (((:insert . :nil) (:insert . e)))))
       "Delete and insert in the same place, with improper list."))
 
 (deftest sexp-merge3-delete-insert-tail.2 ()
   (is (equalp (multiple-value-list (merge3 '((a b . c)) '((a)) '((a b . c))
                                            :base-cost 0))
-	      '(((:recurse (:same . a) (:delete . b)
-                  (:recurse-tail (:delete . c) (:insert))))
+              '(((:recurse (:same . a) (:insert . :nil) (:delete . b)
+                  (:delete . c))
+                 (:same . :nil))
 		nil))
       "Delete including tail of improper list."))
 
 (deftest sexp-merge3-delete-insert-tail.3 ()
   (is (equalp (multiple-value-list (merge3 '((a b . c)) '((a b . c)) '((a))
                                            :base-cost 0))
-	      '(((:recurse (:same . a) (:delete . b)
-                  (:recurse-tail (:delete . c) (:insert))))
+              '(((:recurse (:same . a) (:insert . :nil) (:delete . b)
+                  (:delete . c))
+                 (:same . :nil))
 		nil))
       "Delete including tail of improper list."))
 
@@ -924,92 +995,103 @@
                (merge3 '((a b . c)) '((a . c)) '((a b . e))
                        :base-cost 2))
 	      '(((:recurse (:same . a) (:delete . b)
-                  (:recurse-tail (:delete . c) (:insert . e))))
+                  (:insert . e) (:delete . c))
+                 (:same . :nil))
 		nil))
       "Delete, but change tail of improper list."))
 
-
 (deftest sexp-merge3-insert2 ()
   (is (equalp (multiple-value-list (merge3 '(a d) '(a b c d) '(a d)))
-	      '(((:same . a) (:insert . b) (:insert . c) (:same . d)) nil))
+              '(((:same . a) (:insert . b) (:insert . c) (:same . d) (:same . :nil))
+                nil))
       "Two insertions"))
 
 (deftest sexp-merge3-insert3 ()
   (is (equalp (multiple-value-list (merge3 '(d) '(d) '(a b c d)))
-	      '(((:insert . a) (:insert . b) (:insert . c) (:same . d)) nil))
+              '(((:insert . a) (:insert . b) (:insert . c) (:same . d) (:same . :nil)) nil))
       "Three insertions"))
 
 (deftest sexp-merge3-delete2 ()
    (is (equalp (multiple-value-list (merge3 '(a b c d) '(a d) '(a b c d)))
-	      '(((:same . a) (:delete . b) (:delete . c) (:same . d)) nil))
+               '(((:same . a) (:delete . b) (:delete . c) (:same . d) (:same . :nil)) nil))
        "Two deletions"))
 
 (deftest sexp-merge3-delete3 ()
    (is (equalp (multiple-value-list (merge3 '(a b c d e) '(a b c d e) '(a e)))
 	       '(((:same . a) (:delete . b) (:delete . c) (:delete . d)
-                  (:same . e))
+                  (:same . e) (:same . :nil))
                  nil))
        "Three deletions"))
 
 (deftest sexp-merge3-unstable-inserts ()
   (is (equalp (multiple-value-list (merge3 '(x 0) '(x 1) '(x 2)))
 	      '(((:same . x) (:conflict ((:insert . 1)) ((:insert . 2)))
-                 (:delete . 0))
+                 (:delete . 0) (:same . :nil))
 		(((:insert . 1) (:insert . 2)))))
       "Two insertions at the same point"))
 
 (deftest sexp-merge3-unstable-recurse-insert/delete ()
-  (is (equalp (multiple-value-list (merge3 '(x (a) y) '(x (b) y) '(x c y)
-                                           :base-cost 0))
+  (is (equalp (unastify-lisp-diff
+               (multiple-value-list (merge3 '(x (a) y) '(x (b) y) '(x c y)
+                                            :base-cost 0)))
 	      '(((:same . x)
 		 (:insert . c)
-		 (:conflict ((:recurse (:insert . b) (:delete . a)))
+                 (:conflict ((:recurse (:insert . b) (:delete . a) (:same . :nil)))
 		  ((:delete a)))
-		 (:same . y))
-		(((:recurse (:insert . b) (:delete . a)) (:delete a)))))
+                 (:same . y) (:same . :nil))
+                (((:recurse (:insert . b) (:delete . a) (:same . :nil)) (:delete a)))))
       "recurse and deletion at same point (unstable)"))
 
 (deftest sexp-merge3-unstable-insert/delete-recurse ()
-  (is (equalp (multiple-value-list (merge3 '(x (a) y) '(x c y) '(x (b) y)
-                                           :base-cost 0))
+  (is (equalp (unastify-lisp-diff
+               (multiple-value-list (merge3 '(x (a) y) '(x c y) '(x (b) y)
+                                            :base-cost 0)))
 	      '(((:same . x)
 		 (:insert . c)
 		 (:conflict ((:delete a))
-		  ((:recurse (:insert . b) (:delete . a))))
-		 (:same . y))
-		(((:delete a) (:recurse (:insert . b) (:delete . a))))))
+                  ((:recurse (:insert . b) (:delete . a) (:same . :nil))))
+                 (:same . y) (:same . :nil))
+                (((:delete a) (:recurse (:insert . b) (:delete . a) (:same . :nil))))))
       "deletion and recurse at same point (unstable)"))
 
 (deftest sexp-merge3-insert/insert-tail1 ()
-  (is (equalp (multiple-value-list (merge3 '((a b)) '((a c)) '((a b . d))
-                                           :base-cost 0))
+  (is (equalp (unastify-lisp-diff
+               (multiple-value-list (merge3 '((a b)) '((a c)) '((a b . d))
+                                            :base-cost 0)))
 	      '(((:recurse (:same . a) (:insert . c) (:delete . b)
-		  (:recurse-tail (:delete) (:insert . d))))
+                  (:insert . d) (:delete . :nil))
+                 (:same . :nil))
 		nil))
       "insert and insertion of a tail element"))
 
 (deftest sexp-merge3-insert/insert-tail2 ()
-  (is (equalp (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c))
-                                           :base-cost 0))
+  (is (equalp (unastify-lisp-diff
+               (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c))
+                                            :base-cost 0)))
 	      '(((:recurse (:same . a) (:insert . c) (:delete . b)
-		  (:recurse-tail (:delete) (:insert . d))))
-		nil))
+                  (:insert . d) (:delete . :nil))
+                 (:same . :nil))
+                nil))
       "insert and insertion of a tail element"))
 
 (deftest sexp-merge3-insert/insert-tail3 ()
-  (is (equalp (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c . d))
-                                           :base-cost 0))
-	      '(((:recurse (:same . a) (:insert . c) (:delete . b)
-		  (:recurse-tail (:delete) (:insert . d))))
-		nil))
+  (is (equalp (unastify-lisp-diff
+               (multiple-value-list (merge3 '((a b)) '((a b . d)) '((a c . d))
+                                            :base-cost 0)))
+              '(((:recurse (:same . a) (:insert . c) (:insert . d) (:delete . b)
+                  (:insert . d) (:delete . :nil))
+                 (:same . :nil))
+                nil))
       "insert and insertion of a tail element"))
 
 (deftest sexp-merge3-insert/insert-tail4 ()
-  (is (equalp (multiple-value-list
-               (merge3 '((a . d)) '((a b . d)) '((a c . d))))
+  (is (equalp (unastify-lisp-diff
+               (multiple-value-list
+                (merge3 '((a . d)) '((a b . d)) '((a c . d)))))
 	      '(((:recurse (:same . a)
                   (:conflict ((:insert . b)) ((:insert . c)))
-		  (:same-tail . d)))
+                  (:same . d))
+                 (:same . :nil))
 		(((:insert . b) (:insert . c)))))
       "insert and insertion with a common tail element"))
 
@@ -1017,7 +1099,9 @@
   (is (equalp (multiple-value-list (merge3 '("abc") '("adbc") '("abec")))
 	      '(((:recurse (:same . #\a)
                   (:insert . #\d) (:same . #\b)
-                  (:insert . #\e) (:same . #\c))) nil))
+                  (:insert . #\e) (:same . #\c))
+                 (:same . :nil))
+                nil))
       "Merge of separate insertions into a string"))
 
 (deftest sexp-merge3-insert-string.2 ()
@@ -1026,14 +1110,17 @@
 	      '(((:recurse (:same . #\a) (:same . #\x) (:insert . #\d)
 		  (:same . #\b) (:same . #\y)
 		  (:insert . #\e)
-		  (:same . #\c) (:same . #\z))) nil))
+                  (:same . #\c) (:same . #\z))
+                 (:same . :nil))
+                nil))
       "Merge of separate insertions into a string"))
 
 (deftest sexp-merge3-string-same.1 ()
   (is (equalp (multiple-value-list
                (merge3 '(("foo" 2)) '((3 "foo" 2)) '((4 "foo" 2))))
 	      '(((:recurse (:conflict ((:insert . 3)) ((:insert . 4)))
-                  (:same . "foo") (:same . 2)))
+                  (:same . "foo") (:same . 2) (:same . :nil))
+                 (:same . :nil))
 		(((:insert . 3) (:insert . 4)))))
       "Special handling of strings following insertions"))
 
@@ -1141,30 +1228,33 @@
                         (cons conflict-ast
                          (cons (eql b) null))))
         "9-conflict 1")
-    (is (equal (conflict-ast-child-alist (cadr merged))
+    (is (equal (unastify-lisp-diff
+                (conflict-ast-child-alist (cadr merged)))
                '((:old (d)) (:your (e))))
         "9-conflict 2")))
 
 (deftest sexpr-converge.10-conflict ()
   (let ((merged (converge '(a (d) b) '(a (d) b) '(a (e) b) :meld? nil
                           :conflict t :base-cost 0)))
-    (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
+    (is (typep merged '(cons (eql a) (cons conflict-ast
                                       (cons (eql b) null))))
         "10-conflict 1")
-    (is (equalp (sort (copy-list (conflict-ast-child-alist (caadr merged)))
+    (is (equalp (sort (copy-list (unastify-lisp-diff
+                                  (conflict-ast-child-alist (cadr merged))))
                       #'string< :key #'car)
-                '((:my d) (:old d) (:your e)))
+                '((:my (d)) (:old (d)) (:your (e))))
         "10-conflict 2")))
 
 (deftest sexpr-converge.11-conflict ()
   (let ((merged (converge '(a (e) b) '(a (d) b) '(a (d) b) :meld? nil
                           :conflict t :base-cost 0)))
-    (is (typep merged '(cons (eql a) (cons (cons conflict-ast null)
+    (is (typep merged '(cons (eql a) (cons conflict-ast
                                       (cons (eql b) null))))
         "11-conflict 1")
-    (is (equalp (sort (copy-list (conflict-ast-child-alist (caadr merged)))
+    (is (equalp (sort (copy-list (unastify-lisp-diff
+                                  (conflict-ast-child-alist (cadr merged))))
                       #'string< :key #'car)
-                '((:my e) (:old d) (:your d)))
+                '((:my (e)) (:old (d)) (:your (d))))
         "11-conflict 2")))
 
 (deftest json-merge3 ()
@@ -1423,7 +1513,38 @@
   (with-fixture auto-merge-gcd-project
     (with-temp-dir (*build-dir*)
       (run-auto-merge-test *my* *old* *your* *tests*))))
+
+;;; Additional tests of internals
+(deftest ast-size-test ()
+  (is (equal (ast-size (astify nil)) 2))
+  (is (equal (ast-size (astify '(x y))) 4))
+  (is (equal (ast-size (astify '(x . y))) 3))
+  (is (equal (ast-size nil) 1))
+  (is (equal (ast-size (astify "x")) 1))
+  (let ((a (astify '(a (b) c))))
+    (is (equal (ast-size a) 7))
+    ;; Recomputation (hitting the cache) gives same result
+    (is (equal (ast-size a) 7))))
 
+(deftest ast-text-test ()
+  (let ((*package* (find-package :resolve/test)))
+    (is (equal (ast-text (astify '(x y))) "(X Y)"))
+    (is (equal (ast-text (astify '(x . y))) "(X . Y)"))
+    (is (equal (ast-text '("foo" "bar")) "foobar"))
+    (is (equal (ast-text '("foo" . "bar")) "foo.bar"))))
+
+(deftest print-simple-lisp-ast ()
+  (with-standard-io-syntax
+    (let ((*package* (find-package :resolve/ast-diff)))
+      (is (equal (write-to-string (astify '(1 2))
+                                  :readably nil)
+                 "#<SIMPLE-LISP-AST :VALUE (1 2)>"))
+      (is (equal (write-to-string (astify '(1 2)) :readably t :pretty nil)
+                 "#S(SIMPLE-LISP-AST :CHILDREN (1 2 :NIL) :ORIGINAL (1 2) :HASH NIL :COST NIL :SIZE NIL)")))))
+
+(deftest copy-test ()
+  (is (equal (unastify (copy (astify '(x y)))) '(x y)))
+  (is (equal (unastify (copy (astify '(x . y)))) '(x . y))))
 
 ;;; Functions for interactive testing and experimentation.
 (defun do-populate (my your)
