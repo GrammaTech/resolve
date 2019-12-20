@@ -1259,7 +1259,7 @@
                 '((:my (e)) (:old (d)) (:your (d))))
         "11-conflict 2")))
 
-(deftest json-merge3 ()
+(deftest (json-merge3 :long-running) ()
   (with-fixture json-conflict-yargs
     (multiple-value-bind (merged unstable)
         (converge *my* *old* *your*)
@@ -1275,7 +1275,7 @@
       ;; TODO: This *should* be the case but it isn't.
       #+regression (is unstable))))
 
-(deftest gcd-conflict-merge3-js ()
+(deftest (gcd-conflict-merge3-js :long-running) ()
   (with-fixture gcd-conflict-javascript
     (multiple-value-bind (merged unstable)
         (converge *my* *old* *your* :conflict t)
@@ -1367,17 +1367,18 @@
     (is (string= (genome (astyle (resolve-to (copy *cnf*) :old)))
                  (genome (astyle (aget :orig *variants*)))))))
 
-(deftest resolve-to-single-equals-original/my ()
+(deftest (resolve-to-single-equals-original/my :long-running) ()
   (with-fixture javascript-converge-conflict
     (is (string= (genome (astyle (resolve-to (copy *cnf*) :my)))
                  (genome (astyle (aget :borders *variants*)))))))
 
-(deftest resolve-to-single-equals-original/your ()
+(deftest (resolve-to-single-equals-original/your :long-running) ()
   (with-fixture javascript-converge-conflict
     (is (string= (genome (astyle (resolve-to (copy *cnf*) :your)))
                  (genome (astyle (aget :min-lines *variants*)))))))
 
-(deftest resolve-to-should-not-modify-conflict-nodes-in-the-original ()
+(deftest (resolve-to-should-not-modify-conflict-nodes-in-the-original
+          :long-running) ()
   ;; NOTE: This was fixed by replacing `nconc' with `append' in
   ;; `set-ast-siblings' in SEL/SW/AST.
   (flet ((conflict-nodes (obj)
@@ -1398,7 +1399,8 @@
                     (length (aget :my (conflict-ast-child-alist
                                        (car (conflict-nodes *cnf*)))))))))))
 
-(deftest resolve-to-of-copy-leaves-original-genome-unmollested ()
+(deftest (resolve-to-of-copy-leaves-original-genome-unmollested
+          :long-running) ()
   (with-fixture javascript-converge-conflict
     (let* (;; (orig-asts (mapc-ast (ast-root *cnf*) #'copy))
            (orig-genome (genome *cnf*))
@@ -1414,7 +1416,8 @@
       ;;      orig:~Snew:~%~S~%" orig-asts (mapc-ast (ast-root *cnf*) #'copy))
       )))
 
-(deftest resolve-to-of-copy-leaves-original-genome-unmollested-simple ()
+(deftest (resolve-to-of-copy-leaves-original-genome-unmollested-simple
+          :long-running) ()
   (with-fixture javascript-converge-conflict
     (let ((it (lastcar (remove-if-not #'conflict-ast-p
                                       (asts *cnf*)))))
@@ -1441,7 +1444,8 @@
             "Path (5 3 3) is STILL a conflict-ast in the original ~
              after replace-ast.")))))
 
-(deftest resolve-to-selects-alternatives-of-conflicts ()
+(deftest (resolve-to-selects-alternatives-of-conflicts
+          :long-running) ()
   (with-fixture javascript-converge-conflict
     ;; Conflicted software object has ASTs.
     (is (asts *cnf*))
@@ -1478,7 +1482,7 @@
 (deftest targeted-populate-run ()
   )
 
-(deftest can-populate-from-conflicted-merges ()
+(deftest (can-populate-from-conflicted-merges :long-running) ()
   (nest
    (with-fixture javascript-converge-conflict)
    (destructuring-bind (my old your)
