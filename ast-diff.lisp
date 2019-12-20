@@ -966,11 +966,6 @@ value that is used instead."
       (setf (gethash hash table) ast))
     hash))
 
-(defmethod ast-diff* ((ast-a ast) (ast-b ast))
-  (if (ast-can-recurse ast-a ast-b)
-      (ast-diff* (ast-children ast-a) (ast-children ast-b))
-      (call-next-method)))
-
 (defmethod ast-diff* (ast-a ast-b)
   #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
   (if (equal ast-a ast-b)
