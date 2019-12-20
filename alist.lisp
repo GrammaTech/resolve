@@ -68,7 +68,8 @@ elements of the alist."
 	      in-both)
       (mapcar (lambda (p) `(:insert-alist . ,p)) only-in-2)))))
 
-(defmethod ast-patch* ((al-obj alist-for-diff) script &rest keys &key (delete? t) &allow-other-keys)
+(defmethod ast-patch* ((al-obj alist-for-diff) script
+                       &rest keys &key (delete? t) &allow-other-keys)
   (let ((al (alist-of-alist-for-diff al-obj))
 	(table (make-hash-table)))
     ;; just in case, remove NIL elements
@@ -101,7 +102,8 @@ elements of the alist."
 		    (let ((sub (gethash (cadr x) table)))
 		      (collect
 			  (cons (cadr x)
-                                (apply #'ast-patch* (cdr sub) (cddr x) keys)))))))))
+                                (apply #'ast-patch*
+                                       (cdr sub) (cddr x) keys)))))))))
       (make-instance (class-of al-obj) :alist new-alist))))
 
 (defmethod merge-diffs-on-syms ((sym-a (eql :alist)) (sym-b (eql :alist)) o-a o-b)

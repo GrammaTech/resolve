@@ -503,7 +503,7 @@ See `ast-patch' for more details on edit scripts.
 
 The following generic functions may be specialized to configure
 differencing of specialized AST structures.; `ast-equal-p',
-`ast-cost', `ast-can-recurse', and `ast-on-recurse'."))
+`ast-cost' and `ast-can-recurse'."))
 
 (defmethod ast-diff* ((ast-a ast) (ast-b ast))
   #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
@@ -966,21 +966,17 @@ value that is used instead."
       (setf (gethash hash table) ast))
     hash))
 
+(defmethod ast-diff* ((ast-a ast) (ast-b ast))
+  (if (ast-can-recurse ast-a ast-b)
+      (ast-diff* (ast-children ast-a) (ast-children ast-b))
+      (call-next-method)))
+
 (defmethod ast-diff* (ast-a ast-b)
   #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
-  #+debug (format t "ast-diff[T] subtypep of parseable: ~S~%"
-                  (mapcar {typep _ 'sel/sw/parseable:parseable}
-                          (list ast-a ast-b)))
-  (cond
-    ;; Get rid of this?
-    ((and (ast-p ast-a)
-          (ast-p ast-b)
-          (ast-can-recurse ast-a ast-b))
-     (ast-diff* (ast-children ast-a) (ast-children ast-b)))
-    ((equal ast-a ast-b)
-     (values `((:same . ,ast-a)) 0))
-    (t (values `((:delete . ,ast-a) (:insert . ,ast-b))
-               (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b))))))
+  (if (equal ast-a ast-b)
+      (values `((:same . ,ast-a)) 0)
+      (values `((:delete . ,ast-a) (:insert . ,ast-b))
+              (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b)))))
 
 (defmethod ast-diff* ((ast-a list) (ast-b list))
   #+ast-diff-debug (format t "ast-diff LIST LIST~%")
@@ -988,21 +984,25 @@ value that is used instead."
         (assert (proper-list-p a) () "Not a proper list: ~a" a))
   #+ast-diff-debug (format t "ast-a = ~a~%ast-b = ~a~%" ast-a ast-b)
   (let* ((table (make-hash-table))
-         (hashes-a (mapcar (lambda (ast) (ast-hash-with-check ast table)) ast-a))
-         (hashes-b (mapcar (lambda (ast) (ast-hash-with-check ast table)) ast-b))
+         (hashes-a (mapcar (lambda (ast) (ast-hash-with-check ast table))
+                           ast-a))
+         (hashes-b (mapcar (lambda (ast) (ast-hash-with-check ast table))
+                           ast-b))
          (subseq-triples (good-common-subsequences2 hashes-a hashes-b))
          diff-a common-a diff-b common-b)
     ;; split ast-a and ast-b into subsequences
     ;; Get lists of subsequences on which they differ, and subsequences on
     ;; which they are equal.  Some of the former may be empty.
     (setf (values diff-a common-a)
-          (split-into-subsequences ast-a
-                                   (mapcar (lambda (x) (list (car x) (caddr x)))
-                                           subseq-triples)))
+          (split-into-subsequences
+           ast-a
+           (mapcar (lambda (x) (list (car x) (caddr x)))
+                   subseq-triples)))
     (setf (values diff-b common-b)
-          (split-into-subsequences ast-b
-                                   (mapcar (lambda (x) (list (cadr x) (caddr x)))
-                                           subseq-triples)))
+          (split-into-subsequences
+           ast-b
+           (mapcar (lambda (x) (list (cadr x) (caddr x)))
+                   subseq-triples)))
     (assert (= (length diff-a) (length diff-b)))
     (assert (= (length common-a) (length common-b)))
     ;; (assert (= (length diff-a) (1+ (length common-a))))
@@ -1018,7 +1018,8 @@ value that is used instead."
               (setf overall-diff (append diff overall-diff))
               (incf overall-cost cost))
             (setf overall-diff
-                  (append (mapcar (lambda (it) (cons :same it)) ca) overall-diff)))
+                  (append (mapcar (lambda (it) (cons :same it)) ca)
+                          overall-diff)))
       (values overall-diff overall-cost))))
 
 (defmethod ast-diff* ((s1 string) (s2 string)
