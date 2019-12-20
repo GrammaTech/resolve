@@ -49,7 +49,6 @@
      ;; Modify the parent of all conflict nodes to replace with OPTION.
      (mapc
       (lambda (ast)
-        (check-path-exists (ast-root conflicted) (ast-path ast))
         #+debug (format t "Replacing conflict at ~S~%" (ast-path ast))
         (setf (get-ast conflicted (ast-path ast))
               (aget option (conflict-ast-child-alist ast)))
@@ -76,8 +75,6 @@ the strategies.")
              (repeatedly (random (+ (length (aget :my options))
                                     (length (aget :your options))))
                          (pick-good fodder))))
-      ;; Confirm that a path in CONFLICTED exists
-      (check-path-exists (ast-root conflicted) (ast-path conflict))
       (replace-ast conflicted
                    (ast-path conflict)
                    ;; Six ways of resolving a conflict:
@@ -96,16 +93,6 @@ the strategies.")
                      ;; 5. (NN) select the base version
                      (:NN (aget :old options)))
                    :literal t))))
-
-(defgeneric check-path-exists (ast path)
-  (:method ((ast ast) (path null)) t)
-  (:method ((ast ast) (path cons))
-    (let ((i (car path))
-          (c (ast-children ast)))
-      (and (<= 0 i (1- (length c)))
-           (check-path-exists (elt c i) (cdr path)))))
-  (:method ((ast t) (path t)) nil))
-
 
 
 ;;; Actual population and evolution of resolution.
