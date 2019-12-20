@@ -33,8 +33,19 @@ BIN_TESTS =					\
 	octomap-diff				\
 	octomap-diff-count			\
 	octomap-diff-edit-tree			\
-	ast-merge-json-has-conflict		\
+	ast-merge-json-has-conflict
+
+# REST tests are only executed for SBCL builds.
+# CCL reports an error on rest server startup related to the use of
+# "#$O_NONBLOCK" in the cl-plus-ssl library at
+# https://github.com/cl-plus-ssl/cl-plus-ssl/blame/master/src/streams.lisp#L180.
+# This issue may be related to an incorrect installation of CCL; see also
+# https://lists.clozure.com/pipermail/openmcl-devel/2011-January/008283.html.
+# For now, we are punting and disabling these tests on CCL builds.
+ifneq (,$(findstring sbcl, $(LISP)))
+BIN_TESTS +=					\
 	rest-ast-diff-returns-json		\
 	rest-ast-diff-takes-full-strings
+endif
 
 include cl.mk
