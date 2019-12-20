@@ -168,7 +168,9 @@ wrapping and unwrapping to be considered.")
   (let ((c (ast-children ast)))
     (if c (reduce #'+ (ast-children ast) :key #'ast-cost) 1)))
 
-(defmethod ast-cost (ast) 1)
+(defmethod ast-cost (ast)
+  (declare (ignorable ast))
+  1)
 
 (defmethod ast-cost ((ast string))
   (let ((len (length ast)))
@@ -455,6 +457,7 @@ rewritten TO by part of the edit script"))
     (format stream "#<EDIT-TREE-NODE ~s>" s)))
 
 (defmethod slot-unbound (class (node edit-tree-node) (slot (eql 'size)))
+  (declare (ignorable class))
   (let ((value (reduce #'+ (edit-tree-node-children node)
                        :key #'ast-size :initial-value 1)))
     (setf (slot-value node slot) value)
@@ -464,6 +467,7 @@ rewritten TO by part of the edit script"))
 
 ;; Cache for SIZE slot, accessed by ast-size
 (defmethod slot-unbound (c (segment edit-segment) (slot (eql 'size)))
+  (declare (ignorable c))
   (let* ((node (edit-segment-node segment))
          (length (edit-segment-length segment))
          (start (edit-segment-start segment))
@@ -1322,8 +1326,10 @@ during calls to MAP-EDIT-TREE.")
       (let ((source-text (ast-text (edit-tree-node-source node)))
             (target-text (ast-text (edit-tree-node-target node)))
             (per-line-prefix
-             (coerce (loop for x in *map-edit-tree-ancestors*
-                        collect #\> collect #\>) 'string)))
+             (coerce (iter (for x in *map-edit-tree-ancestors*)
+                           (declare (ignorable x))
+                           (collect #\>)
+                           (collect #\>)) 'string)))
         (terpri)
         (loop repeat 6 do (princ "----------"))
         (terpri)
@@ -2241,6 +2247,7 @@ a tail of diff-a, and a tail of diff-b.")
     (error "Bad diff merge: ~A, ~A" o-a o-b))
 
   (:method ((sym-a null) sym-b o-a o-b)
+    (declare (ignorable sym-b))
     (handle-conflict o-a o-b :leave-a t))
 
   ;; do not handle these for now
