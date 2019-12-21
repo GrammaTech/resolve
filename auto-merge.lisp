@@ -133,16 +133,20 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
                                    (cartesian resolutions)))))))
 
 (defgeneric resolve (my old your test &rest rest
-                     &key evolve? target &allow-other-keys)
+                     &key evolve? target
+                       base-cost wrap max-wrap-diff &allow-other-keys)
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.
 Keyword argument EVOLVE? is a boolean specifying whether to attempt evolution
 Keyword argument TARGET specifies the target fitness.
+Keyword argument BASE COST specifies the basic cost of a diff
+Keyword argument WRAP specifies if wrap/unwrap actions should appear in diffs
+Keyword argument MAX-WRAP-DIFF specifies the max size difference for wrap/unwrap
 Extra keys are passed through to EVOLVE.")
   (:method ((my software) (old software) (your software) test
             &rest rest &key (evolve? nil) (target nil target-supplied-p)
-                         ((:wrap *wrap*) *wrap*)
                          ((:base-cost *base-cost*) *base-cost*)
+                         ((:wrap *wrap*) *wrap*)
                          ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
                          &allow-other-keys)
     (note 2 "Populate candidate merge resolutions.")
