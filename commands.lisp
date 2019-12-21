@@ -520,6 +520,7 @@ command-line options processed by the returned function."
                   (expand-options-for-which-files language "OLD")
                   (expand-options-for-which-files language "YOUR")
                   {test _ tests}
+                  :strings strings
                   :wrap wrap
                   :max-wrap-diff max-wrap
                   :base-cost base-cost

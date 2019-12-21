@@ -134,17 +134,19 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
 
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target
-                       base-cost wrap max-wrap-diff &allow-other-keys)
+                       strings base-cost wrap max-wrap-diff &allow-other-keys)
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.
 Keyword argument EVOLVE? is a boolean specifying whether to attempt evolution
 Keyword argument TARGET specifies the target fitness.
+Keyword argument STRINGS specifies if the diff should descend into strings
 Keyword argument BASE COST specifies the basic cost of a diff
 Keyword argument WRAP specifies if wrap/unwrap actions should appear in diffs
 Keyword argument MAX-WRAP-DIFF specifies the max size difference for wrap/unwrap
 Extra keys are passed through to EVOLVE.")
   (:method ((my software) (old software) (your software) test
             &rest rest &key (evolve? nil) (target nil target-supplied-p)
+                         ((:strings *strings*) *strings*)
                          ((:base-cost *base-cost*) *base-cost*)
                          ((:wrap *wrap*) *wrap*)
                          ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)

@@ -82,6 +82,7 @@
    :*base-cost*
    :*max-wrap-diff*
    :*wrap*
+   :*strings*
    ;; :*ignore-whitespace*
    ))
 (in-package :resolve/ast-diff)
