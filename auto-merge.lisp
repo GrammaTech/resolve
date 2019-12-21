@@ -6,6 +6,7 @@
         :named-readtables
         :curry-compose-reader-macros
         :iterate
+        :bordeaux-threads
         :uiop
         :software-evolution-library
         :software-evolution-library/utility
@@ -133,7 +134,7 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
 
 ;;; Evolution of a merge resolution.
 (defgeneric resolve (my old your test &rest rest
-                     &key evolve? target
+                     &key evolve? target num-threads
                        strings base-cost wrap max-wrap-diff &allow-other-keys)
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.
@@ -141,6 +142,7 @@ Keyword argument EVOLVE? is a boolean specifying whether to attempt evolution
 Keyword argument MAX-EVALS specifies maximum number of evals run in evolution
 Keyword argument MAX-TIME specifies maximum number of seconds to run evolution
 Keyword argument TARGET specifies the target fitness.
+Keyword argument NUM-THREADS specifies the number of threads to utilize
 Keyword argument STRINGS specifies if the diff should descend into strings
 Keyword argument BASE COST specifies the basic cost of a diff
 Keyword argument WRAP specifies if wrap/unwrap actions should appear in diffs
@@ -148,7 +150,7 @@ Keyword argument MAX-WRAP-DIFF specifies the max size difference for wrap/unwrap
 Extra keys are passed through to EVOLVE.")
   (:method ((my software) (old software) (your software) test
             &key (evolve? nil) (max-evals nil) (max-time nil)
-              (target nil target-supplied-p)
+              (target nil target-supplied-p) (num-threads 1)
               ((:strings *strings*) *strings*)
               ((:base-cost *base-cost*) *base-cost*)
               ((:wrap *wrap*) *wrap*)
@@ -158,7 +160,7 @@ Extra keys are passed through to EVOLVE.")
     (let ((*population* (populate (converge my old your :conflict t)))
           (*target-fitness-p* (if target-supplied-p
                                   [{equalp target} #'fitness]
-                                  [{every #'zerop} #'fitness]))
+                                  «and #'fitness [{every #'zerop} #'fitness]»))
           (*tournament-selector* #'pareto-selector)
           (*tournament-tie-breaker* #'pick-least-crowded)
           (*pareto-comparison-set-size* (max 1 (round
@@ -169,21 +171,33 @@ Extra keys are passed through to EVOLVE.")
           (*fitness-scalar-fn* #'multi-objective-scalar)
           (*fitness-predicate* #'<))
 
+      ;; Evaluate the fitness of the initial population
       (note 2 "Evaluate ~d population members." (length *population*))
-      (mapc (lambda (variant)
-              (incf *fitness-evals*)
-              (evaluate test variant)
-              (when (funcall *target-fitness-p* variant)
-                (note 2 "Merge resolution found.")
-                (return-from resolve variant)))
-            *population*)
+      (task-map num-threads
+                (lambda (variant)
+                  (unless (some {funcall *target-fitness-p*} *population*)
+                    (evaluate test variant)))
+                *population*)
 
-      (note 2 "Best fitness: ~a." (extremum (mapcar #'fitness *population*)
-                                            #'fitness-better-p))
+      ;; Update global vars after evaluating initial population
+      (setf *population* (remove-if [#'null #'fitness] *population*))
+      (incf *fitness-evals* (length *population*))
+
+      ;; Determine if a soluation has been found and if so, return.  Otherwise,
+      ;; report the best initial fitness.
+      (let ((best (extremum *population* #'fitness-better-p :key #'fitness)))
+        (if (funcall *target-fitness-p* best)
+            (progn
+              (note 2 "Merge resolution found.")
+              (return-from resolve best))
+            (note 2 "Best fitness: ~a." (fitness best))))
+
+      ;; Perform the evolutionary search
       (when evolve?
         (note 2 "Evolve conflict resolution.")
         (eval `(evolve ,test
                        :filter [#'not {funcall *worst-fitness-p*}]
                        :max-time max-time :max-evals max-evals)))
 
+      ;; Return the best variant
       (extremum *population* #'fitness-better-p :key #'fitness))))

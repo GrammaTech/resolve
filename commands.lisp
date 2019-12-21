@@ -122,6 +122,8 @@
   (defparameter +auto-merge-only-command-line-options+
     `((("evolve") :type boolean :optional t :initial-value nil
        :documentation "attempt to use evolution to resolve conflicts")
+      (("num-threads" #\n) :type integer :initial-value 1
+       :documentation "number of threads to utilize")
       (("num-tests") :type integer :optional t :initial-value 1
        :documentation "number of test cases to execute"))))
 
@@ -469,6 +471,14 @@ command-line options processed by the returned function."
         (make-list (length (test-cases tests))
                    :initial-element most-positive-fixnum))))
 
+(defmethod test :around ((obj clang-project) (tests test-suite))
+  "Setup environment so the fitness of OBJ can be evaluated against TESTS."
+  ;; Bind *build-dir* so multiple builds can occur in a multi-threaded
+  ;; environment.
+  (with-temp-dir (dir)
+    (let ((*build-dir* dir))
+      (call-next-method))))
+
 (define-command auto-merge (my-file old-file your-file test-script
                                     &spec +auto-merge-command-line-options+
                                     &aux tests)
@@ -515,6 +525,7 @@ command-line options processed by the returned function."
                   (expand-options-for-which-files language "OLD")
                   (expand-options-for-which-files language "YOUR")
                   {test _ tests}
+                  :num-threads num-threads
                   :strings strings
                   :wrap wrap
                   :max-wrap-diff max-wrap

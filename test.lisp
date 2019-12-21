@@ -1499,16 +1499,17 @@
 
 (defun run-auto-merge-test (my old your tests)
   (flet ((fitness-test (obj)
-           (with-temp-file (bin)
-             (if (ignore-phenome-errors (phenome obj :bin bin))
-                 (mapcar (lambda (test-case)
-                           (nth-value 2 (run-test bin test-case)))
-                         tests)
-                 (make-list (length tests)
-                            :initial-element most-positive-fixnum)))))
+           (with-temp-dir (*build-dir*)
+             (with-temp-file (bin)
+               (if (ignore-phenome-errors (phenome obj :bin bin))
+                   (mapcar (lambda (test-case)
+                             (nth-value 2 (run-test bin test-case)))
+                           tests)
+                   (make-list (length tests)
+                              :initial-element most-positive-fixnum))))))
     (let ((*note-level* 0))
       (is (every #'zerop (fitness (resolve my old your #'fitness-test
-                                           :base-cost 10)))
+                                           :base-cost 10 :num-threads 2)))
           "auto-merge did not find a solution for the three-way GCD merge."))))
 
 (deftest (can-auto-merge-gcd-single-file :long-running) ()
@@ -1517,8 +1518,8 @@
 
 (deftest (can-auto-merge-gcd-project :long-running) ()
   (with-fixture auto-merge-gcd-project
-    (with-temp-dir (*build-dir*)
-      (run-auto-merge-test *my* *old* *your* *tests*))))
+    (run-auto-merge-test *my* *old* *your* *tests*)))
+
 
 ;;; Additional tests of internals
 (deftest ast-size-test ()
