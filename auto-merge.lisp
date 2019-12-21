@@ -61,8 +61,7 @@
                              (asts conflicted))))
     conflicted))
 
-(defgeneric resolve-conflict (conflicted conflict strategy
-                              &key fodder &allow-other-keys)
+(defgeneric resolve-conflict (conflicted conflict strategy)
   (:documentation
    "Resolve CONFLICT in CONFLICTED with STRATEGY.
 Keyword argument FODDER may be used to provide a source of novel code.
@@ -70,30 +69,21 @@ See the empirical study _On the Nature of Merge Conflicts: a Study of
 2,731 Open Source Java Projects Hosted by GitHub_ for the source of
 the strategies.")
   (:method ((conflicted parseable) (conflict ast) (strategy symbol)
-            &key (fodder (resolve-to (copy conflicted) :old)) &allow-other-keys
             &aux (options (conflict-ast-child-alist conflict)))
-    (flet ((generate-novel-code ()
-             (repeatedly (random (+ (length (aget :my options))
-                                    (length (aget :your options))))
-                         (pick-good fodder))))
-      (replace-ast conflicted
-                   (ast-path conflict)
-                   ;; Six ways of resolving a conflict:
-                   (case strategy
-                     ;; 1. (V1) version 1
-                     (:V1 (aget :my options))
-                     ;; 2. (V2) version 2
-                     (:V2 (aget :your options))
-                     ;; 3. (CC) concatenate versions (either order)
-                     (:C1 (append (aget :my options) (aget :your options)))
-                     (:C2 (append (aget :your options) (aget :my options)))
-                     ;; 4. (NC) mix interleaving subset with novel code
-                     (:NC (shuffle (copy-list (append (generate-novel-code)
-                                                      (aget :my options)
-                                                      (aget :your options)))))
-                     ;; 5. (NN) select the base version
-                     (:NN (aget :old options)))
-                   :literal t))))
+    (replace-ast conflicted
+                 (ast-path conflict)
+                 ;; Five ways of resolving a conflict:
+                 (case strategy
+                   ;; 1. (V1) version 1
+                   (:V1 (aget :my options))
+                   ;; 2. (V2) version 2
+                   (:V2 (aget :your options))
+                   ;; 3. (CC) concatenate versions (either order)
+                   (:C1 (append (aget :my options) (aget :your options)))
+                   (:C2 (append (aget :your options) (aget :my options)))
+                   ;; 4. (NN) select the base version
+                   (:NN (aget :old options)))
+                 :literal t)))
 
 
 ;;; Generation of the initial population.
@@ -101,7 +91,7 @@ the strategies.")
   (:documentation "Build a population from MERGED and UNSTABLE chunks.
 NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:method ((conflicted parseable)
-            &key (strategies `(:V1 :V2 :C1 :C2 :NC :NN))
+            &key (strategies `(:V1 :V2 :C1 :C2 :NN))
             &aux (pop (list (copy conflicted))))
     ;; Initially population is just a list of the base object.
     (let ((chunks (remove-if-not #'conflict-ast-p (asts conflicted))))

@@ -1491,9 +1491,9 @@
           (chunks (remove-if-not #'conflict-ast-p
                                  (ast-to-list (ast-root conflicted))))
           (*population* (populate conflicted))))
-   (is (= (length *population*) (expt 6 (length chunks)))
-       "Population has the expected size ~d = 6^|chunks| => ~d."
-       (length *population*) (expt 6 (length chunks)))
+   (is (= (length *population*) (expt 5 (length chunks)))
+       "Population has the expected size ~d = 5^|chunks| => ~d."
+       (length *population*) (expt 5 (length chunks)))
    (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
        "Population has no conflict ASTs remaining.")))
 
