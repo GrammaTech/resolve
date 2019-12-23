@@ -105,18 +105,22 @@
               (("max-wrap") :type integer
                :initial-value #.*max-wrap-diff*
                :documentation "max size diff of wrapping/unwrapping")
-              (("base-cost") :type integer
-               :initial-value #.*base-cost*
-               :documentation "Base edit operation cost")
               (("coherence") :type string :optional t
                :documentation
                "Bound used to find relevant nodes in the edit tree")))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter +ast-diff-only-command-line-options+
+    `((("base-cost") :type integer :initial-value #.*base-cost*
+       :documentation "Base edit operation cost"))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter +ast-merge-only-command-line-options+
     `((("conflict") :type boolean :optional t
        :documentation
-       "Generate conflict nodes rather than resolving conflicts"))))
+       "Generate conflict nodes rather than resolving conflicts")
+      (("base-cost") :type integer :initial-value #.*base-cost*
+       :documentation "Base edit operation cost"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter +auto-merge-only-command-line-options+
@@ -125,7 +129,9 @@
       (("num-threads" #\n) :type integer :initial-value 1
        :documentation "number of threads to utilize")
       (("num-tests") :type integer :optional t :initial-value 1
-       :documentation "number of test cases to execute"))))
+       :documentation "number of test cases to execute")
+      (("base-cost") :type integer :initial-value 10
+       :documentation "Base edit operation cost"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
@@ -151,6 +157,7 @@ command-line options processed by the returned function."
   (nest
    (defparameter +ast-diff-command-line-options+)
    (append +command-line-options+)
+   (append +ast-diff-only-command-line-options+)
    (mappend (argument-multiplier "old" "new"))
    (append +clang-command-line-options+
            +project-command-line-options+
@@ -527,9 +534,9 @@ command-line options processed by the returned function."
                   {test _ tests}
                   :num-threads num-threads
                   :strings strings
+                  :base-cost base-cost
                   :wrap wrap
                   :max-wrap-diff max-wrap
-                  :base-cost base-cost
                   (append (when evolve (list :evolve? evolve))
                           (when max-evals (list :max-evals max-evals))
                           (when max-time (list :max-time max-time))))
