@@ -144,8 +144,6 @@ wrapping and unwrapping to be considered.")
 
 (defun clength (x) (iter (while (consp x)) (pop x) (summing 1)))
 
-;; (defun make-costed (&key obj &allow-other-keys) obj)
-
 (defmethod ccost ((x cons))
   (let ((conses nil))
     (let ((y x))
@@ -196,15 +194,12 @@ wrapping and unwrapping to be considered.")
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
 can be recursed on if STRINGS is true (defaults to true)"))
 
-;; (defmethod ast-can-recurse ((ast-a cons) (ast-b cons))
-;;  t)
 (defmethod ast-can-recurse ((ast-a string) (ast-b string))
   *strings*)
 (defmethod ast-can-recurse ((ast-a t) (ast-b t))
   nil)
 (defmethod ast-can-recurse ((ast-a ast) (ast-b ast))
   t)
-;; (eq (ast-class ast-a) (ast-class ast-b)))
 
 (defmethod ast-text ((ast string))
   ast)
@@ -598,8 +593,6 @@ of children leading down to the node."))
 (defgeneric ast-diff-unwrap (ast-a ast-b)
   (:documentation "Find a minimum cost 'unwrap' edit, which pulls a subast
 out of one tree and turns it into another."))
-
-;; (defmethod ast-diff-unwrap ((ast-a list) (ast-b t)) (error "Not implemented"))
 
 (defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast))
   ;; search over the ASTs under ast-a that are the same class as ast-b,
@@ -1028,7 +1021,8 @@ value that is used instead."
       ;; Otherwise, treat the strings as single objects and replace
       ;; entirely if different.  Empty strings are considered to not
       ;; be present.  If whitespace is ignored, treat strings the same
-      ;; if
+      ;; if whitespace were there, except cost is computed as if whitespace
+      ;; is not there.
       (let*
           ((ns1 (if ignore-whitespace (remove-if #'whitespacep s1) s1))
            (ns2 (if ignore-whitespace (remove-if #'whitespacep s2) s2))
