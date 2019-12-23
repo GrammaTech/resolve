@@ -89,7 +89,7 @@
               (("no-color" #\C) :type boolean :optional t
                :documentation "inhibit color printing")
               (("unified" #\U) :type integer :initial-value 3
-               :documentation "output NUM (default 3) lines of unified context")
+               :documentation "output NUM lines of unified context")
               (("edit-tree" #\T) :type boolean :optional t
                :documentation "Print edit tree")
               (("json" #\J):type boolean :optional t
@@ -104,15 +104,10 @@
                "diff searches for wrap/unwrap operations (UNTESTED)")
               (("max-wrap") :type integer
                :initial-value #.*max-wrap-diff*
-               :documentation
-               #.(format nil "max size diff (default ~d) of wrapping/unwrapping"
-                         *max-wrap-diff*))
-              (("base-cost")
-               :type integer
+               :documentation "max size diff of wrapping/unwrapping")
+              (("base-cost") :type integer
                :initial-value #.*base-cost*
-               :documentation
-               #.(format nil "Base cost of an edit operation (default ~d)"
-                         *base-cost*))
+               :documentation "Base edit operation cost")
               (("coherence") :type string :optional t
                :documentation
                "Bound used to find relevant nodes in the edit tree")))))
