@@ -7,7 +7,8 @@
         :resolve/ast-diff
         :resolve/alist
         :software-evolution-library
-        :software-evolution-library/software/project))
+        :software-evolution-library/software/project)
+  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*))
 (in-package :resolve/software/project)
 (in-readtable :curry-compose-reader-macros)
 

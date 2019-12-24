@@ -9,6 +9,7 @@
 	:iterate
 	:software-evolution-library
 	:resolve/ast-diff)
+  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:export :alist-for-diff
            :alist-of-alist-for-diff
            :edit-tree-alist-node))

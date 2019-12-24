@@ -49,10 +49,8 @@
    :ast-size
    :ast-can-recurse
    :ast-diff
-   :ast-diff*
    :ast-diff-elide-same
    :ast-patch
-   :ast-patch*
    :astify
    :unastify
    :print-diff

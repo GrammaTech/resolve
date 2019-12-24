@@ -7,7 +7,8 @@
         :resolve/ast-diff
         :software-evolution-library
         :software-evolution-library/software/ast
-        :software-evolution-library/software/parseable))
+        :software-evolution-library/software/parseable)
+  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*))
 (in-package :resolve/software/parseable)
 (in-readtable :curry-compose-reader-macros)
 

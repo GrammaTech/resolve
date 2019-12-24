@@ -36,6 +36,7 @@
    :appendf :ensure-list :featurep :emptyp
    :if-let :ensure-function :ensure-gethash :copy-file
    :parse-body :simple-style-warning)
+  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:export :test :batch-test))
 (in-package :resolve/test)
 (in-readtable :curry-compose-reader-macros)
