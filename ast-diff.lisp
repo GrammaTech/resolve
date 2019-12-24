@@ -1972,7 +1972,8 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
             (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
             (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
             (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
-            (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+))))
+            (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
+            (sort-insert-delete t))
   "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
   (let ((*print-escape* nil)
@@ -2042,6 +2043,9 @@ Numerous options are provided to control presentation."
                     (%print-diff sub-diff)
                     (mapc #'push-deletes (reverse right-wrap))))
                  (t
+                  (assert (every #'consp diff))
+                  (when sort-insert-delete
+                    (setf diff (put-inserts-before-deletes diff)))
                   (mapc (lambda-bind ((type . content))
                                      (ecase type
                                        (:same (pr content))
@@ -2065,6 +2069,20 @@ Numerous options are provided to control presentation."
       (%print-diff diff)
       (purge)
       (values))))
+
+(defun put-inserts-before-deletes (diff)
+  "Rearrange DIFF so that in each chunk of inserts and delete, the
+   inserts preceed the deletes."
+  (let ((saved-deletes nil))
+    (nconc
+     (iter (for d in diff)
+           (case (car d)
+             (:insert (collecting d))
+             (:delete (push d saved-deletes))
+             (t (appending (nreverse saved-deletes))
+                (setf saved-deletes nil)
+                (collecting d))))
+     (nreverse saved-deletes))))
 
 
 ;;; Merge algorithms

@@ -36,7 +36,8 @@
    :appendf :ensure-list :featurep :emptyp
    :if-let :ensure-function :ensure-gethash :copy-file
    :parse-body :simple-style-warning)
-  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
+  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
+                :put-inserts-before-deletes)
   (:export :test :batch-test))
 (in-package :resolve/test)
 (in-readtable :curry-compose-reader-macros)
@@ -1546,6 +1547,16 @@
 (deftest copy-test ()
   (is (equal (unastify (copy (astify '(x y)))) '(x y)))
   (is (equal (unastify (copy (astify '(x . y)))) '(x . y))))
+
+(deftest put-inserts-before-deletes-test ()
+  (is (equal (put-inserts-before-deletes
+              '((:insert x) (:delete y) (:delete w)))
+             '((:insert x) (:delete y) (:delete w))))
+  (is (equal (put-inserts-before-deletes '((:delete y) (:insert x)))
+             '((:insert x) (:delete y))))
+  (is (equal (put-inserts-before-deletes
+              '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))
+             '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))))
 
 ;;; Functions for interactive testing and experimentation.
 (defun do-populate (my your)
