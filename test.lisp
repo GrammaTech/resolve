@@ -1497,7 +1497,7 @@
    (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
        "Population has no conflict ASTs remaining.")))
 
-(defun run-auto-merge-test (my old your tests)
+(defun run-auto-merge-test (my old your tests &key evolve?)
   (flet ((fitness-test (obj)
            (with-temp-dir (*build-dir*)
              (with-temp-file (bin)
@@ -1507,9 +1507,12 @@
                            tests)
                    (make-list (length tests)
                               :initial-element most-positive-fixnum))))))
-    (let ((*note-level* 0))
+    (let ((*note-level* 0)
+          (*population* nil))
       (is (every #'zerop (fitness (resolve my old your #'fitness-test
-                                           :base-cost 10 :num-threads 2)))
+                                           :base-cost 10
+                                           :num-threads 2
+                                           :evolve? evolve?)))
           "auto-merge did not find a solution for the three-way GCD merge."))))
 
 (deftest (can-auto-merge-gcd-single-file :long-running) ()
@@ -1519,6 +1522,18 @@
 (deftest (can-auto-merge-gcd-project :long-running) ()
   (with-fixture auto-merge-gcd-project
     (run-auto-merge-test *my* *old* *your* *tests*)))
+
+(deftest (can-auto-merge-gcd-single-file-evolve :long-running) ()
+  (with-fixture auto-merge-gcd-single-file
+    (with-warnings-as-notes 1
+      (let ((*max-population-size* 1))
+        (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
+
+(deftest (can-auto-merge-gcd-project-evolve :long-running) ()
+  (with-fixture auto-merge-gcd-project
+    (with-warnings-as-notes 1
+      (let ((*max-population-size* 1))
+        (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
 
 
 ;;; Additional tests of internals

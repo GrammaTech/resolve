@@ -61,6 +61,42 @@
                              (asts conflicted))))
     conflicted))
 
+(defgeneric resolve-conflict-ast (strategy conflict)
+  (:documentation "Return a concrete resolution of CONFLICT AST
+using STRATEGY.")
+  (:method ((strategy symbol) (conflict ast)
+            &aux (options (conflict-ast-child-alist conflict)))
+    (labels ((normalize (children)
+               "Normalize CHILDREN by adding the conflict AST
+               to each child AST's aux-data.  If there are no children,
+               create a NullStmt AST with this aux-data.  The aux-data
+               is required for the `new-conflict-resolution` mutation."
+               (if children
+                   (mapcar (lambda (child)
+                             (if (ast-p child)
+                                 (copy child :aux-data
+                                      (list (cons :conflict-ast conflict)
+                                            (cons :conflict-resolution-length
+                                                  (length children))))
+                                 child))
+                           children)
+                   (list (to-ast 'clang
+                                 `(:nullstmt :aux-data
+                                   ,(list (cons :conflict-ast conflict)
+                                          (cons :conflict-resolution-length
+                                                (length children)))))))))
+      ;; Five ways of resolving a conflict:
+      (case strategy
+        ;; 1. (V1) version 1
+        (:V1 (normalize (aget :my options)))
+        ;; 2. (V2) version 2
+        (:V2 (normalize (aget :your options)))
+        ;; 3. (CC) concatenate versions (either order)
+        (:C1 (normalize (append (aget :my options) (aget :your options))))
+        (:C2 (normalize (append (aget :your options) (aget :my options))))
+        ;; 4. (NN) select the base version
+        (:NN (normalize (aget :old options)))))))
+
 (defgeneric resolve-conflict (conflicted conflict strategy)
   (:documentation
    "Resolve CONFLICT in CONFLICTED with STRATEGY.
@@ -68,22 +104,54 @@ Keyword argument FODDER may be used to provide a source of novel code.
 See the empirical study _On the Nature of Merge Conflicts: a Study of
 2,731 Open Source Java Projects Hosted by GitHub_ for the source of
 the strategies.")
-  (:method ((conflicted parseable) (conflict ast) (strategy symbol)
-            &aux (options (conflict-ast-child-alist conflict)))
+  (:method ((conflicted parseable) (conflict ast) (strategy symbol))
     (replace-ast conflicted
                  (ast-path conflict)
-                 ;; Five ways of resolving a conflict:
-                 (case strategy
-                   ;; 1. (V1) version 1
-                   (:V1 (aget :my options))
-                   ;; 2. (V2) version 2
-                   (:V2 (aget :your options))
-                   ;; 3. (CC) concatenate versions (either order)
-                   (:C1 (append (aget :my options) (aget :your options)))
-                   (:C2 (append (aget :your options) (aget :my options)))
-                   ;; 4. (NN) select the base version
-                   (:NN (aget :old options)))
+                 (resolve-conflict-ast strategy conflict)
                  :literal t)))
+
+
+;;; Mutations for the auto-merge evolutionary loop
+(define-mutation new-conflict-resolution (parseable-mutation)
+  ((targeter :initform #'find-resolved-conflict-ast))
+  (:documentation "Replace a conflict AST resolution with an alternative
+option."))
+
+(defun find-resolved-conflict-ast (obj)
+  "Return a conflict AST previously resolved in OBJ."
+  (if-let ((conflict-asts (nest (remove-duplicates)
+                                (remove-if #'null)
+                                (mapcar [{aget :conflict-ast} #'ast-aux-data])
+                                (asts obj))))
+    (random-elt conflict-asts)
+    (error (make-condition 'no-mutation-targets
+             :obj obj :text "No resolved conflict asts to pick from"))))
+
+(defmethod build-op ((mutation new-conflict-resolution) software
+                     &aux (strategies '(:V1 :V2 :C1 :C2 :NN)))
+  (declare (ignorable software))
+  (let* ((conflict-ast (targets mutation))
+         (prior-resolution (remove-if-not [{eq conflict-ast}
+                                           {aget :conflict-ast}
+                                           #'ast-aux-data] (asts software)))
+         (new-resolution (resolve-conflict-ast (random-elt strategies)
+                                               conflict-ast))
+         (conflict-path (ast-path (car prior-resolution)))
+         (parent (get-ast software (butlast conflict-path))))
+    ;; Replace the prior resolution children with the new resolution
+    `((:set (:stmt1 . ,parent)
+            (:literal1 .
+             ,(copy parent
+                    :children
+                    (append (subseq (ast-children parent)
+                                    0
+                                    (lastcar conflict-path))
+                            new-resolution
+                            (subseq (ast-children parent)
+                                    (+ (lastcar conflict-path)
+                                       (nest (aget :conflict-resolution-length)
+                                             (ast-aux-data)
+                                             (car prior-resolution)))))))))))
 
 
 ;;; Generation of the initial population.
@@ -174,7 +242,9 @@ Extra keys are passed through to EVOLVE.")
                                   «and #'fitness [{every #'zerop} #'fitness]»))
           (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
           (*fitness-evals* 0)
-          (*fitness-predicate* #'<))
+          (*fitness-predicate* #'<)
+          (*parseable-mutation-types* '((new-conflict-resolution . 1)))
+          (*clang-mutation-types* '((new-conflict-resolution . 1))))
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Evaluate ~d population members." (length *population*))
@@ -200,12 +270,21 @@ Extra keys are passed through to EVOLVE.")
       ;; Perform the evolutionary search
       (when evolve?
         (note 2 "Evolve conflict resolution.")
-        (generational-evolve #'simple-reproduce
-                             {simple-evaluate test}
-                             #'lexicase-select
-                             :filter [#'not {funcall *worst-fitness-p*}]
-                             :max-time max-time
-                             :max-evals max-evals))
+        (handler-bind
+            ((no-mutation-targets
+              (lambda (c)
+                (declare (ignorable c))
+                (invoke-restart 'try-another-mutation)))
+             (mutate
+              (lambda (c)
+                (declare (ignorable c))
+                (invoke-restart 'try-another-mutation))))
+          (generational-evolve #'simple-reproduce
+                               {simple-evaluate test}
+                               #'lexicase-select
+                               :filter [#'not {funcall *worst-fitness-p*}]
+                               :max-time max-time
+                               :max-evals max-evals)))
 
       ;; Return the best variant
       (extremum *population* #'fitness-better-p :key #'fitness))))
