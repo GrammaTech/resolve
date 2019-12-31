@@ -92,34 +92,55 @@ the strategies.")
 NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:method ((conflicted parseable)
             &key (strategies `(:V1 :V2 :C1 :C2 :NN))
-            &aux (pop (list (copy conflicted))))
+            &aux (pop (list (copy conflicted)))
+              (pop-size (or *max-population-size* (expt 2 10))))
     ;; Initially population is just a list of the base object.
     (let ((chunks (remove-if-not #'conflict-ast-p (asts conflicted))))
       (assert chunks (chunks) "Software ~S must have conflict ASTs" conflicted)
-      ;; Warn if we're about to do something really expensive.
-      (when (> (expt (length strategies) (length chunks))
-               (or *max-population-size* (expt 2 10)))
-        (warn "About to generate ~d possible resolutions from ~d chunks"
-              (expt (length strategies) (length chunks)) (length chunks)))
-      (mapc (lambda (chunk)
-              (setf pop
-                    (mappend
-                     (lambda (variant)
-                       (mapcar
-                        (lambda (strategy)
-                          (resolve-conflict (copy variant) chunk strategy))
-                        strategies))
-                     pop)))
-            (reverse chunks)))
+      ;; Create all conflict resolution variants if the total number
+      ;; is less than POP-SIZE.  Otherwise, create a random sample.
+      (if (< (expt (length strategies) (length chunks)) pop-size)
+          (mapc (lambda (chunk)
+                  (setf pop
+                        (mappend
+                         (lambda (variant)
+                           (mapcar
+                            (lambda (strategy)
+                              (resolve-conflict (copy variant) chunk strategy))
+                            strategies))
+                         pop)))
+                (reverse chunks))
+          (progn
+            (warn "Randomly sampling ~d possible resolutions from ~
+                   ~d possibilities."
+                  pop-size (expt (length strategies) (length chunks)))
+            (setf pop
+                  (iter (for i below pop-size)
+                        (collect
+                          (reduce (lambda (variant chunk)
+                                    (resolve-conflict (copy variant) chunk
+                                                      (random-elt strategies)))
+                                  (reverse chunks)
+                                  :initial-value (copy conflicted))))))))
     pop)
-  (:method ((conflicted parseable-project) &rest rest)
+  (:method ((conflicted parseable-project) &rest rest
+            &aux (pop-size (or *max-population-size* (expt 2 10))))
     (iter (for (file . obj) in (evolve-files conflicted))
           (collect (if (some #'conflict-ast-p (asts obj))
                        (mapcar {cons file} (apply #'populate obj rest))
                        (list (cons file (copy obj)))) into resolutions)
-          (finally (return (mapcar (lambda (resolution)
-                                     (copy conflicted :evolve-files resolution))
-                                   (cartesian resolutions)))))))
+          (finally
+            ;; Return all conflict resolution variants if the total number
+            ;; is less than POP-SIZE.  Otherwise, return a random sample.
+            (if (< (reduce #'* resolutions :key #'length) pop-size)
+                (return (mapcar (lambda (resolution)
+                                  (copy conflicted :evolve-files resolution))
+                                (cartesian resolutions)))
+                (return (iter (for i below pop-size)
+                              (collect (copy conflicted :evolve-files
+                                             (mapcar (lambda (objs)
+                                                       (random-elt objs))
+                                                     resolutions))))))))))
 
 
 ;;; Evolution of a merge resolution.
