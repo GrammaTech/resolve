@@ -178,7 +178,8 @@ Extra keys are passed through to EVOLVE.")
       (when evolve?
         (note 2 "Evolve conflict resolution.")
         (eval `(evolve ,test
-                       :filter [{every {equalp most-positive-fixnum}} #'fitness]
+                       :filter [#'not {every {equalp most-positive-fixnum}}
+                                #'fitness]
                        ,@rest)))
 
       (extremum *population* #'fitness-better-p :key #'fitness))))
