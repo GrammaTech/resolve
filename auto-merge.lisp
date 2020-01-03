@@ -11,7 +11,7 @@
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/command-line
-        :software-evolution-library/components/multi-objective
+        :software-evolution-library/components/lexicase
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
         :software-evolution-library/software/parseable-project
@@ -172,14 +172,8 @@ Extra keys are passed through to EVOLVE.")
           (*target-fitness-p* (if target-supplied-p
                                   [{equalp target} #'fitness]
                                   «and #'fitness [{every #'zerop} #'fitness]»))
-          (*tournament-selector* #'pareto-selector)
-          (*tournament-tie-breaker* #'pick-least-crowded)
-          (*pareto-comparison-set-size* (max 1 (round
-                                                (/ (or *max-population-size* 0)
-                                                   10))))
           (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
           (*fitness-evals* 0)
-          (*fitness-scalar-fn* #'multi-objective-scalar)
           (*fitness-predicate* #'<))
 
       ;; Evaluate the fitness of the initial population
@@ -206,9 +200,12 @@ Extra keys are passed through to EVOLVE.")
       ;; Perform the evolutionary search
       (when evolve?
         (note 2 "Evolve conflict resolution.")
-        (eval `(evolve ,test
-                       :filter [#'not {funcall *worst-fitness-p*}]
-                       :max-time max-time :max-evals max-evals)))
+        (generational-evolve #'simple-reproduce
+                             {simple-evaluate test}
+                             #'lexicase-select
+                             :filter [#'not {funcall *worst-fitness-p*}]
+                             :max-time max-time
+                             :max-evals max-evals))
 
       ;; Return the best variant
       (extremum *population* #'fitness-better-p :key #'fitness))))
