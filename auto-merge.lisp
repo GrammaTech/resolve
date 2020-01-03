@@ -136,6 +136,8 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.
 Keyword argument EVOLVE? is a boolean specifying whether to attempt evolution
+Keyword argument MAX-EVALS specifies maximum number of evals run in evolution
+Keyword argument MAX-TIME specifies maximum number of seconds to run evolution
 Keyword argument TARGET specifies the target fitness.
 Keyword argument STRINGS specifies if the diff should descend into strings
 Keyword argument BASE COST specifies the basic cost of a diff
@@ -143,12 +145,12 @@ Keyword argument WRAP specifies if wrap/unwrap actions should appear in diffs
 Keyword argument MAX-WRAP-DIFF specifies the max size difference for wrap/unwrap
 Extra keys are passed through to EVOLVE.")
   (:method ((my software) (old software) (your software) test
-            &rest rest &key (evolve? nil) (target nil target-supplied-p)
-                         ((:strings *strings*) *strings*)
-                         ((:base-cost *base-cost*) *base-cost*)
-                         ((:wrap *wrap*) *wrap*)
-                         ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
-                         &allow-other-keys)
+            &key (evolve? nil) (max-evals nil) (max-time nil)
+              (target nil target-supplied-p)
+              ((:strings *strings*) *strings*)
+              ((:base-cost *base-cost*) *base-cost*)
+              ((:wrap *wrap*) *wrap*)
+              ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*))
     (note 2 "Populate candidate merge resolutions.")
 
     (let ((*population* (populate (converge my old your :conflict t)))
@@ -180,6 +182,6 @@ Extra keys are passed through to EVOLVE.")
         (eval `(evolve ,test
                        :filter [#'not {every {equalp most-positive-fixnum}}
                                 #'fitness]
-                       ,@rest)))
+                       :max-time max-time :max-evals max-evals)))
 
       (extremum *population* #'fitness-better-p :key #'fitness))))
