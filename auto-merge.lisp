@@ -95,7 +95,7 @@ the strategies.")
                    :literal t))))
 
 
-;;; Actual population and evolution of resolution.
+;;; Generation of the initial population.
 (defgeneric populate (conflicted &key strategies &allow-other-keys)
   (:documentation "Build a population from MERGED and UNSTABLE chunks.
 NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
@@ -130,6 +130,8 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
                                      (copy conflicted :evolve-files resolution))
                                    (cartesian resolutions)))))))
 
+
+;;; Evolution of a merge resolution.
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target
                        strings base-cost wrap max-wrap-diff &allow-other-keys)
