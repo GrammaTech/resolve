@@ -164,6 +164,7 @@ Extra keys are passed through to EVOLVE.")
           (*pareto-comparison-set-size* (max 1 (round
                                                 (/ (or *max-population-size* 0)
                                                    10))))
+          (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
           (*fitness-evals* 0)
           (*fitness-scalar-fn* #'multi-objective-scalar)
           (*fitness-predicate* #'<))
@@ -182,8 +183,7 @@ Extra keys are passed through to EVOLVE.")
       (when evolve?
         (note 2 "Evolve conflict resolution.")
         (eval `(evolve ,test
-                       :filter [#'not {every {equalp most-positive-fixnum}}
-                                #'fitness]
+                       :filter [#'not {funcall *worst-fitness-p*}]
                        :max-time max-time :max-evals max-evals)))
 
       (extremum *population* #'fitness-better-p :key #'fitness))))
