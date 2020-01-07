@@ -7,6 +7,7 @@
         :curry-compose-reader-macros
         :iterate
         :bordeaux-threads
+        :metabang-bind
         :uiop
         :software-evolution-library
         :software-evolution-library/utility
@@ -152,6 +153,91 @@ option."))
                                        (nest (aget :conflict-resolution-length)
                                              (ast-aux-data)
                                              (car prior-resolution)))))))))))
+
+
+;;; Auto-merge crossover implementation.
+(defmethod crossover ((a parseable) (b parseable))
+  "Crossover two parseable software objects.  This implementation
+performs a 2-pt, homologous crossover of 'top-level' ASTs in A and B.
+
+As an example, consider the following software objects:
+
+   A       B
+-------+--------
+foo()  | foo()
+bar()  | bar()
+my1 () | yours1()
+baz()  | baz()
+my2 () | yours2()
+bag()  | bag()
+
+A 2-pt homologous crossover in this situation may be the following:
+foo()       <- From A (1)
+bar()       <- From A (1)
+my1()       <- From A (1)
+baz()       <- From A (1)
+yours2()    <- From B (2)
+bag()       <- From A (3)
+
+In this case we, took foo(), bar(), my1(), and baz() from A,
+yours2() from B, and baz() again from A.  In other words,
+yours2() was crossed over from the genome of B into A."
+  (multiple-value-bind (a-begin a-end b-begin b-end)
+      (select-crossover-points a b)
+    (if (and a-begin a-end b-begin b-end)
+        (let ((a-children (ast-children (ast-root a)))
+              (b-children (ast-children (ast-root b))))
+          (nest (copy a :ast-root)
+                (copy (ast-root a) :children)
+                (append (subseq a-children 0 a-begin)     ;; (1)
+                        (subseq b-children b-begin b-end) ;; (2)
+                        (subseq a-children a-end))))      ;; (3)
+        (copy a))))
+
+(defmethod crossover ((a clang-base) (b clang-base))
+  "Redefinition of crossover for clang software objects to utilize the
+auto-merge crossover."
+  (call-next-method))
+
+(defmethod select-crossover-points ((a parseable) (b parseable))
+  "Select 2-pt homologous crossover points in A and B.  Four indices,
+A-BEGIN, A-END, B-BEGIN, and B-END will be returned; the crossover product
+will contain the top-level children of A from 0 to A-END, the top-level
+children of B from B-BEGIN to B-END, and the remaining top-level ASTs
+of A from A-END. If no suitable points are found, return nil."
+  ;; Because we know A and B are software objects representing the same
+  ;; underlying source code with the only differences due to resolution
+  ;; of conflict ASTs, we can assume the selection of any two non-conflict
+  ;; homologous points at the top-level of A and B will result in a
+  ;; reasonable crossover.
+  (let ((ast-pool (iter (for ast in (nest (remove-if [{aget :conflict-ast}
+                                                      #'ast-aux-data])
+                                          (get-immediate-children a)
+                                          (ast-root a)))
+                        (when (find ast (ast-children (ast-root b))
+                                    :test #'ast-equal-p)
+                          (collect ast)))))
+    ;; AST pool contains those ASTs at the top-level common to A and B.
+    (when (<= 2 (length ast-pool))
+      (bind ((a-children (ast-children (ast-root a)))
+             (b-children (ast-children (ast-root b)))
+             ((:values begin end) (select-begin-and-end ast-pool)))
+        (values (position begin a-children :test #'ast-equal-p)
+                (position end a-children :test #'ast-equal-p)
+                (position begin b-children :test #'ast-equal-p)
+                (position end b-children :test #'ast-equal-p))))))
+
+(defmethod select-crossover-points ((a clang-base) (b clang-base))
+  "Redefinition of select-crossover-points for clang software objects to
+utlize the auto-merge crossover."
+  (call-next-method))
+
+(defun select-begin-and-end (pool)
+  "Return two ordered ASTs from POOL."
+  (let* ((ast1 (random-elt pool))
+         (ast2 (random-elt (remove ast1 pool))))
+    (values (if (ast-later-p ast2 ast1) ast1 ast2)
+            (if (ast-later-p ast2 ast1) ast2 ast1))))
 
 
 ;;; Generation of the initial population.
