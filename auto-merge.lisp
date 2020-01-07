@@ -354,23 +354,40 @@ Extra keys are passed through to EVOLVE.")
             (note 2 "Best fitness: ~a." (fitness best))))
 
       ;; Perform the evolutionary search
-      (when evolve?
-        (note 2 "Evolve conflict resolution.")
-        (handler-bind
-            ((no-mutation-targets
-              (lambda (c)
-                (declare (ignorable c))
-                (invoke-restart 'try-another-mutation)))
-             (mutate
-              (lambda (c)
-                (declare (ignorable c))
-                (invoke-restart 'try-another-mutation))))
-          (generational-evolve #'simple-reproduce
-                               {simple-evaluate test}
-                               #'lexicase-select
-                               :filter [#'not {funcall *worst-fitness-p*}]
-                               :max-time max-time
-                               :max-evals max-evals)))
+      (note 2 "Evolve conflict resolution.")
+      (note 2 "~16a ~16a ~a"
+            "Generations" "Evaluations" "Best-fitness")
+      (labels ((best ()
+                 (extremum *population* #'fitness-better-p :key #'fitness))
+               (periodic ()
+                 (note 2 "~16a ~16a ~a"
+                       *generations* *fitness-evals* (fitness (best)))))
+        (when evolve?
+          (handler-bind
+              ((no-mutation-targets
+                (lambda (c)
+                  (declare (ignorable c))
+                  (invoke-restart 'try-another-mutation)))
+               (mutate
+                (lambda (c)
+                  (declare (ignorable c))
+                  (invoke-restart 'try-another-mutation))))
+            (generational-evolve
+             #'simple-reproduce
+             {simple-evaluate test}
+             #'lexicase-select
+             :filter [#'not {funcall *worst-fitness-p*}]
+             :max-time max-time
+             :max-evals max-evals
+             :period 1
+             :period-fn #'periodic)))
 
-      ;; Return the best variant
-      (extremum *population* #'fitness-better-p :key #'fitness))))
+        ;; Print notes
+        (if (funcall *target-fitness-p* (best))
+            (progn
+              (periodic)
+              (note 2 "Merge resolution found."))
+            (note 2 "Evolution complete, returning best variant."))
+
+        ;; Return the best variant
+        (best)))))
