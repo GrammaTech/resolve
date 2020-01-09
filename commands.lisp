@@ -59,6 +59,7 @@
         :software-evolution-library/components/test-suite)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
+  (:import-from :spinneret :with-html)
   (:import-from :cl-ppcre :scan)
   (:import-from :split-sequence :split-sequence)
   (:import-from :uiop :nest)
@@ -395,14 +396,42 @@ command-line options processed by the returned function."
                            ast-diff-params)
         (error (e) (http-condition 500 "Error: ~a" e))))))
 
+(defroute diff (:post :application/json)
+  (with-output-to-string (*standard-output*)
+    (rest-diff :json t)))
+
 (defroute diff (:post :text/plain)
   (with-output-to-string (*standard-output*)
     (rest-diff)
     (format t "~&")))                  ; Ensure we end with a newline.
 
-(defroute diff (:post :application/json)
-  (with-output-to-string (*standard-output*)
-    (rest-diff :json t)))
+(defroute diff (:post :text/html)
+  (let ((*print-pretty* t)
+        (json (with-output-to-string (*standard-output*)
+                (rest-diff :json t))))
+    (with-output-to-string (*standard-output*)
+      ;; HTML Header, CSS, and JavaScript to handle display.
+      (with-html
+          (:doctype)
+        (:html (:head (:title "AST-Diff")
+                      (:script :type "text/json" json)
+                      (:script :type "text/javascript"
+                               :src "/javascript/ast-diff.js"))
+               (:body (:div :id "diff")))))))
+
+(define-constant +javascript-directory+
+    (append (pathname-directory
+             #.(or *compile-file-truename*
+                   *load-truename*
+                   *default-pathname-defaults*))
+            (list "js"))
+  :test #'equalp
+  :documentation "Path to directory holding javascript files.")
+
+(defroute javascript (:get :text/javascript filename)
+  (file-to-string (make-pathname :name (string-downcase (symbol-name filename))
+                                 :type "js"
+                                 :directory +javascript-directory+)))
 
 (define-command ast-merge (my-file old-file your-file
                                    &spec +ast-merge-command-line-options+)
