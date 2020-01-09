@@ -1,1 +1,4 @@
 body {}
+span.same {}
+span.delete{ background:pink;}
+span.insert{ background:lightgreen;}

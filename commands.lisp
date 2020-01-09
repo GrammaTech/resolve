@@ -320,7 +320,8 @@ command-line options processed by the returned function."
                softwares diff
                :print-asts print-asts
                :coherence coherence))
-             (json (println (encode-json-to-string diff)))
+             (json (println (encode-json-to-string
+                             (mapcar «list #'car #'cdr» diff))))
              (t
               (if (zerop unified)
                   (print-diff diff :no-color no-color)
@@ -429,7 +430,7 @@ command-line options processed by the returned function."
               (:title "AST-Diff")
               (:script :id "diff" :type "text/json" json)
               (:script :type "text/javascript" :src "/javascript/ast-diff.js")
-              (:script :type "text/css" :src "/css/ast-diff.css"))
+              (:link :rel "stylesheet" :href "/css/ast-diff.css"))
              (:body :onload "renderDiff()" (:pre (:code :id "page")))))))
 
 (defroute show (:get :text/html hash)
