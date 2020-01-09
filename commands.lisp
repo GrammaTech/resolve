@@ -416,7 +416,6 @@ command-line options processed by the returned function."
     (rest-diff :json t)))
 
 (defroute diff (:post :text/plain)
-  ;; Handle direct text printing and HTML link printing separately.
   (with-output-to-string (*standard-output*)
     (rest-diff)
     (format t "~&")))
@@ -426,11 +425,12 @@ command-line options processed by the returned function."
     ;; HTML Header, CSS, and JavaScript to handle display.
     (with-html
         (:doctype)
-      (:html (:head (:title "AST-Diff")
-                    (:script :type "text/json" json)
-                    (:script :type "text/javascript"
-                             :src "/javascript/ast-diff.js"))
-             (:body (:div :id "diff"))))))
+      (:html (:head
+              (:title "AST-Diff")
+              (:script :id "diff" :type "text/json" json)
+              (:script :type "text/javascript" :src "/javascript/ast-diff.js")
+              (:script :type "text/css" :src "/css/ast-diff.css"))
+             (:body :onload "renderDiff()" (:pre (:code :id "page")))))))
 
 (defroute show (:get :text/html hash)
   (render-json-diff-to-html (gethash (symbol-name hash) *json-diffs* "\"MISSING DIFF\"")))
@@ -438,10 +438,6 @@ command-line options processed by the returned function."
 (defroute diff (:post :text/html)
   (render-json-diff-to-html (with-output-to-string (*standard-output*)
                               (rest-diff :json t))))
-
-;;; TODO: Handle this "route"
-;;;       get favicon.ico "image/webp,*/*" "application/x-www-form-urlencoded"
-;;;       Can't define these paths with `defroute', maybe directly in clack?
 
 (define-constant +javascript-directory+
     (append (pathname-directory
@@ -456,6 +452,20 @@ command-line options processed by the returned function."
   (file-to-string (make-pathname :name (string-downcase (symbol-name filename))
                                  :type "js"
                                  :directory +javascript-directory+)))
+
+(define-constant +css-directory+
+    (append (pathname-directory
+             #.(or *compile-file-truename*
+                   *load-truename*
+                   *default-pathname-defaults*))
+            (list "css"))
+  :test #'equalp
+  :documentation "Path to directory holding css files.")
+
+(defroute css (:get :text/css filename)
+  (file-to-string (make-pathname :name (string-downcase (symbol-name filename))
+                                 :type "css"
+                                 :directory +css-directory+)))
 
 (define-command ast-merge (my-file old-file your-file
                                    &spec +ast-merge-command-line-options+)
