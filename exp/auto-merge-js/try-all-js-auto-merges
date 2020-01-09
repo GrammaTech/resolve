@@ -1,0 +1,315 @@
+#!/usr/bin/python3
+#
+# Script which reads lines of the format
+#   "benchmark base left right"
+# from STDIN or a file and attempts to execute auto-merge
+# on the given merge.
+
+import argparse
+import functools
+import multiprocessing
+import logging
+import os
+import subprocess
+import sys
+import tempfile
+
+from contextlib import contextmanager
+
+# Constants reflecting the categories of auto-merge resolutions
+NO_TESTS = 0
+SETUP_ERROR = 1
+AUTO_MERGE_ERROR = 2
+NO_CONFLICT = 3
+NO_RESOLUTION = 4
+NON_EVOLVED_RESOLUTION = 5
+EVOLVED_RESOLUTION = 6
+
+# Default command line args
+DEFAULT_CONFLICT_FILE = sys.stdin
+DEFAULT_NUM_THREADS = 1
+DEFAULT_OUT_DIR = os.getcwd()
+DEFAULT_EVOLVE = False
+DEFAULT_MAX_TIME = 21600
+DEFAULT_POP_SIZE = 1024
+DEFAULT_VERBOSITY = 2
+DEFAULT_LOG_LEVEL = 'INFO'
+
+def execute(command):
+    """
+    Execute COMMAND, logging and returning the output.
+    """
+    logging.debug('command: %s', command)
+
+    proc = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+    out  = proc.communicate()[0].decode('utf-8')
+    exit = proc.returncode
+
+    logging.debug('output: %s', out)
+    logging.debug('exit: %d', exit)
+
+    return out, exit
+
+@contextmanager
+def chdir(path):
+    """
+    Context manager for changing directories.
+    """
+    old_dir = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(old_dir)
+
+def parse_log_level(level):
+    """
+    Return the logging enumeration associated with the given LEVEL string.
+    """
+    level = level.upper()
+
+    if level == 'DEBUG':
+        return logging.DEBUG
+    elif level == 'INFO':
+        return logging.INFO
+    elif level == 'WARNING':
+        return logging.WARNING
+    elif level == 'ERROR':
+        return logging.ERROR
+    elif level == 'CRITICAL':
+        return logging.CRITICAL
+    else:
+        assert False, '%s is not a valid logging level' % level
+
+def checkout(project, commit, tmpdir):
+    """
+    Checkout PROJECT at the given commit to TMPDIR for use
+    with auto-merge.
+    """
+    commands = [['git', 'clone', project, tmpdir],
+                ['git', 'clean', '-fxd'],
+                ['git', 'reset', '--hard', commit],
+                ['timeout', '--signal', '9', '600', 'npm', 'install'],
+                ['timeout', '--signal', '9', '300', 'npm', 'test']]
+
+    with chdir(tmpdir):
+        for command in commands:
+            output, exit = execute(command)
+            if exit != 0:
+                break
+
+    return output, exit
+
+def get_merge_commit(project, left, right):
+    """
+    Return the merge commit in PROJECT corresponding to the given
+    hashes representing the branches involved in the merge.
+    """
+    return execute([(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                  'get-merge-commit.sh')),
+                    project,
+                    left,
+                    right])[0].strip()
+
+def try_js_auto_merge(benchmarks, outdir, line,
+                      evolve=DEFAULT_EVOLVE,
+                      max_time=DEFAULT_MAX_TIME,
+                      pop_size=DEFAULT_POP_SIZE,
+                      verbose=DEFAULT_VERBOSITY):
+    """
+    Read the given line in the format "project base left right"
+    where project is a git repository in BENCHMARKS and attempt to
+    perform an auto-merge on the conflict represented by the git
+    hashes BASE, LEFT, and RIGHT, saving the results to OUTDIR.
+
+    EVOLVE: Attempt to use evolution to resolve conflicts.
+    MAX_TIME: Maximum number of seconds to run the evolutionary loop.
+    POP_SIZE: Size of the evolution population.
+    VERBOSE: Verbosity level of auto-merge output
+    """
+    name, base, left, right = line.split()
+    project_path = os.path.realpath(os.path.join(benchmarks, name))
+
+    base = base[:8]
+    left = left[:8]
+    right = right[:8]
+    resolution = get_merge_commit(project_path, left, right)[:8]
+
+    logging.info('Processing: %s %s %s %s' %
+                 (name, base, left, right))
+
+    with tempfile.TemporaryDirectory() as tbase:
+        with tempfile.TemporaryDirectory() as tleft:
+            with tempfile.TemporaryDirectory() as tright:
+                with tempfile.TemporaryDirectory() as tresolution:
+                    # Checkout the git repository at the given commits
+                    # to temporary directories.
+                    checkout(project_path, base, tbase)
+                    checkout(project_path, left, tleft)
+                    checkout(project_path, right, tright)
+
+                    # Determine the result for this experiment instance.
+                    # Checkout the git repository at the resolution commit
+                    # and validate that the project can be installed
+                    # and tested properly.  If not, we cannot expect
+                    # auto-merge to find a result.  Otherwise,
+                    # execute auto-merge to attempt to find a result.
+                    out, exit = checkout(project_path, resolution, tresolution)
+                    if exit != 0:
+                        result = SETUP_ERROR
+                    elif ('Error: no test specified' in out):
+                        result = NO_TESTS
+                    else:
+                        # Execute auto-merge
+                        result_dir = os.path.join(outdir,
+                                                  '%s-%s-%s-%s' %
+                                                  (name, base,
+                                                   left, right))
+                        test_script = '%s ~a %s' % \
+                                      (os.path.join(os.path.dirname(
+                                                      os.path.realpath(
+                                                        __file__)),
+                                                    'test.sh'),
+                                       resolution)
+                        args = ['--evolve'] if evolve else []
+                        args = args + \
+                               ['--max-time',
+                                str(max_time),
+                                '--pop-size',
+                                str(pop_size),
+                                '--out-dir',
+                                result_dir,
+                                '--verbose',
+                                str(verbose),
+                                '--ignore-paths',
+                                'test/**/*,tests/**/*,__tests__/**/*',
+                                tleft,
+                                tbase,
+                                tright,
+                                test_script]
+
+                        out, exit = execute(['auto-merge'] + args)
+
+                        if (exit != 0):
+                            result = AUTO_MERGE_ERROR
+                        elif ('Merge resolution found.' in out and
+                              'Evolve conflict resolution.' in out):
+                            result = EVOLVED_RESOLUTION
+                        elif ('Merge resolution found.' in out):
+                            result = NON_EVOLVED_RESOLUTION
+                        elif ('No conflicts found.' in out):
+                            result = NO_CONFLICT
+                        else:
+                            result = NO_RESOLUTION
+
+                    # Log result
+                    log_postfix = '%s %s %s %s' % (name, base, left, right)
+                    if result == EVOLVED_RESOLUTION:
+                        logging.info('Evolved resolution: %s' % log_postfix)
+                    elif result == NON_EVOLVED_RESOLUTION:
+                        logging.info('Resolution found prior to evolution: %s' %
+                                     log_postfix)
+                    elif result == NO_TESTS:
+                        logging.info('No test suite: %s' % log_postfix)
+                    elif result == NO_CONFLICT:
+                        logging.info('No conflict found: %s' % log_postfix)
+                    elif result == NO_RESOLUTION:
+                        logging.info('No resolution found: %s' % log_postfix)
+                    elif result == SETUP_ERROR:
+                        logging.info('Error during setup: %s' % log_postfix)
+                    elif result == AUTO_MERGE_ERROR:
+                        logging.info('Error during auto-merge: %s' % log_postfix)
+
+                    return result
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Perform auto-merge experiments with JavaScript benchmarks'
+    )
+
+    parser.add_argument(
+        'benchmarks', type=str,
+        help='Base directory containing JavaScript benchmarks under test.'
+    )
+    parser.add_argument(
+        '--conflict-file', type=argparse.FileType('r'),
+        default=DEFAULT_CONFLICT_FILE,
+        help='File containing a list of conflicts to be merged.'
+    )
+    parser.add_argument(
+        '--num-threads', type=int, default=DEFAULT_NUM_THREADS,
+        help='Number of threads to utilize when performing the merges.'
+    )
+    parser.add_argument(
+        '--out-dir', type=str, default=DEFAULT_OUT_DIR,
+        help='Directory to place experiment results.'
+    )
+    parser.add_argument(
+        '--evolve', action='store_true',
+        help='Attempt to use evolution to resolve conflicts.'
+    )
+    parser.add_argument(
+        '--max-time', type=int, default=DEFAULT_MAX_TIME,
+        help='Maximum number of seconds to run the evolutionary loop.'
+    )
+    parser.add_argument(
+        '--pop-size', type=int, default=DEFAULT_POP_SIZE,
+        help='Size of the evolution population.'
+    )
+    parser.add_argument(
+        '--verbose', type=int, default=DEFAULT_VERBOSITY,
+        help='Verbosity argument to auto-merge.  ' +
+             'Use in coordination with DEBUG logging.'
+    )
+    parser.add_argument(
+        '--log-level', type=str, default=DEFAULT_LOG_LEVEL,
+        help='Level of logging include in output.  One of ' +
+             '[DEBUG,INFO,WARNING,ERROR,CRITICAL].'
+    )
+
+    # Parse arguments
+    args = parser.parse_args()
+    lines = args.conflict_file.read().splitlines()
+
+    # Ensure arguments are valid
+    assert os.path.exists(os.path.realpath(args.benchmarks)), \
+           '%s does not exist.' % args.benchmarks
+    assert os.path.exists(os.path.realpath(os.path.dirname(args.out_dir))), \
+           '%s does not exist.' % os.path.dirname(args.out_dir)
+    for line in lines:
+        assert len(line.split()) == 4, \
+               '%s does not follow the format "benchmark base left right"' % \
+               line
+        project = line.split()[0]
+        assert os.path.exists(os.path.join(args.benchmarks, project)), \
+               '%s does not exist.' % os.path.join(args.benchmarks, project)
+
+    # Setup logger
+    logging.basicConfig(
+        format='%(asctime)s %(levelname)s: %(message)s',
+        level=parse_log_level(args.log_level),
+    )
+
+    # Run auto-merge
+    p = multiprocessing.Pool(args.num_threads)
+    f = functools.partial(try_js_auto_merge,
+                          os.path.realpath(args.benchmarks),
+                          os.path.realpath(args.out_dir),
+                          evolve=args.evolve,
+                          max_time=args.max_time,
+                          pop_size=args.pop_size,
+                          verbose=args.verbose)
+    results = p.map(f, lines)
+
+    # Log totals
+    def num_results(enum):
+        return len([result for result in results if result == enum])
+    logging.info('Total no test suite: %d' % num_results(NO_TESTS))
+    logging.info('Total setup error: %d' % num_results(SETUP_ERROR))
+    logging.info('Total auto-merge error: %d' % num_results(AUTO_MERGE_ERROR))
+    logging.info('Total no conflict: %d' % num_results(NO_CONFLICT))
+    logging.info('Total no resolution found: %d' % num_results(NO_RESOLUTION))
+    logging.info('Total resolution found before evolution: %d' %
+                 (num_results(NON_EVOLVED_RESOLUTION)))
+    logging.info('Total resolution found during evolution: %d' %
+                 (num_results(EVOLVED_RESOLUTION)))
