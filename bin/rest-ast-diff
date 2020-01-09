@@ -9,6 +9,7 @@
 #   -p,--port PORT ----- port to contact (default: 5000)
 #   -a,--accept MIME --- mime type accepted (default: application/json)
 #   -l,--language LANG - set the language (default: none)
+#   -L,--link ---------- request a link back
 #
 # NOTE: If we find that at some point we want to release this utility,
 #       we should probably rewrite it as a simple C executable which
@@ -30,8 +31,9 @@ HOST=localhost
 PORT=5000
 ACCEPT=application/json
 LANGUAGE=
+LINK=
 
-eval set -- $(getopt -o hH:p:a:l: -l help,host:,port:,accept:,language: -- "$@" || help;)
+eval set -- $(getopt -o hH:p:a:l:L -l help,host:,port:,accept:,language:,link -- "$@" || help;)
 while [ $# -gt 0 ];do
     case $1 in
         -h|--help) help;;
@@ -39,6 +41,7 @@ while [ $# -gt 0 ];do
         -p|--port) PORT=$2; shift;;
         -a|--accept) ACCEPT=$2; shift;;
         -l|--language) LANGUAGE=", \"language\" : \"$2\""; shift;;
+        -L|--link) LINK=", \"link\" : \"YES\"";;
         (--) shift; break;;
         (-*) error "unrecognized option $1";;
         (*)  break;;
@@ -54,7 +57,7 @@ NEW_FILE=$2
 PAYLOAD="$(jq -n \
        --arg OLD "$(cat $OLD_FILE)" \
        --arg NEW "$(cat $NEW_FILE)" \
-       "{\"old-file\": \$OLD, \"new-file\": \$NEW ${LANGUAGE}}")"
+       "{\"old-file\": \$OLD, \"new-file\": \$NEW ${LANGUAGE} ${LINK}}")"
 
 curl -X POST \
      -H "Accept: application/json" \
