@@ -128,9 +128,8 @@ option."))
     (error (make-condition 'no-mutation-targets
              :obj obj :text "No resolved conflict asts to pick from"))))
 
-(defmethod build-op ((mutation new-conflict-resolution) software
+(defmethod build-op ((mutation new-conflict-resolution) (software t)
                      &aux (strategies '(:V1 :V2 :C1 :C2 :NN)))
-  (declare (ignorable software))
   (let* ((conflict-ast (targets mutation))
          (prior-resolution (remove-if-not [{eq conflict-ast}
                                            {aget :conflict-ast}

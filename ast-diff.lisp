@@ -169,8 +169,7 @@ wrapping and unwrapping to be considered.")
   (let ((c (ast-children ast)))
     (if c (reduce #'+ (ast-children ast) :key #'ast-cost) 1)))
 
-(defmethod ast-cost (ast)
-  (declare (ignorable ast))
+(defmethod ast-cost ((ast t))
   1)
 
 (defmethod ast-cost ((ast string))
@@ -1327,10 +1326,8 @@ during calls to MAP-EDIT-TREE.")
       (let ((source-text (ast-text (edit-tree-node-source node)))
             (target-text (ast-text (edit-tree-node-target node)))
             (per-line-prefix
-             (coerce (iter (for x in *map-edit-tree-ancestors*)
-                           (declare (ignorable x))
-                           (collect #\>)
-                           (collect #\>)) 'string)))
+             (make-string (* (length *max-edit-tree-ancestors*) 2)
+                          :initial-element #\>)))
         (terpri)
         (loop repeat 6 do (princ "----------"))
         (terpri)
@@ -2247,8 +2244,7 @@ a tail of diff-a, and a tail of diff-b.")
   (:method ((sym-a null) (sym-b null) o-a o-b)
     (error "Bad diff merge: ~A, ~A" o-a o-b))
 
-  (:method ((sym-a null) sym-b o-a o-b)
-    (declare (ignorable sym-b))
+  (:method ((sym-a null) (sym-b t) o-a o-b)
     (handle-conflict o-a o-b :leave-a t))
 
   ;; do not handle these for now
