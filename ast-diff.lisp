@@ -1326,7 +1326,7 @@ during calls to MAP-EDIT-TREE.")
       (let ((source-text (ast-text (edit-tree-node-source node)))
             (target-text (ast-text (edit-tree-node-target node)))
             (per-line-prefix
-             (make-string (* (length *max-edit-tree-ancestors*) 2)
+             (make-string (* (length *map-edit-tree-ancestors*) 2)
                           :initial-element #\>)))
         (terpri)
         (loop repeat 6 do (princ "----------"))
