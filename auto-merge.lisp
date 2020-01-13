@@ -16,19 +16,16 @@
         :software-evolution-library/components/test-suite
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
-        :software-evolution-library/software/parseable-project
         :software-evolution-library/software/project
         :software-evolution-library/software/source
         :software-evolution-library/software/clang
-        :software-evolution-library/software/javascript
-        :software-evolution-library/software/json
         :software-evolution-library/software/simple
         :resolve/core
         :resolve/ast-diff
         :resolve/alist
         :resolve/software/project
-        :resolve/software/parseable
-        :resolve/software/lisp)
+        :resolve/software/auto-mergeable
+        :resolve/software/parseable)
   (:shadowing-import-from
    :alexandria
    :appendf :ensure-list :featurep :emptyp
@@ -64,10 +61,19 @@
                              (asts conflicted))))
     conflicted))
 
-(defgeneric resolve-conflict-ast (strategy conflict)
+(defgeneric get-conflict-strategies (ast)
+  (:documentation "Return a list of strategies which may be utilized
+to resolve the conflict AST.")
+  (:method ((ast ast))
+    (if (null (ast-path ast))
+        '(:V1 :NN)
+        '(:V1 :V2 :C1 :C2 :NN))))
+
+(defgeneric resolve-conflict-ast (conflict &key strategy)
   (:documentation "Return a concrete resolution of CONFLICT AST
 using STRATEGY.")
-  (:method ((strategy symbol) (conflict ast)
+  (:method ((conflict ast)
+            &key (strategy (random-elt (get-conflict-strategies conflict)))
             &aux (options (conflict-ast-child-alist conflict)))
     (labels ((normalize (children)
                "Normalize CHILDREN by adding the conflict AST
@@ -97,187 +103,106 @@ using STRATEGY.")
         ;; 4. (NN) select the base version
         (:NN (normalize (aget :old options)))))))
 
-(defgeneric resolve-conflict (conflicted conflict strategy)
-  (:documentation
-   "Resolve CONFLICT in CONFLICTED with STRATEGY.
-Keyword argument FODDER may be used to provide a source of novel code.
-See the empirical study _On the Nature of Merge Conflicts: a Study of
-2,731 Open Source Java Projects Hosted by GitHub_ for the source of
-the strategies.")
-  (:method ((conflicted parseable) (conflict ast) (strategy symbol))
-    (replace-ast conflicted
-                 (ast-path conflict)
-                 (resolve-conflict-ast strategy conflict)
-                 :literal t)))
+(defgeneric resolve-conflict (conflicted conflict &key strategy)
+  (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
+  (:method ((conflicted parseable) (conflict conflict-ast)
+            &key (strategy (random-elt (get-conflict-strategies conflict))))
+    (apply-mutation conflicted
+                    (make-instance 'new-conflict-resolution
+                      :targets conflict
+                      :strategy strategy))))
 
 
 ;;; Mutations for the auto-merge evolutionary loop
 (define-mutation new-conflict-resolution (parseable-mutation)
-  ((targeter :initform #'find-resolved-conflict-ast))
+  ((targeter :initform #'find-resolved-conflict)
+   (strategy :initarg :strategy :reader strategy :initform nil))
   (:documentation "Replace a conflict AST resolution with an alternative
 option."))
 
-(defun find-resolved-conflict-ast (obj)
-  "Return a conflict AST previously resolved in OBJ."
-  (if-let ((conflict-asts (nest (remove-duplicates)
-                                (remove-if #'null)
-                                (mapcar [{aget :conflict-ast} #'ast-aux-data])
-                                (asts obj))))
-    (random-elt conflict-asts)
+(defun find-resolved-conflict (obj)
+  "Return a conflict previously resolved in OBJ."
+  (if-let ((conflicts (nest (remove-duplicates)
+                            (mapcar [{aget :conflict-ast} #'ast-aux-data])
+                            (get-resolved-conflicts obj))))
+    (random-elt conflicts)
     (error (make-condition 'no-mutation-targets
-             :obj obj :text "No resolved conflict asts to pick from"))))
+                           :obj obj :text "No resolved conflict asts to pick from."))))
 
-(defmethod build-op ((mutation new-conflict-resolution) (software t)
-                     &aux (strategies '(:V1 :V2 :C1 :C2 :NN)))
+(defmethod build-op ((mutation new-conflict-resolution) (software t))
+  "Return a list of parseable mutation operations to replace an existing
+conflict AST resolution with an alternative option."
   (let* ((conflict-ast (targets mutation))
-         (prior-resolution (remove-if-not [{eq conflict-ast}
-                                           {aget :conflict-ast}
-                                           #'ast-aux-data] (asts software)))
-         (new-resolution (resolve-conflict-ast (random-elt strategies)
-                                               conflict-ast))
+         (strategy (or (strategy mutation)
+                       (random-elt (get-conflict-strategies conflict-ast))))
+         (prior-resolution (or (remove-if-not [{eq conflict-ast}
+                                               {aget :conflict-ast}
+                                               #'ast-aux-data]
+                                              (ast-to-list (ast-root software)))
+                               (list conflict-ast)))
+         (new-resolution (resolve-conflict-ast conflict-ast
+                                               :strategy strategy))
          (conflict-path (ast-path (car prior-resolution)))
          (parent (get-ast software (butlast conflict-path))))
     ;; Replace the prior resolution children with the new resolution
-    `((:set (:stmt1 . ,parent)
-            (:literal1 .
-             ,(copy parent
-                    :children
-                    (append (subseq (ast-children parent)
-                                    0
-                                    (lastcar conflict-path))
-                            new-resolution
-                            (subseq (ast-children parent)
-                                    (+ (lastcar conflict-path)
-                                       (length prior-resolution))))))))))
-
-
-;;; Auto-merge crossover implementation.
-(defmethod crossover ((a parseable) (b parseable))
-  "Crossover two parseable software objects.  This implementation
-performs a 2-pt, homologous crossover of 'top-level' ASTs in A and B.
-
-As an example, consider the following software objects:
-
-   A       B
--------+--------
-foo()  | foo()
-bar()  | bar()
-my1 () | yours1()
-baz()  | baz()
-my2 () | yours2()
-bag()  | bag()
-
-A 2-pt homologous crossover in this situation may be the following:
-foo()       <- From A (1)
-bar()       <- From A (1)
-my1()       <- From A (1)
-baz()       <- From A (1)
-yours2()    <- From B (2)
-bag()       <- From A (3)
-
-In this case we, took foo(), bar(), my1(), and baz() from A,
-yours2() from B, and baz() again from A.  In other words,
-yours2() was crossed over from the genome of B into A."
-  (multiple-value-bind (a-begin a-end b-begin b-end)
-      (select-crossover-points a b)
-    (if (and a-begin a-end b-begin b-end)
-        (let ((a-children (ast-children (ast-root a)))
-              (b-children (ast-children (ast-root b))))
-          (nest (copy a :ast-root)
-                (copy (ast-root a) :children)
-                (append (subseq a-children 0 a-begin)     ;; (1)
-                        (subseq b-children b-begin b-end) ;; (2)
-                        (subseq a-children a-end))))      ;; (3)
-        (copy a))))
-
-(defmethod crossover ((a clang-base) (b clang-base))
-  "Redefinition of crossover for clang software objects to utilize the
-auto-merge crossover."
-  (call-next-method))
-
-(defmethod select-crossover-points ((a parseable) (b parseable))
-  "Select 2-pt homologous crossover points in A and B.  Four indices,
-A-BEGIN, A-END, B-BEGIN, and B-END will be returned; the crossover product
-will contain the top-level children of A from 0 to A-END, the top-level
-children of B from B-BEGIN to B-END, and the remaining top-level ASTs
-of A from A-END. If no suitable points are found, return nil."
-  ;; Because we know A and B are software objects representing the same
-  ;; underlying source code with the only differences due to resolution
-  ;; of conflict ASTs, we can assume the selection of any two non-conflict
-  ;; homologous points at the top-level of A and B will result in a
-  ;; reasonable crossover.
-  (let ((ast-pool (iter (for ast in (nest (remove-if [{aget :conflict-ast}
-                                                      #'ast-aux-data])
-                                          (get-immediate-children a)
-                                          (ast-root a)))
-                        (when (find ast (ast-children (ast-root b))
-                                    :test #'ast-equal-p)
-                          (collect ast)))))
-    ;; AST pool contains those ASTs at the top-level common to A and B.
-    (when (<= 2 (length ast-pool))
-      (bind ((a-children (ast-children (ast-root a)))
-             (b-children (ast-children (ast-root b)))
-             ((:values begin end) (select-begin-and-end ast-pool)))
-        (values (position begin a-children :test #'ast-equal-p)
-                (position end a-children :test #'ast-equal-p)
-                (position begin b-children :test #'ast-equal-p)
-                (position end b-children :test #'ast-equal-p))))))
-
-(defmethod select-crossover-points ((a clang-base) (b clang-base))
-  "Redefinition of select-crossover-points for clang software objects to
-utlize the auto-merge crossover."
-  (call-next-method))
-
-(defun select-begin-and-end (pool)
-  "Return two ordered ASTs from POOL."
-  (let* ((ast1 (random-elt pool))
-         (ast2 (random-elt (remove ast1 pool))))
-    (values (if (ast-later-p ast2 ast1) ast1 ast2)
-            (if (ast-later-p ast2 ast1) ast2 ast1))))
+    (if (null conflict-path)
+        `((:set (:stmt1 . ,conflict-path)
+                (:literal1 . ,(car new-resolution))))
+        `((:set (:stmt1 . ,parent)
+                (:literal1 .
+                           ,(copy parent :children
+                                  (append (subseq (ast-children parent)
+                                                  0
+                                                  (lastcar conflict-path))
+                                          new-resolution
+                                          (subseq (ast-children parent)
+                                                  (+ (lastcar conflict-path)
+                                                     (length prior-resolution)))))))))))
 
 
 ;;; Generation of the initial population.
-(defgeneric populate (conflicted &key strategies &allow-other-keys)
-  (:documentation "Build a population from MERGED and UNSTABLE chunks.
-NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
-  (:method ((conflicted parseable)
-            &key (strategies `(:V1 :V2 :C1 :C2 :NN))
+(defgeneric populate (conflicted)
+  (:documentation "Return a population suitable for evolution from MERGED
+and UNSTABLE chunks in CONFLICTED.  The number of software objects
+returned is limited by the *MAX-POPULATION-SIZE* global variable.")
+  (:method ((conflicted auto-mergeable-parseable)
             &aux (pop (list (copy conflicted)))
               (pop-size (or *max-population-size* (expt 2 10))))
     ;; Initially population is just a list of the base object.
-    (let ((chunks (remove-if-not #'conflict-ast-p (asts conflicted))))
+    (let* ((chunks (get-conflicts conflicted))
+           (num-solutions (reduce #'* chunks
+                                  :key [#'length #'get-conflict-strategies])))
       (assert chunks (chunks) "Software ~S must have conflict ASTs" conflicted)
       ;; Create all conflict resolution variants if the total number
       ;; is less than POP-SIZE.  Otherwise, create a random sample.
-      (if (< (expt (length strategies) (length chunks)) pop-size)
+      (if (< num-solutions pop-size)
           (mapc (lambda (chunk)
                   (setf pop
                         (mappend
                          (lambda (variant)
                            (mapcar
                             (lambda (strategy)
-                              (resolve-conflict (copy variant) chunk strategy))
-                            strategies))
+                              (resolve-conflict (copy variant) chunk
+                                                :strategy strategy))
+                            (get-conflict-strategies chunk)))
                          pop)))
                 (reverse chunks))
           (progn
             (warn "Randomly sampling ~d possible resolutions from ~
-                   ~d possibilities."
-                  pop-size (expt (length strategies) (length chunks)))
+                   ~d possibilities." pop-size num-solutions)
             (setf pop
                   (iter (for i below pop-size)
                         (collect
                           (reduce (lambda (variant chunk)
-                                    (resolve-conflict (copy variant) chunk
-                                                      (random-elt strategies)))
+                                    (resolve-conflict (copy variant) chunk))
                                   (reverse chunks)
                                   :initial-value (copy conflicted))))))))
     pop)
-  (:method ((conflicted parseable-project) &rest rest
+  (:method ((conflicted auto-mergeable-project)
             &aux (pop-size (or *max-population-size* (expt 2 10))))
     (iter (for (file . obj) in (evolve-files conflicted))
-          (collect (if (some #'conflict-ast-p (asts obj))
-                       (mapcar {cons file} (apply #'populate obj rest))
+          (collect (if (get-conflicts obj)
+                       (mapcar {cons file} (populate obj))
                        (list (cons file (copy obj)))) into resolutions)
           (finally
             ;; Return all conflict resolution variants if the total number
@@ -345,8 +270,7 @@ Extra keys are passed through to EVOLVE.")
           (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
           (*fitness-evals* 0)
           (*fitness-predicate* #'<)
-          (*parseable-mutation-types* '((new-conflict-resolution . 1)))
-          (*clang-mutation-types* '((new-conflict-resolution . 1))))
+          (*parseable-mutation-types* '((new-conflict-resolution . 1))))
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Evaluate ~d population members." (length *population*))

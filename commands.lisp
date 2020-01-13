@@ -38,6 +38,7 @@
         :resolve/core
         :resolve/ast-diff
         :resolve/auto-merge
+        :resolve/software/auto-mergeable
         :resolve/software/parseable
         :resolve/software/project
         :resolve/software/lisp
@@ -573,9 +574,12 @@ command-line options processed by the returned function."
         num-tests (resolve-num-tests-from-num-tests num-tests)
         tests (create-test-suite test-script num-tests))
   (to-file (apply #'resolve
-                  (expand-options-for-which-files language "MY")
-                  (expand-options-for-which-files language "OLD")
-                  (expand-options-for-which-files language "YOUR")
+                  (create-auto-mergeable
+                   (expand-options-for-which-files language "MY"))
+                  (create-auto-mergeable
+                   (expand-options-for-which-files language "OLD"))
+                  (create-auto-mergeable
+                   (expand-options-for-which-files language "YOUR"))
                   {auto-merge-test _ tests}
                   :num-threads num-threads
                   :strings strings

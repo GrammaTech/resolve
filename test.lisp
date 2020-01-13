@@ -28,6 +28,7 @@
         :resolve/alist
         :resolve/auto-merge
         :resolve/software/project
+        :resolve/software/auto-mergeable
         :resolve/software/parseable
         :resolve/software/lisp)
   (:shadowing-import-from :uiop :getenv :quit :parameter-error)
@@ -100,6 +101,18 @@
     (append +etc-dir+ (list "gcd-project-auto-merge"))
   :test #'equalp
   :documentation "Path to the directory holding the GCD auto-merge test data.")
+
+(define-constant +gcd-auto-merge-project-insert-file-dir+
+    (append +etc-dir+ (list "gcd-project-insert-file-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the GCD auto-merge test data,
+including a file insertion.")
+
+(define-constant +gcd-auto-merge-project-delete-file-dir+
+    (append +etc-dir+ (list "gcd-project-delete-file-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the GCD auto-merge test data,
+including a file deletion.")
 
 (defvar *binary-search* nil "Holds the binary_search software object.")
 (defvar *forms*         nil "Forms used in tests.")
@@ -210,20 +223,23 @@
 (defixture auto-merge-gcd-single-file
   (:setup
    (setf *my*
-         (from-file (make-instance 'new-clang)
-                    (make-pathname
-                     :name "gcd-1" :type "c"
-                     :directory +gcd-auto-merge-single-file-dir+))
+         (nest (create-auto-mergeable)
+               (from-file (make-instance 'new-clang)
+                          (make-pathname
+                           :name "gcd-1" :type "c"
+                           :directory +gcd-auto-merge-single-file-dir+)))
          *old*
-         (from-file (make-instance 'new-clang)
-                    (make-pathname
-                     :name "gcd-2" :type "c"
-                     :directory +gcd-auto-merge-single-file-dir+))
+         (nest (create-auto-mergeable)
+               (from-file (make-instance 'new-clang)
+                          (make-pathname
+                           :name "gcd-2" :type "c"
+                           :directory +gcd-auto-merge-single-file-dir+)))
          *your*
-         (from-file (make-instance 'new-clang)
-                    (make-pathname
-                     :name "gcd-3" :type "c"
-                     :directory +gcd-auto-merge-single-file-dir+))
+         (nest (create-auto-mergeable)
+               (from-file (make-instance 'new-clang)
+                          (make-pathname
+                           :name "gcd-3" :type "c"
+                           :directory +gcd-auto-merge-single-file-dir+)))
          *tests*
          (mapcar
           (lambda (test-num)
@@ -239,43 +255,52 @@
   (:teardown
    (setf *old* nil *my* nil *your* nil *tests* nil)))
 
+(defun setup-auto-merge-gcd-project (base-dir)
+  (flet ((load-and-parse (project-dir)
+           (with-temp-cwd-of (tmp) project-dir
+                             (let ((obj (nest (create-auto-mergeable)
+                                              (from-file
+                                               (make-instance 'clang-project
+                                                 :build-command "make"
+                                                 :ignore-paths (list #p"compile_commands.json")
+                                                 :artifacts '("gcd"))
+                                               tmp))))
+                               (asts obj)
+                               obj))))
+    (setf *my*
+          (load-and-parse
+           (make-pathname :directory (append base-dir (list "gcd-1"))))
+          *old*
+          (load-and-parse
+           (make-pathname :directory (append base-dir (list "gcd-2"))))
+          *your*
+          (load-and-parse
+           (make-pathname :directory (append base-dir (list "gcd-3"))))
+          *tests*
+          (mapcar
+           (lambda (test-num)
+             (make-instance 'test-case
+               :program-name
+               (namestring
+                (make-pathname :name "test" :type "sh" :directory base-dir))
+               :program-args (list :bin (write-to-string test-num))))
+           (iota 11)))))
+
 (defixture auto-merge-gcd-project
   (:setup
-   (flet ((load-and-parse (project-dir)
-            (with-temp-cwd-of (tmp) project-dir
-                              (let ((obj (from-file
-                                          (make-instance 'clang-project
-                                            :build-command "make"
-                                            :ignore-paths (list #p"compile_commands.json")
-                                            :artifacts '("gcd"))
-                                          tmp)))
-                                (asts obj)
-                                obj))))
-     (setf *my*
-           (load-and-parse
-            (make-pathname :directory
-                           (append +gcd-auto-merge-project-dir+
-                                   (list "gcd-1"))))
-           *old*
-           (load-and-parse
-            (make-pathname :directory
-                           (append +gcd-auto-merge-project-dir+
-                                   (list "gcd-2"))))
-           *your*
-           (load-and-parse
-            (make-pathname :directory
-                           (append +gcd-auto-merge-project-dir+
-                                   (list "gcd-3"))))
-           *tests*
-           (mapcar
-            (lambda (test-num)
-              (make-instance 'test-case
-                :program-name
-                (namestring
-                 (make-pathname :name "test" :type "sh"
-                                :directory +gcd-auto-merge-project-dir+))
-                :program-args (list :bin (write-to-string test-num))))
-            (iota 11)))))
+   (setup-auto-merge-gcd-project +gcd-auto-merge-project-dir+))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
+
+(defixture auto-merge-gcd-insert-file-project
+  (:setup
+   (setup-auto-merge-gcd-project +gcd-auto-merge-project-insert-file-dir+))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
+
+(defixture auto-merge-gcd-delete-file-project
+  (:setup
+   (setup-auto-merge-gcd-project +gcd-auto-merge-project-delete-file-dir+))
   (:teardown
    (setf *old* nil *my* nil *your* nil *tests* nil)))
 
@@ -1489,7 +1514,8 @@
    (with-fixture javascript-converge-conflict)
    (destructuring-bind (my old your)
        (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
-   (let* ((conflicted (converge my old your :conflict t))
+   (let* ((conflicted (nest (create-auto-mergeable)
+                            (converge my old your :conflict t)))
           (chunks (remove-if-not #'conflict-ast-p
                                  (ast-to-list (ast-root conflicted))))
           (*population* (populate conflicted))))
@@ -1533,6 +1559,18 @@
 
 (deftest (can-auto-merge-gcd-project-evolve :long-running) ()
   (with-fixture auto-merge-gcd-project
+    (with-warnings-as-notes 1
+      (let ((*max-population-size* 1))
+        (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
+
+(deftest (can-auto-merge-gcd-project-insert-file-evolve :long-running) ()
+  (with-fixture auto-merge-gcd-insert-file-project
+    (with-warnings-as-notes 1
+      (let ((*max-population-size* 1))
+        (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
+
+(deftest (can-auto-merge-gcd-project-delete-file-evolve :long-running) ()
+  (with-fixture auto-merge-gcd-delete-file-project
     (with-warnings-as-notes 1
       (let ((*max-population-size* 1))
         (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
