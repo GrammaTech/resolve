@@ -1050,7 +1050,6 @@ value that is used instead."
 (defun simple-genome-pack (unpacked-g)
   "Converts list of pairs into a SIMPLE genome"
   (mapcar (lambda (p)
-            (assert (stringp p))
             `((:code . ,p)))
           unpacked-g))
 
@@ -1959,7 +1958,7 @@ and replicating the others."
                        &rest keys &key &allow-other-keys)
   (let ((new-unpacked-genome
          (apply #'ast-patch* (simple-genome-unpack (genome original))
-                script :meld? t keys)))
+                script keys)))
     (let ((patched (copy original)))
       (setf (genome patched) (simple-genome-pack new-unpacked-genome))
       patched)))
