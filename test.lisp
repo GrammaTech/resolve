@@ -243,10 +243,12 @@
   (:setup
    (flet ((load-and-parse (project-dir)
             (with-temp-cwd-of (tmp) project-dir
-                              (let ((obj (from-file (make-instance 'clang-project
-                                                      :build-command "make"
-                                                      :artifacts '("gcd"))
-                                                    tmp)))
+                              (let ((obj (from-file
+                                          (make-instance 'clang-project
+                                            :build-command "make"
+                                            :ignore-paths (list #p"compile_commands.json")
+                                            :artifacts '("gcd"))
+                                          tmp)))
                                 (asts obj)
                                 obj))))
      (setf *my*
