@@ -55,8 +55,7 @@
         :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/json
-        :software-evolution-library/software/lisp
-        :software-evolution-library/components/test-suite)
+        :software-evolution-library/software/lisp)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
   (:import-from :spinneret :with-html)
@@ -532,24 +531,6 @@ command-line options processed by the returned function."
     (wait-on-manual manual)
     (exit-command ast-merge (if unstable 1 0) new-merged)))
 
-(defmethod test ((obj software) (tests test-suite))
-  "Determine the fitness of OBJ against TESTS."
-  (with-temp-file (bin)
-    (if (ignore-phenome-errors (phenome obj :bin bin))
-        (mapcar (lambda (test-case)
-                  (nth-value 2 (run-test bin test-case)))
-                (test-cases tests))
-        (make-list (length (test-cases tests))
-                   :initial-element most-positive-fixnum))))
-
-(defmethod test :around ((obj clang-project) (tests test-suite))
-  "Setup environment so the fitness of OBJ can be evaluated against TESTS."
-  ;; Bind *build-dir* so multiple builds can occur in a multi-threaded
-  ;; environment.
-  (with-temp-dir (dir)
-    (let ((*build-dir* dir))
-      (call-next-method))))
-
 (define-command auto-merge (my-file old-file your-file test-script
                                     &spec +auto-merge-command-line-options+
                                     &aux tests)
@@ -595,7 +576,7 @@ command-line options processed by the returned function."
                   (expand-options-for-which-files language "MY")
                   (expand-options-for-which-files language "OLD")
                   (expand-options-for-which-files language "YOUR")
-                  {test _ tests}
+                  {auto-merge-test _ tests}
                   :num-threads num-threads
                   :strings strings
                   :base-cost base-cost

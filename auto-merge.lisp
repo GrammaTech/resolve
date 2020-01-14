@@ -13,6 +13,7 @@
         :software-evolution-library/utility
         :software-evolution-library/command-line
         :software-evolution-library/components/lexicase
+        :software-evolution-library/components/test-suite
         :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
         :software-evolution-library/software/parseable-project
@@ -34,6 +35,7 @@
    :if-let :ensure-function :ensure-gethash :copy-file
    :parse-body :simple-style-warning)
   (:export :resolve
+           :auto-merge-test
            :populate
            :resolve-to
            :resolve-conflict))
@@ -294,6 +296,26 @@ NOTE: this is exponential in the number of conflict ASTs in CONFLICTED.")
                                              (mapcar (lambda (objs)
                                                        (random-elt objs))
                                                      resolutions))))))))))
+
+
+;;; Fitness testing
+(defmethod auto-merge-test ((obj software) (tests test-suite))
+  "Determine the fitness of OBJ against TESTS."
+  (with-temp-file (bin)
+    (if (ignore-phenome-errors (phenome obj :bin bin))
+        (mapcar (lambda (test-case)
+                  (nth-value 2 (run-test bin test-case)))
+                (test-cases tests))
+        (make-list (length (test-cases tests))
+                   :initial-element most-positive-fixnum))))
+
+(defmethod auto-merge-test :around ((obj project) (tests test-suite))
+  "Setup environment so the fitness of OBJ can be evaluated against TESTS."
+  ;; Bind *build-dir* so multiple builds can occur in a multi-threaded
+  ;; environment.
+  (with-temp-dir (dir)
+    (let ((*build-dir* dir))
+      (call-next-method))))
 
 
 ;;; Evolution of a merge resolution.
