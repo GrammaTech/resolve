@@ -81,7 +81,12 @@ using STRATEGY.")
                                       (list (cons :conflict-ast conflict)
                                             (cons :conflict-resolution-length
                                                   (length children))))
-                                 child))
+                                 (make-raw-ast
+                                  :children (list child)
+                                  :aux-data
+                                  (list (cons :conflict-ast conflict)
+                                        (cons :conflict-resolution-length
+                                              (length children))))))
                            children)
                    (list (nest (make-raw-ast :aux-data)
                                (list (cons :conflict-ast conflict)
