@@ -83,11 +83,10 @@ using STRATEGY.")
                                                   (length children))))
                                  child))
                            children)
-                   (list (to-ast 'clang
-                                 `(:nullstmt :aux-data
-                                   ,(list (cons :conflict-ast conflict)
-                                          (cons :conflict-resolution-length
-                                                (length children)))))))))
+                   (list (nest (make-raw-ast :aux-data)
+                               (list (cons :conflict-ast conflict)
+                                     (cons :conflict-resolution-length
+                                           (length children))))))))
       ;; Five ways of resolving a conflict:
       (case strategy
         ;; 1. (V1) version 1
