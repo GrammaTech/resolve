@@ -392,7 +392,6 @@ Extra keys are passed through to EVOLVE.")
              #'simple-reproduce
              {simple-evaluate test}
              #'lexicase-select
-             :filter [#'not {funcall *worst-fitness-p*}]
              :max-time max-time
              :max-evals max-evals
              :period 1
