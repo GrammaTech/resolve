@@ -28,7 +28,7 @@ response=$(curl -s \
                 http://localhost:${port}/diff \
                 --data "{\"old-file\" : \"$left\", \"new-file\" : \"$right\"}")
 
-echo "${response}"|grep "^{.*}$"
+echo "${response}"|grep "^\[.*\]$"
 EXIT=$?
 
 kill -SIGINT ${server_pid}
