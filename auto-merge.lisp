@@ -64,8 +64,8 @@
 (defgeneric get-conflict-strategies (ast)
   (:documentation "Return a list of strategies which may be utilized
 to resolve the conflict AST.")
-  (:method ((ast ast))
-    (if (null (ast-path ast))
+  (:method ((ast conflict-ast))
+    (if (aget :top-level (ast-aux-data ast))
         '(:V1 :NN)
         '(:V1 :V2 :C1 :C2 :NN))))
 
@@ -105,7 +105,7 @@ using STRATEGY.")
 
 (defgeneric resolve-conflict (conflicted conflict &key strategy)
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
-  (:method ((conflicted parseable) (conflict conflict-ast)
+  (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
     (apply-mutation conflicted
                     (make-instance 'new-conflict-resolution
@@ -120,16 +120,18 @@ using STRATEGY.")
   (:documentation "Replace a conflict AST resolution with an alternative
 option."))
 
-(defun find-resolved-conflict (obj)
-  "Return a conflict previously resolved in OBJ."
-  (if-let ((conflicts (nest (remove-duplicates)
-                            (mapcar [{aget :conflict-ast} #'ast-aux-data])
-                            (get-resolved-conflicts obj))))
-    (random-elt conflicts)
-    (error (make-condition 'no-mutation-targets
-                           :obj obj :text "No resolved conflict asts to pick from."))))
+(defgeneric find-resolved-conflict (obj)
+  (:documentation "Return a conflict previously resolved in OBJ.")
+  (:method ((obj auto-mergeable))
+    (if-let ((conflicts (nest (remove-duplicates)
+                              (mapcar [{aget :conflict-ast} #'ast-aux-data])
+                              (get-resolved-conflicts obj))))
+      (random-elt conflicts)
+      (error (make-condition 'no-mutation-targets
+                             :obj obj :text "No resolved conflict asts to pick from.")))))
 
-(defmethod build-op ((mutation new-conflict-resolution) (software t))
+(defmethod build-op ((mutation new-conflict-resolution)
+                     (software auto-mergeable-parseable))
   "Return a list of parseable mutation operations to replace an existing
 conflict AST resolution with an alternative option."
   (let* ((conflict-ast (targets mutation))
@@ -159,13 +161,39 @@ conflict AST resolution with an alternative option."
                                                   (+ (lastcar conflict-path)
                                                      (length prior-resolution)))))))))))
 
+(defmethod apply-mutation ((software auto-mergeable-simple)
+                           (mutation new-conflict-resolution))
+  "Apply the NEW-CONFLICT-RESOLUTION mutation to SOFTWARE."
+  ;; Simple software objects are a more primitive representation and therefore,
+  ;; we need to override `apply-mutation` instead of `build-op`.
+  (let* ((conflict-ast (targets mutation))
+         (strategy (or (strategy mutation)
+                       (random-elt (get-conflict-strategies conflict-ast))))
+         (prior-resolution (or (remove-if-not «and [#'ast-p {aget :code}]
+                                                   [{eq conflict-ast}
+                                                    {aget :conflict-ast}
+                                                    #'ast-aux-data
+                                                    {aget :code}]»
+                                              (genome software))
+                               `(((:code . ,conflict-ast)))))
+         (new-resolution (mapcar [#'list {cons :code}]
+                                 (resolve-conflict-ast conflict-ast
+                                                       :strategy strategy)))
+         (index (search prior-resolution (genome software) :test #'equalp)))
+    (setf (genome software)
+          (append (subseq (genome software) 0 index)
+                  new-resolution
+                  (subseq (genome software)
+                          (+ index (length prior-resolution)))))
+    software))
+
 
 ;;; Generation of the initial population.
 (defgeneric populate (conflicted)
   (:documentation "Return a population suitable for evolution from MERGED
 and UNSTABLE chunks in CONFLICTED.  The number of software objects
 returned is limited by the *MAX-POPULATION-SIZE* global variable.")
-  (:method ((conflicted auto-mergeable-parseable)
+  (:method ((conflicted auto-mergeable)
             &aux (pop (list (copy conflicted)))
               (pop-size (or *max-population-size* (expt 2 10))))
     ;; Initially population is just a list of the base object.
@@ -270,7 +298,8 @@ Extra keys are passed through to EVOLVE.")
           (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
           (*fitness-evals* 0)
           (*fitness-predicate* #'<)
-          (*parseable-mutation-types* '((new-conflict-resolution . 1))))
+          (*parseable-mutation-types* '((new-conflict-resolution . 1)))
+          (*simple-mutation-types* '((new-conflict-resolution . 1))))
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Evaluate ~d population members." (length *population*))

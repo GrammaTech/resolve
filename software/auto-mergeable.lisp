@@ -3,6 +3,11 @@
 ;;;  This mixin allows us to define custom behavior for auto-merge
 ;;;  simple, parseable, and project representations.
 ;;;
+;;;  For simple representations, we define a custom 2-pt crossover
+;;;  to avoid breaking up existing conflict resolutions.  Further,
+;;;  we add support for handling ASTs (stubs and conflict ASTs)
+;;;  within the simple software object representation.
+;;;
 ;;;  For parseable representations, we define a custom 2-pt
 ;;;  crossover on top-level ASTs.  This bypasses the error-prone
 ;;;  clang crossover implementation and allows for exchange
@@ -194,6 +199,62 @@ AST stub root indicating they were deleted from the project."
         (delete-file path))
       (call-next-method)))
 
+(defmethod phenome ((obj auto-mergeable-simple) &key bin)
+  "Override phenome to write the simple text software object to disk
+at BIN."
+  (to-file obj bin)
+  (values bin 0 "" ""))
+
+(defmethod lines ((obj auto-mergeable-simple))
+  "Override lines to allow for conflict and stub ASTs to appear in the
+genome."
+  (nest (remove nil)
+        (mapcar (lambda (line)
+                  (if (ast-p line)
+                      (source-text line)
+                      line)))
+        (mapcar {aget :code} (genome obj))))
+
+(defmethod to-file ((obj auto-mergeable-simple) path)
+  "Override to-file to avoid writing to disk those objects with an
+AST stub root indicating they were deleted from the project."
+  (if (and (typep (aget :code (car (genome obj))) 'ast-stub)
+           (emptyp (genome-string obj)))
+      (when (probe-file path)
+        (delete-file path))
+      (call-next-method)))
+
+(defmethod crossover ((a auto-mergeable-simple) (b auto-mergeable-simple))
+  "Crossover two simple software objects.  This implementation
+performs a 2-pt, homologous crossover of lines in A and B, as described
+above in the `auto-mergeable-parseable` implementation.  We assume A
+and B are identical with the exception of conflicts, and we take
+care to avoid splitting existing conflict resolutions which would interfere
+with the auto-merge evolutionary loop."
+  (labels ((non-conflict-indices (obj)
+             "Return a list of integer indices into the genome of OBJ which
+             are non-conflict points."
+             (nest (mapcar #'car)
+                   (remove-if [#'ast-p {aget :code} #'cadr])
+                   (indexed (genome obj)))))
+    (let ((pool (iter (for a-index in (non-conflict-indices a))
+                      (for b-index in (non-conflict-indices b))
+                      (collect (list (cons :a-index a-index)
+                                     (cons :b-index b-index))))))
+      (if (<= 2 (length pool))
+          (let ((points (sort (list (random-elt pool) (random-elt pool)) #'<
+                              :key {aget :a-index})))
+            (values (copy a :genome
+                          (append (subseq (genome a) 0
+                                          (aget :a-index (first points)))
+                                  (subseq (genome b)
+                                          (aget :b-index (first points))
+                                          (aget :b-index (second points)))
+                                  (subseq (genome a)
+                                          (aget :a-index (second points)))))
+                    points))
+          (values (copy a) nil)))))
+
 (defmethod pick-file ((obj auto-mergeable-project))
   "Randomly pick one evolve file proportionally based on the number
 of conflict ASTs."
@@ -207,6 +268,9 @@ of conflict ASTs."
 (defgeneric get-conflicts (obj)
   (:documentation "Return the conflicts in OBJ.")
   (:method ((obj t)) nil)
+  (:method ((obj auto-mergeable-simple))
+    (remove-if-not #'conflict-ast-p
+                   (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not #'conflict-ast-p
                    (ast-to-list (ast-root obj)))))
@@ -214,9 +278,13 @@ of conflict ASTs."
 (defgeneric get-resolved-conflicts (obj)
   (:documentation "Return the resolved conflicts in OBJ.")
   (:method ((obj t)) nil)
+  (:method ((obj auto-mergeable-simple))
+    (remove-if-not «and #'ast-p [{aget :conflict-ast} #'ast-aux-data]»
+                   (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not [{aget :conflict-ast} #'ast-aux-data]
                    (ast-to-list (ast-root obj)))))
+
 
 ;;; AST diff interface overrides
 (defmethod ast-patch* ((project auto-mergeable-project) (diff t)
@@ -234,19 +302,13 @@ evolutionary loop."
                 (let ((diff-type (car single-diff))
                       (file (cadr single-diff))
                       (obj (cddr single-diff)))
-                  (cond ((and (eq :insert-alist diff-type)
-                              (typep obj 'parseable))
+                  (cond ((eq :insert-alist diff-type)
                          (areplace file
-                                   (nest (copy obj :ast-root)
-                                         (make-conflict-ast :child-alist)
-                                         (list (list :my (ast-root obj))))
+                                   (create-top-level-conflict obj :my)
                                    patch-files))
-                        ((and (eq :delete-alist diff-type)
-                              (typep obj 'parseable))
+                        ((eq :delete-alist diff-type)
                          (areplace file
-                                   (nest (copy obj :ast-root)
-                                         (make-conflict-ast :child-alist)
-                                         (list (list :old (ast-root obj))))
+                                   (create-top-level-conflict obj :old)
                                    patch-files))
                         (t patch-files))))
               (cadr diff)
@@ -276,3 +338,18 @@ evolutionary loop."
     (copy project
           :evolve-files (evolve-files)
           :other-files (other-files))))
+
+(defgeneric create-top-level-conflict (obj conflict-child)
+  (:documentation "Create a conflict AST at the 'top-level' of OBJ representing
+an insertion or deletion of the OBJ.")
+  (:method ((obj auto-mergeable-simple) (conflict-child symbol))
+    (nest (copy obj :genome)
+          (list)
+          (list)
+          (cons :code)
+          (make-conflict-ast :aux-data (list (cons :top-level t)) :child-alist)
+          (list (cons conflict-child (mapcar {aget :code} (genome obj))))))
+  (:method ((obj auto-mergeable-parseable) (conflict-child symbol))
+    (nest (copy obj :ast-root)
+          (make-conflict-ast :aux-data (list (cons :top-level t)) :child-alist)
+          (list (list conflict-child (ast-root obj))))))

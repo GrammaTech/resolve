@@ -19,6 +19,7 @@
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/new-clang
         :software-evolution-library/software/javascript
+        :software-evolution-library/software/javascript-project
         :software-evolution-library/software/json
         :software-evolution-library/software/simple
         :software-evolution-library/components/formatting
@@ -112,6 +113,28 @@ including a file insertion.")
     (append +etc-dir+ (list "gcd-project-delete-file-auto-merge"))
   :test #'equalp
   :documentation "Path to the directory holding the GCD auto-merge test data,
+including a file deletion.")
+
+(define-constant +text-auto-merge-single-file-dir+
+    (append +etc-dir+ (list "text-single-file-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the text auto-merge test data.")
+
+(define-constant +text-auto-merge-project-dir+
+    (append +etc-dir+ (list "text-project-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the text auto-merge test data.")
+
+(define-constant +text-auto-merge-project-insert-file-dir+
+    (append +etc-dir+ (list "text-project-insert-file-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the text auto-merge test data,
+including a file insertion.")
+
+(define-constant +text-auto-merge-project-delete-file-dir+
+    (append +etc-dir+ (list "text-project-delete-file-auto-merge"))
+  :test #'equalp
+  :documentation "Path to the directory holding the text auto-merge test data,
 including a file deletion.")
 
 (defvar *binary-search* nil "Holds the binary_search software object.")
@@ -301,6 +324,75 @@ including a file deletion.")
 (defixture auto-merge-gcd-delete-file-project
   (:setup
    (setup-auto-merge-gcd-project +gcd-auto-merge-project-delete-file-dir+))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
+
+(defixture auto-merge-text-single-file
+  (:setup
+   (setf *my*
+         (from-file (make-instance 'auto-mergeable-simple)
+                    (make-pathname
+                     :name "text1"
+                     :directory +text-auto-merge-single-file-dir+))
+         *old*
+         (from-file (make-instance 'auto-mergeable-simple)
+                    (make-pathname
+                     :name "text2"
+                     :directory +text-auto-merge-single-file-dir+))
+         *your*
+         (from-file (make-instance 'auto-mergeable-simple)
+                    (make-pathname
+                     :name "text3"
+                     :directory +text-auto-merge-single-file-dir+))
+         *tests*
+         (mapcar
+          (lambda (test-num)
+            (make-instance 'test-case
+              :program-name
+              (namestring
+               (make-pathname :name "test" :type "sh"
+                              :directory +text-auto-merge-single-file-dir+))
+              :program-args (list :bin (write-to-string test-num))))
+          (iota 3))))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
+
+(defun setup-auto-merge-text-project (base-dir)
+  (flet ((create-project (project-dir)
+           (nest (create-auto-mergeable)
+                 (from-file (make-instance 'javascript-project)
+                            project-dir))))
+    (setf *my*
+          (create-project (make-pathname :directory (append base-dir (list "text1"))))
+          *old*
+          (create-project (make-pathname :directory (append base-dir (list "text2"))))
+          *your*
+          (create-project (make-pathname :directory (append base-dir (list "text3"))))
+          *tests*
+          (mapcar
+           (lambda (test-num)
+             (make-instance 'test-case
+               :program-name
+               (namestring (make-pathname :name "test" :type "sh"
+                                          :directory base-dir))
+               :program-args (list :bin (write-to-string test-num))))
+           (iota 2)))))
+
+(defixture auto-merge-text-project
+  (:setup
+   (setup-auto-merge-text-project +text-auto-merge-project-dir+))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
+
+(defixture auto-merge-insert-file-text-project
+  (:setup
+   (setup-auto-merge-text-project +text-auto-merge-project-insert-file-dir+))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil *tests* nil)))
+
+(defixture auto-merge-delete-file-text-project
+  (:setup
+   (setup-auto-merge-text-project +text-auto-merge-project-delete-file-dir+))
   (:teardown
    (setf *old* nil *my* nil *your* nil *tests* nil)))
 
@@ -1539,7 +1631,7 @@ including a file deletion.")
           (*population* nil))
       (is (every #'zerop (fitness (resolve my old your #'fitness-test
                                            :base-cost 10
-                                           :num-threads 2
+                                           :num-threads 1
                                            :evolve? evolve?)))
           "auto-merge did not find a solution for the three-way GCD merge."))))
 
@@ -1571,6 +1663,38 @@ including a file deletion.")
 
 (deftest (can-auto-merge-gcd-project-delete-file-evolve :long-running) ()
   (with-fixture auto-merge-gcd-delete-file-project
+    (with-warnings-as-notes 1
+      (let ((*max-population-size* 1))
+        (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
+
+(deftest (can-auto-merge-text-single-file :long-running) ()
+  (with-fixture auto-merge-text-single-file
+    (run-auto-merge-test *my* *old* *your* *tests*)))
+
+(deftest (can-auto-merge-text-single-file-evolve :long-running) ()
+  (with-fixture auto-merge-text-single-file
+    (let ((*max-population-size* 1))
+      (run-auto-merge-test *my* *old* *your* *tests* :evolve? t))))
+
+(deftest (can-auto-merge-text-project :long-running) ()
+  (with-fixture auto-merge-text-project
+    (with-warnings-as-notes 1
+      (run-auto-merge-test *my* *old* *your* *tests*))))
+
+(deftest (can-auto-merge-text-project-evolve :long-running) ()
+  (with-fixture auto-merge-text-project
+    (with-warnings-as-notes 1
+      (let ((*max-population-size* 1))
+        (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
+
+(deftest (can-auto-merge-text-insert-file-project-evolve :long-running) ()
+  (with-fixture auto-merge-insert-file-text-project
+    (with-warnings-as-notes 1
+      (let ((*max-population-size* 1))
+        (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
+
+(deftest (can-auto-merge-text-delete-file-project-evolve :long-running) ()
+  (with-fixture auto-merge-delete-file-text-project
     (with-warnings-as-notes 1
       (let ((*max-population-size* 1))
         (run-auto-merge-test *my* *old* *your* *tests* :evolve? t)))))
