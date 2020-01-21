@@ -323,9 +323,6 @@ Extra keys are passed through to EVOLVE.")
             (note 2 "Best fitness: ~a." (fitness best))))
 
       ;; Perform the evolutionary search
-      (note 2 "Evolve conflict resolution.")
-      (note 2 "~16a ~16a ~a"
-            "Generations" "Evaluations" "Best-fitness")
       (labels ((best ()
                  (extremum *population* #'fitness-better-p :key #'fitness))
                (periodic ()
@@ -341,6 +338,9 @@ Extra keys are passed through to EVOLVE.")
                 (lambda (c)
                   (declare (ignorable c))
                   (invoke-restart 'try-another-mutation))))
+            (note 2 "Evolve conflict resolution.")
+            (note 2 "~16a ~16a ~a"
+                  "Generations" "Evaluations" "Best-fitness")
             (generational-evolve
              #'simple-reproduce
              {simple-evaluate test}
