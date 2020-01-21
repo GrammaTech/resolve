@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# Test we can auto-merge text file variants in the
+# evolutionary loop by creating a single conflict
+# resolution and repeatedly mutating it.
+
+. $(dirname $0)/common
+
+test_auto_merge $ETC_DIR/text-single-file-auto-merge \
+                text1 \
+                text2 \
+                text3 \
+                --num-tests 3 \
+                --pop-size 1 \
+                --evolve

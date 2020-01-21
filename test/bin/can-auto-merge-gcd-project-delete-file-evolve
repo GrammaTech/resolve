@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Test we can auto-merge the gcd project with a file deletion
+# in the evolutionary loop.
+
+. $(dirname $0)/common
+
+test_auto_merge $ETC_DIR/gcd-project-delete-file-auto-merge \
+                gcd-1 \
+                gcd-2 \
+                gcd-3 \
+                --num-tests 11 \
+                --num-threads 2 \
+                --build-command make \
+                --artifacts gcd \
+                --pop-size 1 \
+                --evolve

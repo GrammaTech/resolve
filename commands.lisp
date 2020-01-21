@@ -133,7 +133,9 @@
       (("num-tests") :type integer :optional t :initial-value 1
        :documentation "number of test cases to execute")
       (("base-cost") :type integer :initial-value 10
-       :documentation "Base edit operation cost"))))
+       :documentation "Base edit operation cost")
+      (("randomize") :type boolean :optional t
+       :documentation "Utilize a non-fixed random seed"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
@@ -566,7 +568,8 @@ command-line options processed by the returned function."
   (when help (show-help-for-ast-merge))
   (unless (every #'resolve-file (list old-file my-file your-file))
     (exit-command auto-merge 2 (error "Missing source.")))
-  (setf out-dir (or out-dir (resolve-out-dir-from-source old-file))
+  (setf *random-state* (if randomize (make-random-state t) *random-state*)
+        out-dir (or out-dir (resolve-out-dir-from-source old-file))
         old-file (truenamize old-file)
         my-file (truenamize my-file)
         your-file (truenamize your-file)

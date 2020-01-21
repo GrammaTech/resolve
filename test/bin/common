@@ -1,0 +1,89 @@
+#!/bin/bash
+
+SCRIPT="$0"
+ETC_DIR="$(readlink -f $(dirname $0)/../etc/)"
+help(){
+    local DESCRIPTION=$(cat "$SCRIPT" \
+        |sed '/^[^#]/q' \
+        |head -n -1 \
+        |tail -n +3 \
+        |sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' \
+        |cut -c3- \
+        |sed 's/^/  /')
+    echo "$DESCRIPTION"
+    echo "Options:"
+    echo "  -h,--help --------- Print this help output then exit"
+    echo "  -v,--verbose ------ Verbose mode with 'set -x' on script"
+    echo "  -k,--keep --------- Keep temporary files after execution"
+    echo "     --out-dir ------ Pass given out-dir to program under test"
+    echo ""
+    exit 0; }
+
+eval set -- $(getopt -o hvko: -l help,verbose,keep,out-dir: -- "$@" || help;)
+while [ $# -gt 0 ];do
+    case $1 in
+        -h|--help) help;;
+        -v|--verbose) set -x;;
+        -k|--keep) KEEP_TMP=YES;;
+        --out-dir) OUT_DIR=$(readlink -f $2); shift ;;
+        (--) shift; break;;
+        (-*) error "unrecognized option $1";;
+        (*)  break;;
+    esac
+    shift
+done
+
+# Execute an auto-merge test
+# $1 - Base directory containing MY, OLD, and YOUR variants to merge
+# $2 - MY variant
+# $3 - OLD variant
+# $4 - YOUR variant
+# $@ - Remaining arguments to pass thru to auto-merge
+test_auto_merge () {
+    BASE_DIR=$1
+    TMP_STDOUT=$(mktemp)
+
+    if [ -d $BASE_DIR/$2 ]; then
+        TMP_MY=$(mktemp -d)
+        TMP_OLD=$(mktemp -d)
+        TMP_YOUR=$(mktemp -d)
+        cp -pr $BASE_DIR/$2/* $TMP_MY/
+        cp -pr $BASE_DIR/$3/* $TMP_OLD/
+        cp -pr $BASE_DIR/$4/* $TMP_YOUR/
+    else
+        TMP_DIR=$(mktemp -d)
+        TMP_MY=$TMP_DIR/$2
+        TMP_OLD=$TMP_DIR/$3
+        TMP_YOUR=$TMP_DIR/$4
+        cp -p $BASE_DIR/$2 $TMP_MY
+        cp -p $BASE_DIR/$3 $TMP_OLD
+        cp -p $BASE_DIR/$4 $TMP_YOUR
+    fi
+
+    TEST_SCRIPT="$BASE_DIR/test.sh ~a ~d"
+    TMP_OUT_DIR=$(mktemp -d)
+    shift 4;
+
+    auto-merge $@ \
+               --out-dir ${OUT_DIR:-$TMP_OUT_DIR} \
+               --randomize \
+               $TMP_MY \
+               $TMP_OLD \
+               $TMP_YOUR \
+               "$TEST_SCRIPT" \
+               | tee $TMP_STDOUT
+
+    grep -q "Merge resolution found" $TMP_STDOUT
+}
+
+function exit_hook (){
+    if [ -z ${KEEP_TMP} ];then
+        rm -rf $TMP_MY
+        rm -rf $TMP_OLD
+        rm -rf $TMP_YOUR
+        rm -rf $TMP_DIR
+        rm -rf $TMP_OUT_DIR
+        rm -rf $TMP_STDOUT
+    fi
+}
+trap exit_hook EXIT SIGHUP SIGINT SIGTERM
