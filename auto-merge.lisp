@@ -77,21 +77,14 @@ using STRATEGY.")
                (if children
                    (mapcar (lambda (child)
                              (if (ast-p child)
-                                 (copy child :aux-data
-                                      (list (cons :conflict-ast conflict)
-                                            (cons :conflict-resolution-length
-                                                  (length children))))
-                                 (make-raw-ast
-                                  :children (list child)
-                                  :aux-data
-                                  (list (cons :conflict-ast conflict)
-                                        (cons :conflict-resolution-length
-                                              (length children))))))
+                                 (copy child :aux-data `((:conflict-ast .
+                                                                        ,conflict)))
+                                 (make-raw-ast :children (list child)
+                                               :aux-data `((:conflict-ast .
+                                                                          ,conflict)))))
                            children)
-                   (list (nest (make-raw-ast :aux-data)
-                               (list (cons :conflict-ast conflict)
-                                     (cons :conflict-resolution-length
-                                           (length children))))))))
+                   (list (make-raw-ast :aux-data `((:conflict-ast .
+                                                                  ,conflict)))))))
       ;; Five ways of resolving a conflict:
       (case strategy
         ;; 1. (V1) version 1
@@ -155,9 +148,7 @@ option."))
                             new-resolution
                             (subseq (ast-children parent)
                                     (+ (lastcar conflict-path)
-                                       (nest (aget :conflict-resolution-length)
-                                             (ast-aux-data)
-                                             (car prior-resolution)))))))))))
+                                       (length prior-resolution))))))))))
 
 
 ;;; Auto-merge crossover implementation.
