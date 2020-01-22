@@ -195,7 +195,7 @@ command-line options processed by the returned function."
                       artifacts compilation-database))))
         (list* (caar pairs)
                :language language
-               :ignore-paths '(list #P"compile_commands.json")
+               :ignore-other-paths '(list #P"compile_commands.json")
                (mappend «list [#'make-keyword #'second] {cons 'or}»
                         (cdr pairs))))))
 

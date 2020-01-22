@@ -285,8 +285,9 @@ including a file deletion.")
                                               (from-file
                                                (make-instance 'clang-project
                                                  :build-command "make"
-                                                 :ignore-paths (list #p"compile_commands.json")
-                                                 :artifacts '("gcd"))
+                                                 :artifacts '("gcd")
+                                                 :ignore-other-paths
+                                                 (list #p"compile_commands.json"))
                                                tmp))))
                                (asts obj)
                                obj))))
