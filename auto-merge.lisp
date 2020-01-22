@@ -215,16 +215,13 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                             (get-conflict-strategies chunk)))
                          pop)))
                 (reverse chunks))
-          (progn
-            (warn "Randomly sampling ~d possible resolutions from ~
-                   ~d possibilities." pop-size num-solutions)
-            (setf pop
-                  (iter (for i below pop-size)
-                        (collect
-                          (reduce (lambda (variant chunk)
-                                    (resolve-conflict (copy variant) chunk))
-                                  (reverse chunks)
-                                  :initial-value (copy conflicted))))))))
+          (setf pop
+                (iter (for i below pop-size)
+                      (collect
+                       (reduce (lambda (variant chunk)
+                                 (resolve-conflict (copy variant) chunk))
+                               (reverse chunks)
+                               :initial-value (copy conflicted)))))))
     pop)
   (:method ((conflicted auto-mergeable-project)
             &aux (pop-size (or *max-population-size* (expt 2 10))))
