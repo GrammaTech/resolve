@@ -83,22 +83,9 @@
             +clang-command-line-options+
             +project-command-line-options+
             +clang-project-command-line-options+
-            `((("raw" #\r) :type boolean :optional t
-               :documentation "output diff as raw ASTs (default is as text)")
-              (("profile" #\P) :type string
+            `((("profile" #\P) :type string
                :action #'pathname
                :documentation "profile and write report to FILE")
-              (("no-color" #\C) :type boolean :optional t
-               :documentation "inhibit color printing")
-              (("unified" #\U) :type integer :initial-value 3
-               :documentation "output NUM lines of unified context")
-              (("edit-tree" #\T) :type boolean :optional t
-               :documentation "Print edit tree")
-              (("json" #\J):type boolean :optional t
-               :documentation "Print results as JSON")
-              (("print-asts") :type boolean :optional t
-               :documentation
-               "Also print a representation of the edit tree ASTs")
               (("strings" #\S) :type boolean :optional t
                :documentation "Diff descends into AST leaf strings")
               (("wrap" #\W) :type boolean :optional t
@@ -106,14 +93,30 @@
                "diff searches for wrap/unwrap operations (UNTESTED)")
               (("max-wrap") :type integer
                :initial-value #.*max-wrap-diff*
-               :documentation "max size diff of wrapping/unwrapping")
-              (("coherence") :type string :optional t
-               :documentation
-               "Bound used to find relevant nodes in the edit tree")))))
+               :documentation "max size diff of wrapping/unwrapping")))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter +ast-diff-and-merge-only-command-line-options+ nil))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter +ast-diff-only-command-line-options+
-    `((("base-cost") :type integer :initial-value #.*base-cost*
+    `((("raw" #\r) :type boolean :optional t
+       :documentation "output diff as raw ASTs (default is as text)")
+      (("no-color" #\C) :type boolean :optional t
+       :documentation "inhibit color printing")
+      (("edit-tree" #\T) :type boolean :optional t
+       :documentation "Print edit tree")
+      (("json" #\J):type boolean :optional t
+       :documentation "Print results as JSON")
+      (("unified" #\U) :type integer :initial-value 3
+       :documentation "output NUM lines of unified context")
+      (("print-asts") :type boolean :optional t
+       :documentation
+       "Also print a representation of the edit tree ASTs")
+      (("coherence") :type string :optional t
+       :documentation
+       "Bound used to find relevant nodes in the edit tree")
+      (("base-cost") :type integer :initial-value #.*base-cost*
        :documentation "Base edit operation cost"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -482,8 +485,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable quiet verbose raw no-color edit-tree json unified
-                      print-asts coherence split-lines
+  (declare (ignorable quiet verbose split-lines
                       my-split-lines your-split-lines old-split-lines))
   #+drop-dead
   (drop-dead-date ()
@@ -555,10 +557,8 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable manual quiet verbose raw no-color json unified edit-tree
-                      print-asts coherence strings split-lines
-                      my-split-lines your-split-lines old-split-lines
-                      fault-loc))
+  (declare (ignorable manual quiet fault-loc split-lines
+                      my-split-lines your-split-lines old-split-lines))
   #+drop-dead
   (drop-dead-date ()
     (exit-command auto-merge 2
