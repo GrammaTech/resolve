@@ -253,7 +253,9 @@ of conflict ASTs."
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not #'conflict-ast-p
-                   (ast-to-list (ast-root obj)))))
+                   (ast-to-list (ast-root obj))))
+  (:method ((obj auto-mergeable-project))
+    (mappend [#'get-conflicts #'cdr] (all-files obj))))
 
 (defgeneric get-resolved-conflicts (obj)
   (:documentation "Return the resolved conflicts in OBJ.")
@@ -263,7 +265,9 @@ of conflict ASTs."
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not [{aget :conflict-ast} #'ast-aux-data]
-                   (ast-to-list (ast-root obj)))))
+                   (ast-to-list (ast-root obj))))
+  (:method ((obj auto-mergeable-project))
+    (mappend [#'get-resolved-conflicts #'cdr] (all-files obj))))
 
 
 ;;; AST diff interface overrides

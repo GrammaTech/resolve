@@ -188,7 +188,6 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
     (let* ((chunks (get-conflicts conflicted))
            (num-solutions (reduce #'* chunks
                                   :key [#'length #'get-conflict-strategies])))
-      (assert chunks (chunks) "Software ~S must have conflict ASTs" conflicted)
       ;; Create all conflict resolution variants if the total number
       ;; is less than POP-SIZE.  Otherwise, create a random sample.
       (if (< num-solutions pop-size)
@@ -287,6 +286,11 @@ Extra keys are passed through to EVOLVE.")
           (*fitness-predicate* #'<)
           (*parseable-mutation-types* '((new-conflict-resolution . 1)))
           (*simple-mutation-types* '((new-conflict-resolution . 1))))
+
+      ;; Special case - there are no conflicts to be resolved
+      (when (null (remove-if-not #'get-resolved-conflicts *population*))
+        (note 2 "No conflicts found.")
+        (return-from resolve (first *population*)))
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Evaluate ~d population members." (length *population*))
