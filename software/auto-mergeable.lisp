@@ -87,27 +87,19 @@
   (:method ((obj software))
     obj)
   (:method ((obj simple))
-    (coerce-auto-mergeable (copy obj) 'auto-mergeable-simple))
+    (change-class (copy obj) 'auto-mergeable-simple))
   (:method ((obj parseable))
-    (coerce-auto-mergeable (copy obj) 'auto-mergeable-parseable))
+    (change-class (copy obj) 'auto-mergeable-parseable))
   (:method ((obj project))
     (flet ((auto-mergeable-files (files)
              (mapcar (lambda-bind ((file . obj))
                                   (cons file (create-auto-mergeable obj)))
                      files)))
-      (coerce-auto-mergeable
-       (copy obj :evolve-files (auto-mergeable-files (evolve-files obj))
-             :other-files (auto-mergeable-files (other-files obj)))
-       (symbol-cat 'auto-mergeable (type-of obj))))))
-
-(defun coerce-auto-mergeable (obj clazz)
-  "Create a shallow copy of OBJ as type CLAZZ."
-  (let ((copy (make-instance clazz)))
-    (mapc (lambda (slot)
-            (setf (slot-value copy (slot-definition-name slot))
-                  (slot-value obj (slot-definition-name slot))))
-          (class-slots (find-class clazz)))
-    copy))
+      (change-class (copy obj :evolve-files
+                          (auto-mergeable-files (evolve-files obj))
+                          :other-files
+                          (auto-mergeable-files (other-files obj)))
+                    (symbol-cat 'auto-mergeable (type-of obj))))))
 
 
 ;;; Software interface overrides for auto-merge specific behavior
