@@ -889,11 +889,29 @@ Prefix and postfix returned as additional values."
                (reduce #'+ (cdr diff) :key #'diff-cost :initial-value base-cost)
                1)))
        ((:same :same-tail :same-sequence) 0)
-       ((:wrap :unwrap)
+       ;; WRAP and UNWRAP diffs have the following format:
+       ;; (<kind> <diff on target> <path to target> <pre-wrap> <post-wrap> [<class>])
+       ;;
+       ;; UNWRAP-SEQUENCE also has this form
+       ;; (:unwrap-sequence <diff on sequence> <path to target> <pre-wrap> <post-wrap>)
+       ;; It has the meaning: apply the transformation to the node at the target, yielding
+       ;; a node with the same class as this node.  Its children are placed into the child list
+       ;; of this node.
+       ((:wrap :unwrap :unwrap-sequence)
         (+ base-cost
            (diff-cost (second diff))
            (cost-of-wrap (fourth diff))
-           (cost-of-wrap (fifth diff))))))
+           (cost-of-wrap (fifth diff))))
+       ;; WRAP-SEQUENCe has the following format:
+       ;; (:wrap-sequence <length of sequence> <diff on sequence> <path to target> <pre-wrap> <post wrap> <class>)
+       ;; The meaning is the same as: wrap the sequence into a node of the same class as the parent,
+       ;; then do a wrap on that
+       ((:wrap-sequence)
+        (+ base-cost
+           (diff-cost (third diff))
+           (cost-of-wrap (fifth diff))
+           (cost-of-wrap (sixth diff))))
+       ))
     (t
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
 
