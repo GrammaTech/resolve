@@ -584,6 +584,7 @@ command-line options processed by the returned function."
         language (or language (guess-language old-file my-file your-file))
         num-tests (resolve-num-tests-from-num-tests num-tests)
         tests (create-test-suite test-script num-tests))
+  (note 2 "Create software objects.")
   (to-file (apply #'resolve
                   (create-auto-mergeable
                    (expand-options-for-which-files language "MY"
