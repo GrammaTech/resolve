@@ -287,10 +287,14 @@ Extra keys are passed through to EVOLVE.")
           (*parseable-mutation-types* '((new-conflict-resolution . 1)))
           (*simple-mutation-types* '((new-conflict-resolution . 1))))
 
-      ;; Special case - there are no conflicts to be resolved
-      (when (null (remove-if-not #'get-resolved-conflicts *population*))
-        (note 2 "No conflicts found.")
-        (return-from resolve (first *population*)))
+      (if (null (remove-if-not #'get-resolved-conflicts *population*))
+          ;; Special case - there are no conflicts to be resolved
+          (progn
+            (note 2 "No conflicts found.")
+            (return-from resolve (first *population*)))
+          ;; Normal case - print the number of conflicts
+          (note 2 "Number of conflicts found: ~d."
+                (length (get-resolved-conflicts (first *population*)))))
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Evaluate ~d population members." (length *population*))
