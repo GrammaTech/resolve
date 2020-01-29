@@ -79,14 +79,30 @@
   (:method ((obj parseable))
     (change-class (copy obj) 'auto-mergeable-parseable))
   (:method ((obj project))
-    (flet ((auto-mergeable-files (files)
-             (mapcar (lambda-bind ((file . obj))
-                                  (cons file (create-auto-mergeable obj)))
-                     files)))
-      (change-class (copy obj :evolve-files
-                          (auto-mergeable-files (evolve-files obj))
-                          :other-files
-                          (auto-mergeable-files (other-files obj)))
+    (labels ((parseable-file-p (file-obj-pair)
+               "Filter files which can be parsed into ASTs."
+               (when (typep (cdr file-obj-pair) 'parseable)
+                 (handler-case
+                     (ast-root (cdr file-obj-pair))
+                   (mutate (c) (declare (ignorable c)) nil))))
+             (evolve-files ()
+               "Return a list of `auto-mergeable-parseable` software objects
+               representing source files which have been parsed into ASTs."
+               (mapcar (lambda-bind ((file . obj))
+                         (cons file
+                               (change-class obj 'auto-mergeable-parseable)))
+                       (remove-if-not #'parseable-file-p (all-files obj))))
+             (other-files ()
+               "Return a list of `auto-mergeable-simple` software objects
+               representing flat text files."
+               (mapcar (lambda-bind ((file . obj))
+                         (declare (ignorable obj))
+                         (cons file
+                               (from-file (make-instance 'auto-mergeable-simple)
+                                          (original-path obj))))
+                       (remove-if #'parseable-file-p (all-files obj)))))
+      (change-class (copy obj :evolve-files (evolve-files)
+                              :other-files (other-files))
                     (symbol-cat 'auto-mergeable (type-of obj))))))
 
 
