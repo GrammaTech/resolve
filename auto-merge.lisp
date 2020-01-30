@@ -12,6 +12,7 @@
         :software-evolution-library/software/project
         :software-evolution-library/software/source
         :software-evolution-library/software/clang
+        :software-evolution-library/software/clang-project
         :software-evolution-library/software/simple
         :resolve/core
         :resolve/ast-diff
@@ -241,7 +242,7 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
         (make-list (length (test-cases tests))
                    :initial-element most-positive-fixnum))))
 
-(defmethod auto-merge-test :around ((obj project) (tests test-suite))
+(defmethod auto-merge-test :around ((obj clang-project) (tests test-suite))
   "Setup environment so the fitness of OBJ can be evaluated against TESTS."
   ;; Bind *build-dir* so multiple builds can occur in a multi-threaded
   ;; environment.
