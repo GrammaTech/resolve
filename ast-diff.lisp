@@ -482,22 +482,6 @@ rewritten TO by part of the edit script"))
 
 ;;; Main interface to calculating ast differences.
 
-(defun ast-diff (ast-a ast-b
-                 &key
-                   ((:ignore-whitespace *ignore-whitespace*)
-                    *ignore-whitespace*)
-                   ((:strings *strings*) *strings*)
-                   ((:wrap *wrap*) *wrap*)
-                   ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
-                   ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
-                   ((:base-cost *base-cost*) *base-cost*)
-                   &allow-other-keys)
-  ;; Convert raw lisp data to asts
-  (let ((ast-a (astify ast-a))
-        (ast-b (astify ast-b)))
-    ;; Bag computation to accelerate wrapping/unwrapping will go here
-    (ast-diff* ast-a ast-b)))
-
 (defgeneric ast-diff* (ast-a ast-b)
   (:documentation
    "Return a least-cost edit script which transforms AST-A into AST-B.
@@ -508,6 +492,82 @@ See `ast-patch' for more details on edit scripts.
 The following generic functions may be specialized to configure
 differencing of specialized AST structures.; `ast-equal-p',
 `ast-cost' and `ast-can-recurse'."))
+
+(let ((ast-diff-cache (make-hash-table))
+      (ast-diff-counter 0)
+      (hash-upper-limit 1000000))
+  (declare (type (integer 0 1000000000) ast-diff-counter))
+  ;; The cache maps key pairs to values and counts
+  ;; The counter is incremented to find the most recent
+  ;; cached entries.
+  (defmethod ast-diff* :around (ast-a ast-b)
+    (let* ((key (cons ast-a ast-b))
+           (h (ast-hash key)))
+      ;; val-alist maps keys to (val . count) pairs
+      (let ((val-alist (gethash h ast-diff-cache)))
+        (let ((p (assoc key val-alist :test #'equal)))
+          (cond
+            (p
+             (let ((vals (cadr p)))
+               (values (car vals) (cdr vals))))
+            ((>= (length val-alist) 10)
+             ;; If a bucket gets too big, just stop caching
+             ;; things that map there
+             (call-next-method))
+            (t
+             (multiple-value-bind (diff cost)
+                 (call-next-method)
+               (when (>= ast-diff-counter hash-upper-limit)
+                 (thin-ast-diff-table))
+               (assert (< ast-diff-counter hash-upper-limit))
+               (setf (gethash key ast-diff-cache)
+                     (cons (list* key (cons diff cost) ast-diff-counter)
+                           (gethash key ast-diff-cache)))
+               (incf ast-diff-counter)
+               (values diff cost))))))))
+
+  (defun thin-ast-diff-table ()
+    (assert (>= ast-diff-counter hash-upper-limit))
+    (let* ((h2 (ash hash-upper-limit 1))
+           (d (- ast-diff-counter h2)))
+      (maphash (lambda (k v)
+                 (let* ((head (cons nil v))
+                        (p head)
+                        (n (cdr p)))
+                   (loop
+                      (unless n (return))
+                      (if (< (cddar n) d)
+                          (setf (cdr p) (cdr n))
+                          (progn
+                            (decf (cddar n) d)
+                            (setf p n n (cdr n)))))
+                   (unless (eql (cdr head) v)
+                     (setf (gethash k ast-diff-cache) (cdr head)))))
+               ast-diff-cache)
+      (setf ast-diff-counter h2)))
+
+  (defun clear-ast-diff-table ()
+    (setf ast-diff-counter 0)
+    (clrhash ast-diff-cache))
+
+  (defun ast-diff (ast-a ast-b
+                   &key
+                     ((:ignore-whitespace *ignore-whitespace*)
+                      *ignore-whitespace*)
+                     ((:strings *strings*) *strings*)
+                     ((:wrap *wrap*) *wrap*)
+                     ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
+                     ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
+                     ((:base-cost *base-cost*) *base-cost*)
+                     &allow-other-keys)
+    ;; Convert raw lisp data to asts
+    (let ((ast-a (astify ast-a))
+          (ast-b (astify ast-b)))
+      ;; Bag computation to accelerate wrapping/unwrapping will go here
+      (unwind-protect
+           (ast-diff* ast-a ast-b)
+        (format t "ast-diff-counter = ~a~%" ast-diff-counter)
+        (clear-ast-diff-table)))))
 
 (defmethod ast-diff* ((ast-a ast) (ast-b ast))
   #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
@@ -731,6 +791,13 @@ Prefix and postfix returned as additional values."
 (defun simple-queue-enqueue (sq val)
   (push val (cdr sq)))
 
+(defstruct rd-link
+  "Link in the computation graph for edits on sequences"
+  (a 0 :type (integer 0))  ;; Index into the 'A' list
+  (b 0 :type (integer 0))  ;; Index into the 'B' list
+  op  ;; The edit operation to corresponding to the link
+  )
+
 (defun recursive-diff (total-a total-b
                        &key (upper-bound most-positive-fixnum)
                        &allow-other-keys
@@ -752,6 +819,8 @@ Prefix and postfix returned as additional values."
                          ;; For closed nodes, G is the actual minimum cost
                          ;; of reaching the node.
                          (g (make-cache total-a total-b))
+                         ;; r-cache is the cache of "recursive" diffs, calls
+                         ;; to ast-diff* on specific individual children
                          (r-cache (make-cache total-a total-b))
                          (lta (clength total-a))
                          (ltb (clength total-b)))
@@ -759,13 +828,14 @@ Prefix and postfix returned as additional values."
   ;; pursuing edges.  This is not currently exploited.
   (labels
       ((%enqueue (node)
-         ;; (enqueue fringe node cost)
+         ;; NODE is a cons of indices
          (simple-queue-enqueue fringe node)
          )
        (%dequeue ()
          ;; (dequeue fringe)
          (simple-queue-dequeue fringe))
        (reconstruct-path- (a b)
+         ;; a, b are indices
          #+ast-diff-debug (format t "reconstruct-path-: ~a ~a~%" a b)
          (let ((result
                 (if (and (zerop a) (zerop b))
@@ -801,9 +871,11 @@ Prefix and postfix returned as additional values."
 
     (do ((current (%dequeue) (%dequeue)))
         ((zerop total-open)
+         ;; No more open vertices -- find the optimum path
          (reconstruct-path (clast total-a) (clast total-b) lta ltb))
 
-      (let* ((a (car current)) (b (cdr current))
+      (let* ((a (car current))
+             (b (cdr current))
              (pos-a (%pos-a a))
              (pos-b (%pos-b b)))
         #+ast-diff-debug (format t "pos-a = ~a, pos-b = ~a~%" pos-a pos-b)
@@ -817,6 +889,9 @@ Prefix and postfix returned as additional values."
 
         (labels                         ; Handle all neighbors.
             ((add (neighbor edge)
+               ;; NEIGHBOR is a cons pair, the car of which
+               ;; is a suffix of total-a, the cdr a suffix
+               ;; of total-b
                #+ast-diff-debug (format t "   add: ~a ~a~%" neighbor edge)
                (let ((next-a (%pos-a (car neighbor)))
                      (next-b (%pos-b (cdr neighbor))))
