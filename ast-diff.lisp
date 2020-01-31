@@ -82,6 +82,7 @@
    :*base-cost*
    :*max-wrap-diff*
    :*wrap*
+   :*wrap-sequences*
    :*strings*
    ;; :*ignore-whitespace*
    ))
@@ -136,6 +137,9 @@
 
 (defvar *wrap* nil
   "If true, perform wrap/unwrap actions in diffs.")
+
+(defvar *wrap-sequences* nil
+  "If true, perform wrap-sequence/unwrap-sequence actions in diffs.")
 
 (defvar *max-wrap-diff* 500
   "When *wrap* is true, this is the maximum size difference for
@@ -484,12 +488,15 @@ rewritten TO by part of the edit script"))
                     *ignore-whitespace*)
                    ((:strings *strings*) *strings*)
                    ((:wrap *wrap*) *wrap*)
+                   ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
                    ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
                    ((:base-cost *base-cost*) *base-cost*)
                    &allow-other-keys)
   ;; Convert raw lisp data to asts
-  (ast-diff* (astify ast-a)
-             (astify ast-b)))
+  (let ((ast-a (astify ast-a))
+        (ast-b (astify ast-b)))
+    ;; Bag computation to accelerate wrapping/unwrapping will go here
+    (ast-diff* ast-a ast-b)))
 
 (defgeneric ast-diff* (ast-a ast-b)
   (:documentation
@@ -728,6 +735,7 @@ Prefix and postfix returned as additional values."
                        &key (upper-bound most-positive-fixnum)
                        &allow-other-keys
                        &aux
+                         (wrap-sequences *wrap-sequences*)
                          (from (make-cache total-a total-b))
                          ;; FRINGE is a queue used to order
                          ;; visits of 'open' nodes.  An open node should only
@@ -891,23 +899,11 @@ Prefix and postfix returned as additional values."
                (reduce #'+ (cdr diff) :key #'diff-cost :initial-value base-cost)
                1)))
        ((:same :same-tail :same-sequence) 0)
-       ;; WRAP and UNWRAP diffs have the following format:
-       ;; (<kind> <diff on target> <path to target> <pre-wrap> <post-wrap> [<class>])
-       ;;
-       ;; UNWRAP-SEQUENCE also has this form
-       ;; (:unwrap-sequence <diff on sequence> <path to target> <pre-wrap> <post-wrap>)
-       ;; It has the meaning: apply the transformation to the node at the target, yielding
-       ;; a node with the same class as this node.  Its children are placed into the child list
-       ;; of this node.
        ((:wrap :unwrap :unwrap-sequence)
         (+ base-cost
            (diff-cost (second diff))
            (cost-of-wrap (fourth diff))
            (cost-of-wrap (fifth diff))))
-       ;; WRAP-SEQUENCe has the following format:
-       ;; (:wrap-sequence <length of sequence> <diff on sequence> <path to target> <pre-wrap> <post wrap> <class>)
-       ;; The meaning is the same as: wrap the sequence into a node of the same class as the parent,
-       ;; then do a wrap on that
        ((:wrap-sequence)
         (+ base-cost
            (diff-cost (third diff))
@@ -1485,19 +1481,79 @@ is shorter, replicate the last value (or NIL if none)."
       (unastify (apply #'ast-patch* (astify original) diff keys))
       (apply #'ast-patch* original diff keys)))
 
+;;; Macros, structures for accessing edit actions
+
+;; I wanted to do all these with defstruct, but some are
+;; represented with improper lists
+
+(deftype same-eop () '(cons (eql :same) t))
+(defun same-eop-p (e) (typep e 'same-eop))
+(defmacro same-eop-old (e) `(cdr ,e))
+(defun copy-same-eop (e) (cons :same (same-eop-old e)))
+
+(deftype insert-eop () '(cons (eql :insert) t))
+(defun insert-eop-p (e) (typep e 'insert-eop))
+(defmacro insert-eop-new (e) `(cdr ,e))
+(defun copy-insert-eop (e) (cons :insert (insert-eop-new e)))
+
+(deftype delete-eop () '(cons (eql :delete) t))
+(defun delete-eop-p (e) (typep e 'delete-eop))
+(defmacro delete-eop-old (e) `(cdr ,e))
+(defun copy-delete-eop (e) (cons :delete (delete-eop-old e)))
+
+(deftype recurse-eop () '(cons (eql :recurse) t))
+(defun recurse-eop-p (e) (typep e 'recurse-eop))
+(defmacro recurse-eop-ops (e) `(cdr ,e))
+(defun copy-recurse-eop (e) (cons :recurse (recurse-eop-ops e)))
+
+(defstruct (:wrap (:type list) (:conc-name wrap-)
+                  (:predicate wrap-p)
+                  (:copier copy-wrap)
+                  :named)
+  sub path left right classes new)
+
+(defstruct (:unwrap (:type list) (:conc-name unwrap-)
+                    (:predicate unwrap-p)
+                    :named)
+  sub path left right)
+
+(defstruct (:wrap-sequence (:type list) (:conc-name wrap-sequence-)
+                           (:predicate wrap-sequence-p)
+                           (:copier copy-wrap-sequence)
+                           :named)
+  length sub path left right classes)
+
+(defstruct (:unwrap-sequence (:type list) (:conc-name unwrap-sequence-)
+                           (:predicate unwrap-sequence-p)
+                           (:copier copy-unwrap-sequence)
+                           :named)
+  sub path left right)
+
+
 (defgeneric ast-patch* (original diff &rest keys &key conflict &allow-other-keys)
   (:documentation "Create an edited AST by applying DIFF to ORIGINAL.
 
 A diff is a sequence of actions as returned by `ast-diff' including:
-:same A B  : keep the current AST
+:same A  : keep the current AST
 :insert B  : insert B at the current position
 :delete A  : remove the current AST
 :recurse S : recursively apply script S to the current AST
-:wrap S <path> <left-wrap> <right-wrap> <class> : Apply S to current AST,
-   then wrap it in a tree of class <class> with left and right children along
-   the path given by <left-wrap> and <right-wrap>
+:wrap S <path> <left-wrap> <right-wrap> <classes> <new> : Apply S to current AST,
+   then wrap it in nodes of kinds <classes> with left and right children along
+   the path given by <left-wrap> and <right-wrap>.  <new> is the result
+   of the wrap action.
 :unwrap S <path> <left-wrap> <right-wrap> : Apply S to the subtree of given
-  by following <path> down from this tree."))
+  by following <path> down from this tree.
+:wrap-sequence <length> S <path> <left-wrap> <right-wrap> <classes> : Apply S to the
+  AST obtained by taking the next <length> elements of the current child
+  list converted to an AST of the same kind as (last <classes>), then
+  wrap it in nodes of kinds (butlast <classes>) with left and right children as for :wrap
+:unwrap-sequence S <path> <left-wrap> <right-wrap> : Apply S to node obtained
+  by going down <path>, then insert its children into the child sequence here.
+
+If diff is a list of these operations, it is interpreted as applying
+to the list of children of ORIGINAL.   The sequence operations can only
+be applied in that context."))
 
 (defmethod ast-patch* ((original null) (script null) &key &allow-other-keys)
   nil)
@@ -1532,6 +1588,7 @@ A diff is a sequence of actions as returned by `ast-diff' including:
         (t
          (apply #'actual-ast-patch original script keys)))
       (case (car script)
+        ;; The script is a single command
         (:wrap
          (apply #'ast-patch-wrap original (cdr script) keys))
         (:unwrap
@@ -1546,6 +1603,10 @@ A diff is a sequence of actions as returned by `ast-diff' including:
                  (cdr script))
          (cdr script))
         (t
+         ;; The script is a list of commands
+         ;; The case of applying a list of commands to
+         ;; a list of things is handled in another method
+         ;; This is just for one or two operations on an atom
          (assert (proper-list-p script))
          (let ((keys (mapcar #'car script)))
            (cond
@@ -1667,22 +1728,77 @@ process with the rest of the script."
           (setf ast (nth (pop path) (ast-children ast))))
     (apply #'ast-patch* ast sub-action keys)))
 
+
 (defun ast-wrap (ast left-wrap right-wrap classes base-ast)
   (assert (= (length left-wrap) (length right-wrap) (length classes)))
-  ;; (assert (= (length ast) 1))
-  ;; (setf ast (car ast))
+  (assert left-wrap)
   (setf left-wrap (reverse left-wrap))
   (setf right-wrap (reverse right-wrap))
   (iter (while left-wrap)
         (let ((class (pop classes)))
-          (if class
-              (setf ast (copy base-ast
-                              :class class
-                              :children (append (pop left-wrap) (list ast)
-                                                (pop right-wrap))))
-              (setf ast (append (pop left-wrap) (list ast) (pop right-wrap))))))
+          (assert class)
+          (setf ast (copy base-ast
+                          :class class
+                          :children (append (pop left-wrap)
+                                            (list ast)
+                                            (pop right-wrap))))))
   #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (ast-text ast))
   ast)
+
+(defun ast-patch-same-wrap-sequence (ast args tag)
+  (declare (ignore ast args tag))
+  (error "Not yet implemented"))
+
+(defgeneric ast-patch-wrap-sequence (ast args &key &allow-other-keys)
+  (:method ((asts list) (args list) &rest keys &key &allow-other-keys)
+    (destructuring-bind (len sub-action path left-wrap right-wrap classes base-ast)
+        args
+      (declare (ignore len))
+      (assert (= (length path) (length left-wrap) (length right-wrap)))
+      (let ((ast (copy base-ast :children asts)))
+        (values-list
+         (mapcar
+          (lambda (a) (ast-wrap-sequence a left-wrap right-wrap classes base-ast))
+          (multiple-value-list (apply #'ast-patch* ast sub-action keys))))))))
+
+(defun ast-wrap-sequence (ast left-wrap right-wrap classes base-ast)
+  (assert (= (length left-wrap) (length right-wrap) (length classes)))
+  (setf left-wrap (reverse left-wrap))
+  (setf right-wrap (reverse right-wrap))
+  (let ((asts (ast-children ast)))
+    (iter (while left-wrap)
+          (let ((class (pop classes)))
+            (assert class)
+            (setf asts (list (copy base-ast
+                                   :class class
+                                   :children (append (pop left-wrap)
+                                                     asts
+                                                     (pop right-wrap)))))))
+    #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (ast-text asts))
+    (car asts)))
+
+
+;; This is not handling meld?
+(defgeneric ast-patch-unwrap-sequence (ast args &key &allow-other-keys)
+  (:method ((ast ast) (args list) &rest keys &key &allow-other-keys)
+    (destructuring-bind (sub-action path left-wrap right-wrap)
+        args
+      (assert (= (1+ (length path)) (length left-wrap) (length right-wrap)))
+      (iter (while path)
+            (setf ast (nth (pop path) (ast-children ast)))
+            (pop left-wrap)
+            (pop right-wrap))
+      (assert (= (length left-wrap) 1))
+      (assert (= (length right-wrap) 1))
+      (let* ((c (ast-children ast))
+             (total-len (length c))
+             (left-len (length (car left-wrap)))
+             (right-len (length (car right-wrap))))
+        (assert (>= total-len (+ left-len right-len)))
+        (let ((new-ast (copy ast :children (subseq c left-len (- total-len right-len)))))
+          (ast-children
+           (apply #'ast-patch* new-ast sub-action keys)))))))
+
 
 (defmethod ast-patch* ((original cons) (script list)
                        &rest keys
@@ -1750,6 +1866,24 @@ process with the rest of the script."
                                  (apply #'ast-patch-wrap (car asts) args keys)
                                  (edit (cdr asts) (cdr script)))))
 
+               (:wrap-sequence
+                (let ((len (car args)))
+                  (assert (typep len '(integer 0)))
+                  (assert (>= (length asts) len))
+                  (if tag
+                      (cons (ast-patch-same-wrap-sequence (subseq asts 0 len) args tag)
+                            (edit (subseq asts len) (cdr script)))
+                      (cons-values meld?
+                                   (apply #'ast-patch-wrap-sequence (subseq asts 0 len) args keys)
+                                   (edit (subseq asts len) (cdr script))))))
+
+               (:unwrap-sequence
+                (if tag
+                    (error "Not implemented: :unwrap-sequences with tag")
+                    (append-values meld?
+                                   (apply #'ast-patch-unwrap-sequence (car asts) args keys)
+                                   (edit (cdr asts) (cdr script)))))
+
                (:same (cons-values meld?
                                    (car asts)
                                    (edit (cdr asts) (cdr script))))
@@ -1797,6 +1931,7 @@ process with the rest of the script."
                        (make-conflict-ast :child-alist alist)
                        (edit asts (cdr script))))
                     (cons-values meld? args (edit asts (cdr script)))))
+
                (:insert-sequence
                 (append-values meld? args (edit asts (cdr script))))
                (:delete-sequence
@@ -1809,7 +1944,7 @@ process with the rest of the script."
                                :DELETE-SEQUENCE not same as in script: ~a, ~a"
                                (car asts) (car args))
                        (let ((a (pop asts)))
-                         (when delete? (collect a)))
+                         (unless delete? (collect a)))
                        (pop args))
                  (edit asts (cdr script)))))))))
     ;; cause various unmerged subsequences to be combined before

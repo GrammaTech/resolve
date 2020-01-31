@@ -349,6 +349,53 @@
 	      '(1 6 3 7 5))
       "Two lists that differ in two non-adjacent places"))
 
+(deftest sexp-wrap.1 ()
+  (is (equalp (ast-patch '(1 (2) 3)
+                         `((:same . 1) (:recurse :wrap ((:same . 2) (:same . :nil)) (0) (nil) ((:nil)) (:list) ,(astify '((2)))) (:same . 3) (:same . :nil)))
+              '(1 ((2)) 3))))
+
+(deftest sexp-wrap.2 ()
+  (is (equalp (ast-patch '(1 (2) 3)
+                         `((:same . 1) (:recurse :wrap ((:same . 2) (:same . :nil)) (0 0) (nil nil) ((:nil) (:nil)) (:list :list) ,(astify '((2)))) (:same . 3) (:same . :nil)))
+              '(1 (((2))) 3))))
+
+(deftest sexp-wrap-sequence.1 ()
+  (is (equalp (ast-patch '(1 2 3 4)
+                         `((:same . 1) (:wrap-sequence 2
+                                                       ((:same . 2) (:same . 3) (:insert . :nil))
+                                                       (0)
+                                                       (nil) (nil)
+                                                       (:list)
+                                                       ,(astify '(1 2 3 4)))
+                           (:same . 4) (:same . :nil)))
+              '(1 (2 3) 4))))
+
+(deftest sexp-unwrap-sequence.1 ()
+  (is (equalp
+       (ast-patch '(1 (:a (2 3 4 5) :b) 5)
+                  '((:same . 1)
+                    (:unwrap-sequence
+                     ((:same . 3) (:same . 4))
+                     (1)
+                     ((:a) (2))
+                     ((:b :nil) (5 :nil)))
+                    (:same . 5)
+                    (:same . :nil)))
+       '(1 3 4 5))))
+
+(deftest sexp-unwrap-sequence.2 ()
+  (is (equalp
+       (ast-patch '(1 (2 3 4 5) 5)
+                  '((:same . 1)
+                    (:unwrap-sequence
+                     ((:same . 3) (:same . 4))
+                     ()
+                     ((2))
+                     ((5 :nil)))
+                    (:same . 5)
+                    (:same . :nil)))
+       '(1 3 4 5))))
+
 (deftest sexp-diff-simple-sublist-test ()
   (multiple-value-bind (script cost)
       (ast-diff '(1 '(1 2 3 4) 3 4) '(1 '(1 2 3 4) 3 5))
@@ -405,8 +452,26 @@
 (deftest ast-diff-patch-wrap.1 ()
   (is (ast-diff-and-patch-equal-p '((1)) '(2 ((1)) 3) :wrap t)))
 
+(deftest ast-diff-patch-wrap.2 ()
+  (is (ast-diff-and-patch-equal-p '(:a :b :c :d ((1)) :e :f :g)
+                                  '(:a :b :c :d (2 ((1)) 3) :e :f :g) :wrap t)))
+
+(deftest ast-diff-patch-wrap.3 ()
+  (is (ast-diff-and-patch-equal-p '((:a :b :c :d :e :f))
+                                  '((:a :b (:c :d) :e :f)) :wrap t)))
+
+(deftest ast-diff-patch-wrap.4 ()
+  (is (ast-diff-and-patch-equal-p '((:a :b :c :d :e :f))
+                                  '((:a :b (:c :d) :e :f)) :wrap t :wrap-sequence t)))
+
+(deftest ast-diff-patch-wrap.5 ()
+  (is (ast-diff-and-patch-equal-p '(1 (2) 3) '(1 ((2)) 3) :wrap t)))
+
 (deftest ast-diff-patch-unwrap.1 ()
   (is (ast-diff-and-patch-equal-p '(2 ((1)) 3) '((1)) :wrap t)))
+
+(deftest ast-diff-patch-unwrap.2 ()
+  (is (ast-diff-and-patch-equal-p '(:a (2 ((1)) 3) :b) '(:a ((1)) :b) :wrap t)))
 
 (deftest ast-diff-simple-dotted-list ()
   (is (= 2 (nth-value 1 (ast-diff '(1 . 1) '(1 . 2) :base-cost 0))))
