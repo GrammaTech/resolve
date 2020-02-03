@@ -72,14 +72,14 @@ using STRATEGY.")
                (if children
                    (mapcar (lambda (child)
                              (if (ast-p child)
-                                 (copy child :aux-data `((:conflict-ast .
-                                                                        ,conflict)))
+                                 (copy child :aux-data
+                                             `((:conflict-ast . ,conflict)))
                                  (make-raw-ast :children (list child)
-                                               :aux-data `((:conflict-ast .
-                                                                          ,conflict)))))
+                                               :aux-data
+                                               `((:conflict-ast . ,conflict)))))
                            children)
-                   (list (make-raw-ast :aux-data `((:conflict-ast .
-                                                                  ,conflict)))))))
+                   (list (make-raw-ast :aux-data
+                                       `((:conflict-ast . ,conflict)))))))
       ;; Five ways of resolving a conflict:
       (case strategy
         ;; 1. (V1) version 1
