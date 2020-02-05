@@ -893,7 +893,7 @@ Prefix and postfix returned as additional values."
     (assert (eql (rd-node-b node) 0))
     ops))
 
-(defun compute-best-paths (ast nodes vec-a vec-b)
+(defun compute-best-paths (ast-a ast-b nodes vec-a vec-b)
   (let ((fringe (make-simple-queue))
         (total-open 1))
     ;; Start at the (0,0) node, which is the () -> ()
@@ -908,7 +908,7 @@ Prefix and postfix returned as additional values."
       ;; Compute the costs of all arcs into this node
       (dolist (in-arc (rd-node-in-arcs node))
         (assert (eql (rd-link-dest in-arc) node))
-        (compute-arc-cost ast in-arc nodes vec-a vec-b)
+        (compute-arc-cost ast-a ast-b in-arc nodes vec-a vec-b)
         (let ((best (rd-node-best-in-arc node)))
           (when (or (null best)
                     (> (rd-node-cost node)
@@ -936,7 +936,7 @@ Prefix and postfix returned as additional values."
             (incf total-open))))
       )))
 
-(defun compute-arc-cost (ast arc nodes vec-a vec-b)
+(defun compute-arc-cost (ast-a ast-b arc nodes vec-a vec-b)
   "Compute the cost of an RD arc"
   (declare (ignorable nodes))
   (let* ((src (aref nodes (rd-link-a arc) (rd-link-b arc)))
@@ -966,10 +966,10 @@ Prefix and postfix returned as additional values."
       (setf (rd-link-cost arc) (diff-cost op)
             (rd-link-op arc) op))))
 
-(defun recursive-diff (ast total-a total-b)
+(defun recursive-diff (ast-a total-a ast-b total-b)
   (multiple-value-bind (nodes vec-a vec-b)
       (build-rd-graph total-a total-b)
-    (compute-best-paths ast nodes vec-a vec-b)
+    (compute-best-paths ast-a ast-b nodes vec-a vec-b)
     (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b)))))
 
 (defun diff-cost (diff &aux (base-cost *base-cost*))
@@ -1052,7 +1052,7 @@ Prefix and postfix returned as additional values."
             (values (mapcar (lambda (el) (cons :delete el)) unique-a)
                     (1- (ccost unique-a)))))) ; 1- for trailing nil.
 
-      (let ((rdiff (recursive-diff ast-a unique-a unique-b)))
+      (let ((rdiff (recursive-diff ast-a unique-a ast-b unique-b)))
         (add-common rdiff (diff-cost rdiff))))))
 
 (defun ast-hash-with-check (ast table)
