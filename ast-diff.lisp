@@ -170,8 +170,7 @@ wrapping and unwrapping to be considered.")
   (:documentation "Return cost of AST."))
 
 (defmethod ast-cost ((ast ast))
-  (let ((c (ast-children ast)))
-    (if c (reduce #'+ (ast-children ast) :key #'ast-cost) 1)))
+  (reduce #'+ (ast-children ast) :key #'ast-cost :initial-value 1))
 
 (defmethod ast-cost ((ast t))
   1)
@@ -566,7 +565,6 @@ differencing of specialized AST structures.; `ast-equal-p',
       ;; Bag computation to accelerate wrapping/unwrapping will go here
       (unwind-protect
            (ast-diff* ast-a ast-b)
-        (format t "ast-diff-counter = ~a~%" ast-diff-counter)
         (clear-ast-diff-table)))))
 
 (defmethod ast-diff* ((ast-a ast) (ast-b ast))
@@ -791,13 +789,188 @@ Prefix and postfix returned as additional values."
 (defun simple-queue-enqueue (sq val)
   (push val (cdr sq)))
 
-(defstruct rd-link
-  "Link in the computation graph for edits on sequences"
-  (a 0 :type (integer 0))  ;; Index into the 'A' list
-  (b 0 :type (integer 0))  ;; Index into the 'B' list
-  op  ;; The edit operation to corresponding to the link
+(defstruct rd-node
+  "Node in the recursive-diff computation graph"
+  ;; Coordinates of the node in the r-d graph
+  (a 0 :type (integer 0))
+  (b 0 :type (integer 0))
+  (in-arcs nil :type list) ;; list of arcs into this node
+  (out-arcs nil :type list) ;; list of arcs out of this node
+  (open-pred-count 0 :type (integer 0)) ;; number of predecessors that are still open
+  best-in-arc ;; The in arc that gave the lowest cost to this point
+  (cost 0) ;; total cost to reach this node along best path
   )
 
+(defstruct rd-link
+  "Link in the computation graph for edits on sequences"
+  src ;; a b ;; indices of source node
+  dest ;; destination node
+  cost ;; Cost of this operation
+  kind  ;; The kind of edit operation to corresponding to the link
+  op ;; The actual edit operation on this arc
+  )
+
+(defun rd-link-a (e) (rd-node-a (rd-link-src e)))
+(defun rd-link-b (e) (rd-node-b (rd-link-src e)))
+
+(defun build-rd-graph (total-a total-b &key (wrap-sequences *wrap-sequences*))
+  ;; Construct the graph of a pair of lists.  The graph will have
+  ;; (* (1+ (length total-a)) (1+ (length total-b))) nodes
+  ;; Return the 2d array of the nodes
+  (let* ((len-a (length total-a))
+         (len-b (length total-b))
+         (nodes (make-array (list (1+ len-a) (1+ len-b))))
+         (vec-a (coerce total-a 'vector))
+         (vec-b (coerce total-b 'vector)))
+    ;; For now, we eagerly construct all possible wrap/unwrap edges
+    ;; Prune these if they take too long
+    (iter (for a from 0 to len-a)
+          (iter (for b from 0 to len-b)
+                (let ((node (make-rd-node :a a :b b)))
+                  (when (> b 0)
+                    (push (make-rd-link ;; :a a :b (1- b)
+                           :src (aref nodes a (1- b))
+                           :dest node
+                           :kind :insert)
+                          (rd-node-in-arcs node)))
+                  (when (> a 0)
+                    (push (make-rd-link
+                           ;; :a (1- a) :b b
+                             :src (aref nodes (1- a) b)
+                             :dest node :kind :delete)
+                          (rd-node-in-arcs node))
+                    (when (and (> b 0) (ast-can-recurse (aref vec-a (1- a))
+                                                        (aref vec-b (1- b))))
+                      (push (make-rd-link
+                             ;; :a (1- a) :b (1- b)
+                             :src (aref nodes (1- a) (1- b))
+                             :dest node
+                             :kind :same-or-recurse)
+                            (rd-node-in-arcs node))))
+                  (when wrap-sequences
+                    (when (> a 1)
+                      (iter (for x from 0 to (- a 2))
+                            (push (make-rd-link
+                                   ;; :a x :b b
+                                   :src (aref nodes x b)
+                                   :dest node
+                                   :kind :wrap-sequence)
+                                  (rd-node-in-arcs node))))
+                    (when (> b 1)
+                      (iter (for x from 0 to (- b 2))
+                            (push (make-rd-link
+                                   ;; :a a :b x
+                                   :src (aref nodes a x)
+                                   :dest node
+                                   :kind :unwrap-sequence)
+                                  (rd-node-in-arcs node)))))
+                  (setf (rd-node-open-pred-count node)
+                        (length (rd-node-in-arcs node)))
+                  (setf (aref nodes a b) node))))
+    ;; Fill in out-arcs
+    (iter (for a from 0 to len-a)
+          (iter (for b from 0 to len-b)
+                (let* ((node (aref nodes a b))
+                       (in-arcs (reverse (rd-node-in-arcs node))))
+                  (iter (for ia in in-arcs)
+                        (let ((pa (rd-link-a ia))
+                              (pb (rd-link-b ia)))
+                          (push ia (rd-node-out-arcs (aref nodes pa pb))))))))
+
+    (values nodes vec-a vec-b)))
+
+(defun reconstruct-path-to-node (nodes node)
+  (assert (rd-node-p node))
+  (assert (typep nodes '(array * (* *))))
+  (let ((ops nil))
+    (iter (let ((pred-arc (rd-node-best-in-arc node)))
+            (while pred-arc)
+            (push (rd-link-op pred-arc) ops)
+            (setf node (aref nodes
+                             (rd-link-a pred-arc)
+                             (rd-link-b pred-arc)))))
+    (assert (eql (rd-node-a node) 0))
+    (assert (eql (rd-node-b node) 0))
+    ops))
+
+(defun compute-best-paths (nodes vec-a vec-b)
+  (let ((fringe (make-simple-queue))
+        (total-open 1))
+    ;; Start at the (0,0) node, which is the () -> ()
+    ;; diff and has zero cost
+    (let ((start (aref nodes 0 0)))
+      (setf (rd-node-cost start) 0)
+      (simple-queue-enqueue fringe start))
+    (do ((node (simple-queue-dequeue fringe)
+               (simple-queue-dequeue fringe)))
+        ((zerop total-open) nil)
+      (decf total-open)
+      ;; Compute the costs of all arcs into this node
+      (dolist (in-arc (rd-node-in-arcs node))
+        (assert (eql (rd-link-dest in-arc) node))
+        (compute-arc-cost in-arc nodes vec-a vec-b)
+        (let ((best (rd-node-best-in-arc node)))
+          (when (or (null best)
+                    (> (rd-node-cost node)
+                       (+ (rd-node-cost (rd-link-src in-arc))
+                          (rd-link-cost in-arc))))
+            (format t "a = ~a, b = ~a~%"
+                    (rd-link-a in-arc)
+                    (rd-link-b in-arc))
+            (if best 
+                (format t "Replace ~a (~a) with ~a (~a)~%"
+                        (rd-link-op best) (rd-link-cost best)
+                        (rd-link-op in-arc) (rd-link-cost in-arc))
+                (format t "Best ~a (~a)~%" (rd-link-op in-arc) (rd-link-cost in-arc)))
+            (setf (rd-node-best-in-arc node) in-arc
+                  (rd-node-cost node) (+ (rd-link-cost in-arc)
+                                         (rd-node-cost (rd-link-src in-arc)))))))
+      ;; See if any successor are now ready to be handled
+      (dolist (out-arc (rd-node-out-arcs node))
+        (let ((dest (rd-link-dest out-arc)))
+          (when (zerop (decf (rd-node-open-pred-count dest)))
+            ;; All predecessors have been computed, queue this node
+            (simple-queue-enqueue fringe dest)
+            (incf total-open))))
+      )))
+
+(defun compute-arc-cost (arc nodes vec-a vec-b)
+  "Compute the cost of an RD arc"
+  (declare (ignorable nodes))
+  (let* (; (src (aref nodes (rd-link-a arc) (rd-link-b arc)))
+         (dest (rd-link-dest arc))
+         (dest-a (rd-node-a dest))
+         (dest-b (rd-node-b dest))
+         (a (when (> dest-a 0) (aref vec-a (1- dest-a))))
+         (b (when (> dest-b 0) (aref vec-b (1- dest-b)))))
+    (let ((op
+           (ecase (rd-link-kind arc)
+             (:insert (assert b) (cons :insert b))
+             (:delete (assert a) (cons :delete a))
+             (:same-or-recurse
+              (assert a)
+              (assert b)
+              (if (ast-equal-p a b)
+                  (cons :same a)
+                  ;; Recursive -- we exploit the caching :around method
+                  ;; of ast-diff*
+                  (cons :recurse (ast-diff* a b))))
+             (:wrap-sequence
+              '(:wrap-sequence . :bad)
+              )
+             (:unwrap-sequence
+              '(:unwrap-sequence . :bad)
+              ))))
+      (setf (rd-link-cost arc) (diff-cost op)
+            (rd-link-op arc) op))))
+
+(defun recursive-diff (total-a total-b)
+  (multiple-value-bind (nodes vec-a vec-b)
+      (build-rd-graph total-a total-b)
+    (compute-best-paths nodes vec-a vec-b)
+    (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b)))))
+
+#+(or)
 (defun recursive-diff (total-a total-b
                        &key (upper-bound most-positive-fixnum)
                        &allow-other-keys
@@ -967,7 +1140,7 @@ Prefix and postfix returned as additional values."
      (ecase (car diff)
        (:insert (+ base-cost (ast-cost (cdr diff))))
        (:delete (+ base-cost (if (cdr diff) (ast-cost (cdr diff)) 1)))
-       ((:recurse-tail :recurse) (+ base-cost (diff-cost (cdr diff))))
+       ((:recurse-tail :recurse) (diff-cost (cdr diff)))
        ((:insert-sequence :delete-sequence)
         (+ base-cost
            (if (consp (cdr diff))
@@ -975,15 +1148,19 @@ Prefix and postfix returned as additional values."
                1)))
        ((:same :same-tail :same-sequence) 0)
        ((:wrap :unwrap :unwrap-sequence)
-        (+ base-cost
-           (diff-cost (second diff))
-           (cost-of-wrap (fourth diff))
-           (cost-of-wrap (fifth diff))))
+        (if (not (consp (cdr diff)))
+            most-positive-fixnum
+            (+ base-cost
+               (diff-cost (second diff))
+               (cost-of-wrap (fourth diff))
+               (cost-of-wrap (fifth diff)))))
        ((:wrap-sequence)
-        (+ base-cost
-           (diff-cost (third diff))
-           (cost-of-wrap (fifth diff))
-           (cost-of-wrap (sixth diff))))
+        (if (not (consp (cdr diff)))
+            most-positive-fixnum
+            (+ base-cost
+               (diff-cost (third diff))
+               (cost-of-wrap (fifth diff))
+               (cost-of-wrap (sixth diff)))))
        ))
     (t
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
