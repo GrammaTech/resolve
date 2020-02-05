@@ -914,9 +914,11 @@ Prefix and postfix returned as additional values."
                     (> (rd-node-cost node)
                        (+ (rd-node-cost (rd-link-src in-arc))
                           (rd-link-cost in-arc))))
+            #+ast-diff-debug
             (format t "a = ~a, b = ~a~%"
                     (rd-link-a in-arc)
                     (rd-link-b in-arc))
+            #+ast-diff-debug
             (if best 
                 (format t "Replace ~a (~a) with ~a (~a)~%"
                         (rd-link-op best) (rd-link-cost best)
@@ -969,168 +971,6 @@ Prefix and postfix returned as additional values."
       (build-rd-graph total-a total-b)
     (compute-best-paths nodes vec-a vec-b)
     (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b)))))
-
-#+(or)
-(defun recursive-diff (total-a total-b
-                       &key (upper-bound most-positive-fixnum)
-                       &allow-other-keys
-                       &aux
-                         (wrap-sequences *wrap-sequences*)
-                         (from (make-cache total-a total-b))
-                         ;; FRINGE is a queue used to order
-                         ;; visits of 'open' nodes.  An open node should only
-                         ;; be put on the queue when all its
-                         ;; predecessors are closed.
-                         ;; (fringe (make-instance 'priority-queue))
-                         (fringe (make-simple-queue))
-                         ;; When T, the node is stored in the priority
-                         ;; queue already
-                         (open (make-cache total-a total-b))
-                         (total-open 0)
-                         ;; When CLOSED is T, the node has been processed
-                         (closed (make-cache total-a total-b))
-                         ;; For closed nodes, G is the actual minimum cost
-                         ;; of reaching the node.
-                         (g (make-cache total-a total-b))
-                         ;; r-cache is the cache of "recursive" diffs, calls
-                         ;; to ast-diff* on specific individual children
-                         (r-cache (make-cache total-a total-b))
-                         (lta (clength total-a))
-                         (ltb (clength total-b)))
-  ;; UPPER-BOUND is a limit beyond which we give up on
-  ;; pursuing edges.  This is not currently exploited.
-  (labels
-      ((%enqueue (node)
-         ;; NODE is a cons of indices
-         (simple-queue-enqueue fringe node)
-         )
-       (%dequeue ()
-         ;; (dequeue fringe)
-         (simple-queue-dequeue fringe))
-       (reconstruct-path- (a b)
-         ;; a, b are indices
-         #+ast-diff-debug (format t "reconstruct-path-: ~a ~a~%" a b)
-         (let ((result
-                (if (and (zerop a) (zerop b))
-                    nil
-                    (destructuring-bind ((new-a . new-b) . edge) (aref from a b)
-                      (cons edge (reconstruct-path- new-a new-b))))))
-           #+ast-diff-debug (format t "reconstruct-path- returns: ~a~%" result)
-           result))
-       (reconstruct-path (last-a last-b a b)
-         #+ast-diff-debug
-         (format t "reconstruct-path: ~a ~a ~a ~a~%" last-a last-b a b)
-         (reverse
-          ;; Handle cdr of final cons.  This must be special-cased
-          ;; because when nil (a list) this is ignored by functions
-          ;; expecting lists (not cons trees).
-          ;;
-          ;; Get rid of all of this!
-          (if (ast-equal-p last-a last-b)
-              (if last-a
-                  `((:same-tail . ,last-a) . ,(reconstruct-path- a b))
-                  (reconstruct-path- a b))
-              `((:insert . ,last-b)
-                (:delete . ,last-a)
-                . ,(reconstruct-path- a b)))))
-       (%pos-a (a) (- lta (clength a)))
-       (%pos-b (b) (- ltb (clength b))))
-
-    (setf (aref g 0 0) 0 ;; initial node reachable at zero cost
-          (aref open 0 0) t
-          total-open (1+ total-open))
-
-    (%enqueue (cons total-a total-b))
-
-    (do ((current (%dequeue) (%dequeue)))
-        ((zerop total-open)
-         ;; No more open vertices -- find the optimum path
-         (reconstruct-path (clast total-a) (clast total-b) lta ltb))
-
-      (let* ((a (car current))
-             (b (cdr current))
-             (pos-a (%pos-a a))
-             (pos-b (%pos-b b)))
-        #+ast-diff-debug (format t "pos-a = ~a, pos-b = ~a~%" pos-a pos-b)
-        (when (and (zerop (clength a))
-                   (zerop (clength b)))
-          (reconstruct-path a b (clength a) (clength b)))
-
-        (when (aref open pos-a pos-b) (decf total-open))
-        (setf (aref open pos-a pos-b) nil
-              (aref closed pos-a pos-b) t)
-
-        (labels                         ; Handle all neighbors.
-            ((add (neighbor edge)
-               ;; NEIGHBOR is a cons pair, the car of which
-               ;; is a suffix of total-a, the cdr a suffix
-               ;; of total-b
-               #+ast-diff-debug (format t "   add: ~a ~a~%" neighbor edge)
-               (let ((next-a (%pos-a (car neighbor)))
-                     (next-b (%pos-b (cdr neighbor))))
-                 (unless (aref closed next-a next-b) ; should never happen?
-                   (unless (aref open next-a next-b)
-                     (incf total-open)
-                     (setf (aref open next-a next-b) t))
-                   (let ((tentative
-                          (+ (aref g pos-a pos-b)
-                             (diff-cost edge)))
-                         (value (aref g next-a next-b)))
-                     ;; Neighbor is an improvement.
-                     (when (and (or (null value) (< tentative value))
-                                (< tentative upper-bound))
-                       #+ast-diff-debug
-                       (format t "Improvement: tentative = ~a, value = ~a, ~
-                                               next-a = ~a, next-b = ~a~%"
-                               tentative value next-a next-b)
-                       (setf (aref from next-a next-b)
-                             (cons (cons pos-a pos-b) edge)
-                             value tentative
-                             (aref g next-a next-b) tentative))
-                     ;; Only enqueue if ALL predecessors are closed
-                     (when (and value
-                                (if (= next-a 0)
-                                    (aref closed next-a (1- next-b))
-                                    (and (aref closed (1- next-a) next-b)
-                                         (or (= next-b 0)
-                                             (and (aref closed (1- next-a)
-                                                        (1- next-b))
-                                                  (aref closed next-a
-                                                        (1- next-b)))))))
-                       (%enqueue neighbor))))))
-             (%recursive (a b)
-               #+ast-diff-debug (format t "%recursive: ~a ~a~%" a b)
-               (let ((i (%pos-a a))
-                     (j (%pos-b b)))
-                 (or (aref r-cache i j)
-                     (setf (aref r-cache i j)
-                           (ast-diff* (car a) (car b)))))))
-
-          ;; Check neighbors: diagonal, recurse, insert, delete.
-          (when (and (consp a) (consp b))
-            #+ast-diff-debug (format t "check neighbors case 1: ~a ~a~%" a b)
-            (cond
-              ((ast-equal-p (car a) (car b)) ; Diagonal.
-               #+ast-diff-debug (format t "  diagonal~%")
-               (add (cons (cdr a) (cdr b))
-                    (cons :same (car a))))
-              ((ast-can-recurse (car a) (car b)) ; Recurse.
-               #+ast-diff-debug (format t "  recurse~%")
-               (let ((rec (%recursive a b)))
-                 #+ast-diff-debug
-                 (format t "At ast-can-recurse:  rec = ~a~%" rec)
-                 (add (cons (cdr a) (cdr b))
-                      (cons :recurse rec))))))
-          (if (consp b)                 ; Insert.
-              (add (cons a (cdr b))
-                   (cons :insert (car b)))
-              (add (cons a nil)
-                   (cons :insert b)))
-          (if (consp a)                 ; Delete.
-              (add (cons (cdr a) b)
-                   (cons :delete (car a)))
-              (add (cons nil b)
-                   (cons :delete a))))))))
 
 (defun diff-cost (diff &aux (base-cost *base-cost*))
   "Computes the cost of a diff"
