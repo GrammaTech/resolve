@@ -132,7 +132,11 @@
       (("base-cost") :type integer :initial-value 10
        :documentation "Base edit operation cost")
       (("randomize") :type boolean :optional t
-       :documentation "Utilize a non-fixed random seed"))))
+       :documentation "Utilize a non-fixed random seed")
+      (("ignore-paths") :type string :optional t
+       :initial-value "compile_commands.json"
+       :action #'handle-comma-delimited-argument
+       :documentation "Comma-delimited list of paths to ignore"))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-multiplier (&rest multipliers)
@@ -190,8 +194,12 @@ command-line options processed by the returned function."
             (mapt function (cdr tree)))
       (funcall function tree)))
 
-(defmacro expand-options-for-which-files (language which)
-  "Expand the options for WHICH calling `create-software' appropriately."
+(defmacro expand-options-for-which-files
+    (language which &rest args &key &allow-other-keys)
+  "Expand the options for WHICH calling `create-software' appropriately.
+* LANGUAGE language of the software to create
+* WHICH string indicating the variant being created (e.g. my,your,old)
+* ARGS list of additional arguments to pass thru to `create-software'"
   `(create-software
     ,@(let ((pairs (mapcar
                     «list [#'intern {concatenate 'string which "-"}
@@ -201,9 +209,9 @@ command-line options processed by the returned function."
                       artifacts compilation-database))))
         (list* (caar pairs)
                :language language
-               :ignore-other-paths '(list #P"compile_commands.json")
                (mappend «list [#'make-keyword #'second] {cons 'or}»
-                        (cdr pairs))))))
+                        (cdr pairs))))
+    ,@args))
 
 (defmacro drop-dead-date ((&key (times 100) (cutoff (random times))
                                 (day 1) (month 1) (year 2020))
@@ -578,11 +586,17 @@ command-line options processed by the returned function."
         tests (create-test-suite test-script num-tests))
   (to-file (apply #'resolve
                   (create-auto-mergeable
-                   (expand-options-for-which-files language "MY"))
+                   (expand-options-for-which-files language "MY"
+                    :ignore-paths ignore-paths
+                    :ignore-other-paths ignore-paths))
                   (create-auto-mergeable
-                   (expand-options-for-which-files language "OLD"))
+                   (expand-options-for-which-files language "OLD"
+                    :ignore-paths ignore-paths
+                    :ignore-other-paths ignore-paths))
                   (create-auto-mergeable
-                   (expand-options-for-which-files language "YOUR"))
+                   (expand-options-for-which-files language "YOUR"
+                    :ignore-paths ignore-paths
+                    :ignore-other-paths ignore-paths))
                   {auto-merge-test _ tests}
                   :num-threads num-threads
                   :strings strings
