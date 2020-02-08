@@ -573,7 +573,8 @@ differencing of specialized AST structures.; `ast-equal-p',
   (let (diff cost)
     (when (eql (ast-class ast-a) (ast-class ast-b))
       (setf (values diff cost)
-            (ast-diff* (ast-children ast-a) (ast-children ast-b))))
+            (ast-diff*-lists (ast-children ast-a) (ast-children ast-b)
+                             ast-a ast-b)))
     (when *wrap*
       (multiple-value-bind (wrap-diff wrap-cost)
           (ast-diff-wrap ast-a ast-b)
@@ -601,11 +602,11 @@ of children leading down to the node."))
           (for i from 0)
           (when (ast-p c) (map-ast-while-path c fn (cons i path))))))
 
-(defgeneric ast-diff-wrap (ast-a ast-b)
+(defgeneric ast-diff-wrap (ast-a ast-b &key skip-root)
   (:documentation
    "Find a minimum cost 'wrap' edit, which wraps an AST in a larger ast"))
 
-(defmethod ast-diff-wrap ((ast-a ast) (ast-b ast))
+(defmethod ast-diff-wrap ((ast-a ast) (ast-b ast) &key (skip-root t))
   ;; search over the ASTs under ast-b that are the same class as ast-a,
   ;; and for which the size difference is not too large
   (let* ((ast-a-cost (ast-cost ast-a))
@@ -617,19 +618,25 @@ of children leading down to the node."))
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive calls
          (*wrap* nil))
-    #+ast-diff-debug (format t "(ast-class ast-a) = ~S~%" a-class)
+    #+ast-diff-wrap-debug (format t "(ast-class ast-a) = ~S~%" a-class)
     (nest
      (map-ast-while-path ast-b)
-     (lambda (x path) #+ast-diff-debug (format t "Path = ~A~%" path))
-     (if (null path) t)
+     (lambda (x path) #+ast-diff-wrap-debug (format t "Path = ~A~%" path))
+     (if (and (null path) skip-root) t)
      (let ((x-cost (ast-cost x))))
      (cond
        ;; If X is too small, stop search down into it
-       ((< x-cost min-cost) nil)
+       ((< x-cost min-cost)
+        #+ast-diff-wrap-debug (format t "~a is too small~%" x)
+        nil)
        ;; If X is too large, skip it but keep searching
-       ((> x-cost max-cost) t)
+       ((> x-cost max-cost)
+        #+ast-diff-wrap-debug (format t "~a is too big~%" x)
+        t)
        ;; If X is not the right class, also skip it
-       ((not (eql (ast-class x) a-class)) t))
+       ((not (eql (ast-class x) a-class))
+        #+ast-diff-wrap-debug (format t "~a is wrong class~%" x)
+        t))
      ;; Only if the size is in the right range, and the
      ;; ast-class matches, do we try to insert here
      (t) (multiple-value-bind (diff cost) (ast-diff* ast-a x))
@@ -640,7 +647,7 @@ of children leading down to the node."))
                           (cost-of-wrap left-wrap)
                           (cost-of-wrap right-wrap))))
        (when (< total-cost best-cost)
-         #+ast-diff-debug
+         #+ast-diff-wrap-debug
          (progn
            (format t "Wrap candidate found~%")
            (format t "Cost = ~a~%" total-cost)
@@ -657,11 +664,11 @@ of children leading down to the node."))
     (when best-candidate
       (values best-candidate best-cost))))
 
-(defgeneric ast-diff-unwrap (ast-a ast-b)
+(defgeneric ast-diff-unwrap (ast-a ast-b &key skip-root)
   (:documentation "Find a minimum cost 'unwrap' edit, which pulls a subast
 out of one tree and turns it into another."))
 
-(defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast))
+(defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast) &key (skip-root t))
   ;; search over the ASTs under ast-a that are the same class as ast-b,
   ;; and for which the size difference is not too large
   (let* ((ast-b-cost (ast-cost ast-b))
@@ -673,19 +680,25 @@ out of one tree and turns it into another."))
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive call
          (*wrap* nil))
-    #+ast-diff-debug (format t "(ast-class ast-a) = ~S~%" a-class)
+    #+ast-diff-unwrap-debug (format t "(ast-class ast-b) = ~S~%" b-class)
     (nest
      (map-ast-while-path ast-a)
-     (lambda (x path) #+ast-diff-debug (format t "Path = ~A~%" path))
-     (if (null path) t)
+     (lambda (x path) #+ast-diff-unwrap-debug (format t "Path = ~A~%" path))
+     (if (and (null path) skip-root) t)
      (let ((x-cost (ast-cost x))))
      (cond
        ;; If X is too small, stop search down into it
-       ((< x-cost min-cost) nil)
+       ((< x-cost min-cost)
+        #+ast-diff-unwrap-debug (format t "~a is too small~%" x)
+        nil)
        ;; If X is too large, skip it but keep searching
-       ((> x-cost max-cost) t)
+       ((> x-cost max-cost)
+        #+ast-diff-unwrap-debug (format t "~a is too big~%" x)
+        t)
        ;; If X is not the right class, also skip it
-       ((not (eql (ast-class x) b-class)) t))
+       ((not (eql (ast-class x) b-class))
+        #+ast-diff-unwrap-debug (format t "~a is wrong class~%" x)
+        t))
      ;; Only if the size is in the right range, and the
      ;; ast-class matches, do we try to insert here
      (t)
@@ -698,9 +711,13 @@ out of one tree and turns it into another."))
                               (cost-of-wrap left-wrap)
                               (cost-of-wrap right-wrap))))
            (when (< total-cost best-cost)
-             (setf best-cost total-cost
-                   best-candidate
-                   (list :unwrap diff (reverse path) left-wrap right-wrap)))))))
+             (let ((new (list :unwrap diff (reverse path) left-wrap right-wrap)))
+               #+ast-diff-unwrap-debug
+               (format t "Replace~%~a (~a)~%with~%~a (~a)~%"
+                       best-candidate best-cost
+                       new total-cost)
+               (setf best-cost total-cost
+                     best-candidate new)))))))
     (when best-candidate
       (values best-candidate best-cost))))
 
@@ -731,11 +748,74 @@ down from AST, as well as the classes of the nodes along the path."
   (reduce #'+ wrap :initial-value 0
           :key (lambda (w) (reduce #'+ w :key #'ast-cost :initial-value *base-cost*))))
 
-(defmethod ast-diff-wrap ((ast-a t) (ast-b t))
+(defmethod ast-diff-wrap ((ast-a t) (ast-b t) &key skip-root)
+  (declare (ignore skip-root))
   nil)
 
-(defmethod ast-diff-unwrap ((ast-a t) (ast-b t))
+(defmethod ast-diff-unwrap ((ast-a t) (ast-b t) &key skip-root)
+  (declare (ignore skip-root))
   nil)
+
+(defun ast-diff-wrap-sequence (ast-a sub-a ast-b)
+  (let ((len (length sub-a)))
+    (assert (>= len 2))
+    (let ((sub-ast (copy ast-a :children (coerce sub-a 'list)))
+          (*wrap-sequences* nil)
+          (*wrap* nil))
+      (let ((diff (ast-diff-wrap sub-ast ast-b :skip-root nil)))
+        (if (consp diff)
+          (let ((new-diff `(:wrap-sequence ,len ,@(cdr diff))))
+            (values new-diff (diff-cost new-diff)))
+          (values :bad most-positive-fixnum))))))
+
+(defun ast-diff-unwrap-sequence (a ast-b sub-b)
+  (let ((len (length sub-b)))
+    (assert (>= len 2))
+    (let ((sub-ast (copy ast-b :children (coerce sub-b 'list)))
+          (*wrap-sequences* nil)
+          (*wrap* nil))
+      (let ((diff (ast-diff-unwrap a sub-ast :skip-root nil)))
+        (if (consp diff)
+            (let ((new-diff (cons :unwrap-sequence (cdr diff))))
+              (values new-diff (diff-cost diff)))
+            (values :bad most-positive-fixnum))))))
+
+#|
+(defun ast-diff-wrap-sequence (ast-a sub-a ast-b)
+  "Search for the best wrap of the children SUB-A of AST-A inside
+AST-B.  If none are acceptable, return :BAD"
+  ;; Search inside SUB-A for sequences of children of a node of Sort (AST-CLASS AST-A)
+  ;; that meet some criterion
+  (let* ((len (length sub-a))
+         (best-candidate nil)
+         (best-cost most-positive-fixnum))
+    (assert (>= len 2))
+    (nest
+     (let ((a-class (ast-class ast-a)
+           (limit (- (reduce #'+ sub-a :key #'ast-cost) *max-wrap-diff*))
+           (*wrap-sequence* nil)
+           (sub-ast-a (copy ast-a :children (coerce sub-a 'list)))))
+     (map-ast-while-path ast-b)
+     (lambda (x path)  #+ast-diff-debug (format t "Path = ~A~%" path))
+     ;; Abort descent if the subtree is too small
+     (if (and (> limit 0) (< (ast-cost x) limit)) nil)
+     (if (not (eql (ast-class x) a-class)) t)
+     (multiple-value-bind (diff raw-cost) (ast-diff* sub-ast-a b))
+     
+     (let ((cost (+ cost prefix-cost postfix-cost))))
+     (progn
+       (when (< cost best-cost)
+         (setf best-cost cost)
+         (multiple-value-bind (left-wrap rightwrap classes)
+             (wraps-of-path ast-b (reverse path))
+           (setf best-candidate
+                 `(:wrap-sequence ,len ,diff ,path ,left-wrap
+                                  ,right-wrap ,classes ,ast-a))))
+       t))
+    ;; At this point, we've found the best candidate.  Recompute the cost
+    (values best-candidate (diff-cost best-candidate))))
+|#
+
 
 (defun remove-common-prefix-and-suffix (list-a list-b)
   "Return unique portions of LIST-A and LIST-B less shared prefix and postfix.
@@ -801,6 +881,13 @@ Prefix and postfix returned as additional values."
   (cost 0) ;; total cost to reach this node along best path
   )
 
+(defmethod print-object ((node rd-node) stream)
+  (if *print-readably*
+      (call-next-method)
+      (print-unreadable-object (node stream :type t :identity t)
+        (format stream ":A ~a :B ~a"
+                (rd-node-a node) (rd-node-b node)))))
+
 (defstruct rd-link
   "Link in the computation graph for edits on sequences"
   src ;; a b ;; indices of source node
@@ -809,6 +896,16 @@ Prefix and postfix returned as additional values."
   kind  ;; The kind of edit operation to corresponding to the link
   op ;; The actual edit operation on this arc
   )
+
+(defmethod print-object ((arc rd-link) stream)
+  (if *print-readably*
+      (call-next-method)
+      (print-unreadable-object (arc stream)
+        (format stream "~a ~a ~s ~a"
+                (rd-link-src arc)
+                (rd-link-dest arc)
+                (rd-link-kind arc)
+                (rd-link-cost arc)))))
 
 (defun rd-link-a (e) (rd-node-a (rd-link-src e)))
 (defun rd-link-b (e) (rd-node-b (rd-link-src e)))
@@ -848,19 +945,19 @@ Prefix and postfix returned as additional values."
                              :kind :same-or-recurse)
                             (rd-node-in-arcs node))))
                   (when wrap-sequences
-                    (when (> a 1)
+                    (when (and (> b 0) (> a 1))
                       (iter (for x from 0 to (- a 2))
                             (push (make-rd-link
                                    ;; :a x :b b
-                                   :src (aref nodes x b)
+                                   :src (aref nodes x (1- b))
                                    :dest node
                                    :kind :wrap-sequence)
                                   (rd-node-in-arcs node))))
-                    (when (> b 1)
+                    (when (and (> a 0) (> b 1))
                       (iter (for x from 0 to (- b 2))
                             (push (make-rd-link
                                    ;; :a a :b x
-                                   :src (aref nodes a x)
+                                   :src (aref nodes (1- a) x)
                                    :dest node
                                    :kind :unwrap-sequence)
                                   (rd-node-in-arcs node)))))
@@ -893,7 +990,7 @@ Prefix and postfix returned as additional values."
     (assert (eql (rd-node-b node) 0))
     ops))
 
-(defun compute-best-paths (ast-a ast-b nodes vec-a vec-b)
+(defun compute-best-paths (ast-a ast-b nodes vec-a vec-b parent-a parent-b)
   (let ((fringe (make-simple-queue))
         (total-open 1))
     ;; Start at the (0,0) node, which is the () -> ()
@@ -908,21 +1005,26 @@ Prefix and postfix returned as additional values."
       ;; Compute the costs of all arcs into this node
       (dolist (in-arc (rd-node-in-arcs node))
         (assert (eql (rd-link-dest in-arc) node))
-        (compute-arc-cost ast-a ast-b in-arc nodes vec-a vec-b)
+        (compute-arc-cost ast-a ast-b in-arc nodes vec-a vec-b parent-a parent-b)
         (let ((best (rd-node-best-in-arc node)))
+          (format t "best = ~a~%" best)
           (when (or (null best)
                     (> (rd-node-cost node)
                        (+ (rd-node-cost (rd-link-src in-arc))
                           (rd-link-cost in-arc))))
-            #+ast-diff-debug
             (format t "a = ~a, b = ~a~%"
                     (rd-link-a in-arc)
                     (rd-link-b in-arc))
-            #+ast-diff-debug
+            (format t "node cost = ~a~%" (rd-node-cost node))
             (if best 
-                (format t "Replace ~a (~a) with ~a (~a)~%"
+                (format t "Replace~%~a (~a)(~a)~%with~%~a (~a)(~a)~%"
                         (rd-link-op best) (rd-link-cost best)
-                        (rd-link-op in-arc) (rd-link-cost in-arc))
+                        (+ (rd-node-cost (rd-link-src best))
+                           (rd-link-cost best))
+                        (rd-link-op in-arc) (rd-link-cost in-arc)
+                        (+ (rd-node-cost (rd-link-src in-arc))
+                           (rd-link-cost in-arc))
+                         )
                 (format t "Best ~a (~a)~%" (rd-link-op in-arc) (rd-link-cost in-arc)))
             (setf (rd-node-best-in-arc node) in-arc
                   (rd-node-cost node) (+ (rd-link-cost in-arc)
@@ -936,7 +1038,7 @@ Prefix and postfix returned as additional values."
             (incf total-open))))
       )))
 
-(defun compute-arc-cost (ast-a ast-b arc nodes vec-a vec-b)
+(defun compute-arc-cost (ast-a ast-b arc nodes vec-a vec-b parent-a parent-b)
   "Compute the cost of an RD arc"
   (declare (ignorable nodes))
   (let* ((src (aref nodes (rd-link-a arc) (rd-link-b arc)))
@@ -958,26 +1060,37 @@ Prefix and postfix returned as additional values."
                   ;; of ast-diff*
                   (cons :recurse (ast-diff* a b))))
              (:wrap-sequence
-              '(:wrap-sequence . :bad)
-              )
+              (assert (> dest-a 1))
+              (assert (> dest-b 0))
+              (let* ((len (- dest-a (rd-node-a src)))
+                     (src-a (rd-node-a src))
+                     (sub-a (subseq vec-a src-a (+ src-a len))))
+                (ast-diff-wrap-sequence parent-a sub-a b)))
              (:unwrap-sequence
-              '(:unwrap-sequence . :bad)
-              ))))
-      (setf (rd-link-cost arc) (diff-cost op)
-            (rd-link-op arc) op))))
+              (assert (> dest-a 0))
+              (assert (> dest-b 1))
+              (let* ((len (- dest-b (rd-node-b src)))
+                     (src-b (rd-node-b src))
+                     (sub-b (subseq vec-b src-b (+ src-b len))))
+                (ast-diff-unwrap-sequence a parent-b sub-b))))))
+      (setf (rd-link-op arc) op)
+      (values op (setf (rd-link-cost arc) (diff-cost op)))
+      )))
 
-(defun recursive-diff (ast-a total-a ast-b total-b)
+(defun recursive-diff (ast-a total-a ast-b total-b parent-a parent-b)
   (multiple-value-bind (nodes vec-a vec-b)
       (build-rd-graph total-a total-b)
-    (compute-best-paths ast-a ast-b nodes vec-a vec-b)
+    (compute-best-paths ast-a ast-b nodes vec-a vec-b parent-a parent-b)
     (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b)))))
 
 (defun diff-cost (diff &aux (base-cost *base-cost*))
   "Computes the cost of a diff"
   (cond
+    ((eql diff :bad) most-positive-fixnum)
     ((not (consp diff)) 0)
     ((symbolp (car diff))
      (ecase (car diff)
+       (:bad most-positive-fixnum)
        (:insert (+ base-cost (ast-cost (cdr diff))))
        (:delete (+ base-cost (if (cdr diff) (ast-cost (cdr diff)) 1)))
        ((:recurse-tail :recurse) (diff-cost (cdr diff)))
@@ -1005,7 +1118,8 @@ Prefix and postfix returned as additional values."
     (t
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
 
-(defun ast-diff-on-lists (ast-a ast-b)
+(defun ast-diff-on-lists (ast-a ast-b parent-a parent-b)
+  (declare (ignore parent-a parent-b))
   (assert (proper-list-p ast-a))
   (assert (proper-list-p ast-b))
   ;; Drop common prefix and postfix, just run the diff on different middle.
@@ -1052,7 +1166,7 @@ Prefix and postfix returned as additional values."
             (values (mapcar (lambda (el) (cons :delete el)) unique-a)
                     (1- (ccost unique-a)))))) ; 1- for trailing nil.
 
-      (let ((rdiff (recursive-diff ast-a unique-a ast-b unique-b)))
+      (let ((rdiff (recursive-diff ast-a unique-a ast-b unique-b parent-a parent-b)))
         (add-common rdiff (diff-cost rdiff))))))
 
 (defun ast-hash-with-check (ast table)
@@ -1075,6 +1189,11 @@ value that is used instead."
               (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b)))))
 
 (defmethod ast-diff* ((ast-a list) (ast-b list))
+  (ast-diff*-lists ast-a ast-b nil nil))
+
+(defgeneric ast-diff*-lists (list-a list-b parent-a parent-b))
+
+(defmethod ast-diff*-lists ((ast-a list) (ast-b list) parent-a parent-b)
   #+ast-diff-debug (format t "ast-diff LIST LIST~%")
   (iter (for a in (list ast-a ast-b))
         (assert (proper-list-p a) () "Not a proper list: ~a" a))
@@ -1110,7 +1229,7 @@ value that is used instead."
             ;; (for cb in (reverse (cons nil common-b)))
             ;; (assert (ast-equal-p ca cb))
             (multiple-value-bind (diff cost)
-                (ast-diff-on-lists da db)
+                (ast-diff-on-lists da db parent-a parent-b)
               (setf overall-diff (append diff overall-diff))
               (incf overall-cost cost))
             (setf overall-diff
@@ -2273,23 +2392,25 @@ Numerous options are provided to control presentation."
                (purge-insert)
                (purge-delete))
              (pr (c) (purge) (%p c))
+             (%print-wrap (content)
+               (destructuring-bind (sub-diff path left-wrap
+                                             right-wrap . rest)
+                   content
+                 (declare (ignore path rest))
+                 (mapc #'push-inserts left-wrap)
+                 (%print-diff sub-diff)
+                 (mapc #'push-inserts (reverse right-wrap))))
+             (%print-unwrap (content)
+               (destructuring-bind (sub-diff path left-wrap right-wrap)
+                   content
+                 (declare (ignore path))
+                 (mapc #'push-deletes left-wrap)
+                 (%print-diff sub-diff)
+                 (mapc #'push-deletes (reverse right-wrap))))
              (%print-diff (diff)
                (case (car diff)
-                 (:wrap
-                  (destructuring-bind (sub-diff path left-wrap
-                                                right-wrap . rest)
-                      (cdr diff)
-                    (declare (ignore path rest))
-                    (mapc #'push-inserts left-wrap)
-                    (%print-diff sub-diff)
-                    (mapc #'push-inserts (reverse right-wrap))))
-                 (:unwrap
-                  (destructuring-bind (sub-diff path left-wrap right-wrap)
-                      (cdr diff)
-                    (declare (ignore path))
-                    (mapc #'push-deletes left-wrap)
-                    (%print-diff sub-diff)
-                    (mapc #'push-deletes (reverse right-wrap))))
+                 ((:wrap) (%print-wrap (cdr diff)))
+                 ((:unwrap) (%print-unwrap (cdr diff)))
                  (t
                   (assert (every #'consp diff))
                   (when sort-insert-delete
@@ -2306,6 +2427,8 @@ Numerous options are provided to control presentation."
                                        (:delete-sequence
                                         (map nil #'push-delete content))
                                        (:same-tail (map nil #'pr content))
+                                       (:wrap-sequence (%print-wrap (cdr content)))
+                                       (:unwrap-sequence (%print-unwrap content))
                                        (:recurse-tail
                                         (%print-diff
                                          (remove-if

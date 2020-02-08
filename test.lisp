@@ -396,6 +396,25 @@
                     (:same . :nil)))
        '(1 3 4 5))))
 
+(deftest sexp-diff-wrap-sequence.1 ()
+  (is (equalp
+       (unastify-lisp-diff (ast-diff '(1 2 3 4 5) '(1 (2 3 4) 5)
+                                     :wrap-sequences t))
+       '((:same . 1)
+         (:wrap-sequence 3 ((:same . 2) (:same . 3) (:same . 4) (:insert . :nil)) nil
+          nil nil nil (2 3 4))
+         (:same . 5) (:same . :nil)))))
+
+(deftest sexp-diff-wrap-sequence.2 ()
+  (is (equalp
+       (unastify-lisp-diff (ast-diff '(1 2 3 4 5) '(1 (2 3 . 4) 5)
+                                     :wrap-sequences t))
+       '((:same . 1)
+         (:wrap-sequence 3 ((:same . 2) (:same . 3) (:same . 4)) nil
+          nil nil nil (2 3 4))
+         (:same . 5) (:same . :nil)))))
+
+
 (deftest sexp-diff-simple-sublist-test ()
   (multiple-value-bind (script cost)
       (ast-diff '(1 '(1 2 3 4) 3 4) '(1 '(1 2 3 4) 3 5))
@@ -690,11 +709,13 @@
             #'second]
            (ast-diff-elide-same (ast-diff *binary-search* var)))))))
 
+(defun keys-of-diff (d)
+  (sort (remove-if-not #'symbolp
+                       (copy-list (remove-duplicates (flatten d))))
+        #'string< :key #'symbol-name))
+
 (deftest diff-wrap/unwrap.1 ()
-  (flet ((keys (d)
-           (sort (remove-if-not #'symbolp
-                                (copy-list (remove-duplicates (flatten d))))
-                 #'string< :key #'symbol-name)))
+  (flet ((keys (d) (keys-of-diff d)))
     (let* ((s1 "int f() { return 1; }")
            (s2 "int f() { return 1+2; }")
            (obj1 (from-string (make-instance 'clang) s1))
@@ -721,6 +742,29 @@
           (ast-diff obj2 obj1 :wrap t :max-wrap-diff -100 :base-cost 0)
         (is (equal (keys diff) '(:delete :insert :recurse :same)))
         (is (= cost 8))))))
+
+(deftest diff-sequence-wrap/unwrap.1 ()
+  (let* ((s1 "int f(int x, int y) { int c = 1; int z = x+y; return z+c; }")
+         (s2 "int f(int x, int y, int p) { int c = 1; if (p == 0) { int z = x+y; return z+c; } return 0; }")
+         (obj1 (from-string (make-instance 'new-clang) s1))
+         (obj2 (from-string (make-instance 'new-clang) s2)))
+    (multiple-value-bind (diff cost)
+        (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000
+                  :wrap-sequences t)
+      (let ((k (keys-of-diff diff)))
+        (is (equal k '(:ifstmt :insert :recurse :same :wrap-sequence))))
+      (is (= cost 58))
+      (let ((s (with-output-to-string (*standard-output*)
+                 (print-diff diff :no-color t))))
+        (is (equal s "int f(int x, int y{+, int p+}) { int c = 1; {+if (p == 0) { +}int z = x+y; return z+c;{+ } return 0;+} }"))))
+    (multiple-value-bind (diff cost)
+        (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000
+                  :wrap-sequences t)
+      (let ((k (keys-of-diff diff)))
+        (is (equal k '(:delete :recurse :same :unwrap-sequence))))
+      (is (= cost 58))
+      (let ((s (with-output-to-string (*standard-output*) (print-diff diff :no-color t))))
+        (is (equal s "int f(int x, int y[-, int p-]) { int c = 1; [-if (p == 0) { -]int z = x+y; return z+c;[- } return 0;-] }"))))))
 
 (deftest diff-wrap-patch.1 ()
   (let* ((s1 "int f() { return 1; }")
