@@ -801,7 +801,7 @@ AST-B.  If none are acceptable, return :BAD"
      (if (and (> limit 0) (< (ast-cost x) limit)) nil)
      (if (not (eql (ast-class x) a-class)) t)
      (multiple-value-bind (diff raw-cost) (ast-diff* sub-ast-a b))
-     
+
      (let ((cost (+ cost prefix-cost postfix-cost))))
      (progn
        (when (< cost best-cost)
@@ -877,7 +877,7 @@ Prefix and postfix returned as additional values."
   (in-arcs nil :type list) ;; list of arcs into this node
   (out-arcs nil :type list) ;; list of arcs out of this node
   (open-pred-count 0 :type (integer 0)) ;; number of predecessors that are still open
-  best-in-arc ;; The in arc that gave the lowest cost to this point
+  (best-in-arc nil) ;; The in arc that gave the lowest cost to this point
   (cost 0) ;; total cost to reach this node along best path
   )
 
@@ -890,12 +890,13 @@ Prefix and postfix returned as additional values."
 
 (defstruct rd-link
   "Link in the computation graph for edits on sequences"
-  src ;; a b ;; indices of source node
-  dest ;; destination node
-  cost ;; Cost of this operation
-  kind  ;; The kind of edit operation to corresponding to the link
-  op ;; The actual edit operation on this arc
-  )
+  (src (required-argument :src)) ;; a b ;; indices of source node
+  (dest (required-argument :dest)) ;; destination node
+  (cost nil) ;; Cost of this operation
+  ;; The kind of edit operation to corresponding to the link
+  (kind (required-argument :kind))
+  ;; The actual edit operation on this arc
+  (op nil))
 
 (defmethod print-object ((arc rd-link) stream)
   (if *print-readably*
@@ -1007,25 +1008,27 @@ Prefix and postfix returned as additional values."
         (assert (eql (rd-link-dest in-arc) node))
         (compute-arc-cost ast-a ast-b in-arc nodes vec-a vec-b parent-a parent-b)
         (let ((best (rd-node-best-in-arc node)))
-          (format t "best = ~a~%" best)
+          #+ast-diff-debug (format t "best = ~a~%" best)
           (when (or (null best)
                     (> (rd-node-cost node)
                        (+ (rd-node-cost (rd-link-src in-arc))
                           (rd-link-cost in-arc))))
-            (format t "a = ~a, b = ~a~%"
-                    (rd-link-a in-arc)
-                    (rd-link-b in-arc))
-            (format t "node cost = ~a~%" (rd-node-cost node))
-            (if best 
-                (format t "Replace~%~a (~a)(~a)~%with~%~a (~a)(~a)~%"
-                        (rd-link-op best) (rd-link-cost best)
-                        (+ (rd-node-cost (rd-link-src best))
-                           (rd-link-cost best))
-                        (rd-link-op in-arc) (rd-link-cost in-arc)
-                        (+ (rd-node-cost (rd-link-src in-arc))
-                           (rd-link-cost in-arc))
-                         )
-                (format t "Best ~a (~a)~%" (rd-link-op in-arc) (rd-link-cost in-arc)))
+            #+ast-diff-debug
+            (progn
+              (format t "a = ~a, b = ~a~%"
+                      (rd-link-a in-arc)
+                      (rd-link-b in-arc))
+              (format t "node cost = ~a~%" (rd-node-cost node))
+              (if best
+                  (format t "Replace~%~a (~a)(~a)~%with~%~a (~a)(~a)~%"
+                          (rd-link-op best) (rd-link-cost best)
+                          (+ (rd-node-cost (rd-link-src best))
+                             (rd-link-cost best))
+                          (rd-link-op in-arc) (rd-link-cost in-arc)
+                          (+ (rd-node-cost (rd-link-src in-arc))
+                             (rd-link-cost in-arc))
+                          )
+                  (format t "Best ~a (~a)~%" (rd-link-op in-arc) (rd-link-cost in-arc))))
             (setf (rd-node-best-in-arc node) in-arc
                   (rd-node-cost node) (+ (rd-link-cost in-arc)
                                          (rd-node-cost (rd-link-src in-arc)))))))
