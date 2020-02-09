@@ -411,9 +411,8 @@
                                      :wrap-sequences t))
        '((:same . 1)
          (:wrap-sequence 3 ((:same . 2) (:same . 3) (:same . 4)) nil
-          nil nil nil (2 3 4))
+          nil nil nil (2 3 . 4))
          (:same . 5) (:same . :nil)))))
-
 
 (deftest sexp-diff-simple-sublist-test ()
   (multiple-value-bind (script cost)
