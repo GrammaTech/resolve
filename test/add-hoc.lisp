@@ -15,16 +15,16 @@
 	(t2 (make-test-input n 'c 'd)))
     (time (ast-diff t1 t2))))
 
-(defun diff-asts-old (a1 a2)
-  (time (ast-diff-on-lists a1 a2)))
+;; (defun diff-asts-old (a1 a2)
+;;   (time (ast-diff-on-lists a1 a2)))
 
 (defun diff-asts (a1 a2)
   (time (ast-diff a1 a2)))
 
-(defun diff-files-old (f1 f2)
-  (let* ((ast1 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f1)))
-	 (ast2 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f2))))
-    (time (ast-diff-on-lists ast1 ast2))))
+;; (defun diff-files-old (f1 f2)
+;;   (let* ((ast1 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f1)))
+;;	 (ast2 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f2))))
+;;    (time (ast-diff-on-lists ast1 ast2))))
 
 (defun diff-files (f1 f2)
   (let* ((ast1 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f1)))
@@ -36,6 +36,154 @@
     (let ((ast1 (%fs s1))
 	  (ast2 (%fs s2)))
       (time (funcall fn ast1 ast2)))))
+
+;;; Generation of random sexprs and mutations thereof
+
+(defun random-from-seq (seq)
+  "Generate a random member of a sequence."
+  (let ((len (length seq)))
+    (assert (> len 0))
+    (elt seq (random len))))
+
+(defun random-from-pdf (seq)
+  "Generate a random index into a vector, where the probability
+of generating i is proportional to (elt seq i)"
+  (let* ((sum (reduce #'+ seq))
+         (r (random sum)))
+    (iter (for i from 0)
+          (for p in-sequence seq)
+          (while (>= (decf r p) 0))
+          (finally (return i)))))
+
+(defun random-partition (n p)
+  "Partition n into p numbers, each >= 1 (if possible.)"
+  (cond
+   ((<= n p)
+    (make-list p :initial-element 1))
+   (t (mapcar #'1+ (random-partition* (- n p) p)))))
+
+(defun random-partition* (n p)
+  "Partition n into p numbers, each >= 0.  Return list of numbers."
+  (assert (<= 1 p))
+  (cond
+   ((= p 1) (list n))
+   ((= n 0) (make-list p :initial-element 0))
+   (t (let* ((r (random p))
+             (n1 (random (1+ n))))
+        (cond
+         ((= r 0)
+          (cons n1 (random-partition* (- n n1) (1- p))))
+         ((= r (1- p))
+          (append (random-partition* (- n n1) (1- p)) (list n1)))
+         (t
+          (let* ((n2 (random (1+ (- n n1))))
+                 (n3 (- n n1 n2)))
+            (append (random-partition* n2 r)
+                    (list n1)
+                    (random-partition* n3 (- p 1 r))))))))))
+
+(defgeneric random-generate (generator &key size &allow-other-keys)
+  (:documentation "Generate a random object using GENERATOR"))
+
+(defclass random-sexpr ()
+  ((leafs :accessor random-sexpr-leafs
+          :initarg :leafs
+          :type sequence
+          :initform (required-argument 'leafs)
+          :documentation "Non-empty sequence of values to use as leafs in sexpr")
+   )
+  (:documentation "Object for generating random sexprs"))
+
+(defmethod random-generate ((obj random-sexpr) &key (size (required-argument 'size)))
+  (if (= size 1)
+      (random-leaf obj)
+      (let ((n (random-child-number obj size)))
+        (assert (<= 1 n size))
+        (let ((child-sizes (random-partition size n)))
+          (assert (= (length child-sizes) n))
+          (mapcar (lambda (cs) (random-generate obj :size cs)) child-sizes)))))
+
+(defgeneric random-leaf (obj)
+  (:method ((obj random-sexpr))
+    (case (random 10)
+      ((0 1 2 3 4 5 6 7)
+       (random-from-seq (random-sexpr-leafs obj)))
+      (8 (format nil "~a" (random 100)))
+      (9 (format nil " ~a " (random 100))))))
+
+(defgeneric random-child-number (obj size)
+  (:documentation "Generate a random # in the range [1,size].
+The distribution depends on OBJ")
+  (:method :around ((obj t) (size integer))
+           (assert (>= size 1))
+           (let ((n (call-next-method)))
+             (assert (integerp n))
+             (assert (<= 1 n size))
+             n))
+  (:method ((obj random-sexpr) (size integer))
+    (1+ (random (min 10 size)))))
+
+(defgeneric add-hoc-mutate (mutator val &key &allow-other-keys)
+  (:documentation "Modify VAL according to a random
+template MUTATOR."))
+
+(defgeneric generated-size (generator obj)
+  (:documentation "Size of an object, as yielded by generator")
+  (:method ((generator t) (obj cons))
+    (let ((l obj))
+      (+ (iter (while (consp l))
+               (summing (generated-size generator (pop l) )))
+         (if (null l) 0 (generated-size generator l)))))
+  (:method ((generator t) (obj t)) 1))
+
+(defmethod add-hoc-mutate ((generator t) (val list) &key (insert-size 1))
+  (let* ((len (length val))
+         (sizes (mapcar (lambda (x) (generated-size generator x)) val))
+         (i (random-from-pdf (cons len sizes))))
+    (case i
+      (0
+       (case (random 2)
+         (0 ;; insert
+          (let ((n (random (1+ len)))
+                (x (random-generate generator :size insert-size)))
+            (append (subseq val 0 n)
+                    (list x)
+                    (subseq val n))))
+         (t ;; delete
+          (let ((n (random len)))
+            (append (subseq val 0 n)
+                    (subseq val (1+ n)))))))
+      (t
+       (append (subseq val 0 (1- i))
+               (list (add-hoc-mutate generator (elt val (1- i))))
+               (subseq val i))))))
+
+(defmethod add-hoc-mutate ((generator t) (val t) &key (insert-size 1))
+  (loop (let ((new-val (random-generate generator :size insert-size)))
+          (unless (equal new-val val)
+            (return new-val)))))
+
+(defmethod add-hoc-mutate ((generator t) (val null) &key (insert-size 1))
+  (list (random-generate generator :size insert-size)))
+
+(defun random-test-patch (size reps &optional (n-mutations 1))
+  (let ((g (make-instance 'random-sexpr :leafs #(a b c d e f))))
+    (iter (repeat reps)
+          (let* ((root (random-generate g :size size))
+                 (my root))
+            (iter (repeat n-mutations) (setf my (add-hoc-mutate g my)))
+            (let ((patch (ast-diff root my :conflict t)))
+              (ast-patch root patch))))))
+
+(defun random-test-converge (size reps &optional (n-mutations 1))
+  (let ((g (make-instance 'random-sexpr :leafs #(a b c d e f))))
+    (iter (repeat reps)
+          (let* ((root (random-generate g :size size))
+                 (my root)
+                 (your root))
+            (iter (repeat n-mutations) (setf my (add-hoc-mutate g my)))
+            (iter (repeat n-mutations) (setf your (add-hoc-mutate g your)))
+            (collecting (converge my root your :conflict t))))))
 
 ;;; Utility function to find nice primes for hashing
 ;;; Used this when putting together ast-hash
@@ -98,6 +246,7 @@ by MAKE-RANDOM-DIFF-INPUT"
 	x)
       (make-random-diff-input 1 :top top)))
 
+#|
 (defun random-test (n)
   "Test that the old and new diff algorithms do the same thing.
 They sometimes won't, because the good enough algorithm doesn't
@@ -109,6 +258,7 @@ necessarily find the best diff."
       (if (equal (cadr result1) (cadr result2))
 	  nil
 	  (values :fail x y result1 result2)))))
+|#
 
 (defun random-test-2 (n &optional (fn #'ast-diff))
   "Confirm on random input that the diff algorithm produces
