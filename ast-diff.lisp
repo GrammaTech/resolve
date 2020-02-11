@@ -983,7 +983,8 @@ Prefix and postfix returned as additional values."
   (let ((ops nil))
     (iter (let ((pred-arc (rd-node-best-in-arc node)))
             (while pred-arc)
-            (push (rd-link-op pred-arc) ops)
+            (setf ops (append (rd-link-op pred-arc) ops))
+            ;; (push (rd-link-op pred-arc) ops)
             (setf node (aref nodes
                              (rd-link-a pred-arc)
                              (rd-link-b pred-arc)))))
@@ -1052,32 +1053,38 @@ Prefix and postfix returned as additional values."
          (b (when (> dest-b 0) (aref vec-b (1- dest-b)))))
     (let ((op
            (ecase (rd-link-kind arc)
-             (:insert (assert b) (cons :insert b))
-             (:delete (assert a) (cons :delete a))
+             (:insert (assert b) (list (cons :insert b)))
+             (:delete (assert a) (list (cons :delete a)))
              (:same-or-recurse
               (assert a)
               (assert b)
               (if (ast-equal-p a b)
-                  (cons :same a)
+                  (list (cons :same a))
                   ;; Recursive -- we exploit the caching :around method
                   ;; of ast-diff*
-                  (cons :recurse (ast-diff* a b))))
+                  ;; HACK -- if this is a full replacement, just splice it in
+                  (let ((diff (ast-diff* a b)))
+                    (if (and (eql (length diff) 2)
+                             (null (set-exclusive-or diff `((:delete . ,a) (:insert . ,b))
+                                                     :test #'equal)))
+                        diff
+                        (list (cons :recurse (ast-diff* a b)))))))
              (:wrap-sequence
               (assert (> dest-a 1))
               (assert (> dest-b 0))
               (let* ((len (- dest-a (rd-node-a src)))
                      (src-a (rd-node-a src))
                      (sub-a (subseq vec-a src-a (+ src-a len))))
-                (ast-diff-wrap-sequence parent-a sub-a b)))
+                (list (ast-diff-wrap-sequence parent-a sub-a b))))
              (:unwrap-sequence
               (assert (> dest-a 0))
               (assert (> dest-b 1))
               (let* ((len (- dest-b (rd-node-b src)))
                      (src-b (rd-node-b src))
                      (sub-b (subseq vec-b src-b (+ src-b len))))
-                (ast-diff-unwrap-sequence a parent-b sub-b))))))
+                (list (ast-diff-unwrap-sequence a parent-b sub-b)))))))
       (setf (rd-link-op arc) op)
-      (values op (setf (rd-link-cost arc) (diff-cost op)))
+      (values op (setf (rd-link-cost arc) (reduce #'+ op :key #'diff-cost :initial-value 0)))
       )))
 
 (defun recursive-diff (ast-a total-a ast-b total-b parent-a parent-b)

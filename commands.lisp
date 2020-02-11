@@ -90,7 +90,10 @@
                :documentation "Diff descends into AST leaf strings")
               (("wrap" #\W) :type boolean :optional t
                :documentation
-               "diff searches for wrap/unwrap operations (UNTESTED)")
+               "diff searches for wrap/unwrap operations")
+              (("wrap-sequences") :type boolean :optional t
+               :documentation
+               "diff searches for wrap/unwrap operations on sequences of AST nodes")
               (("max-wrap") :type integer
                :initial-value #.*max-wrap-diff*
                :documentation "max size diff of wrapping/unwrapping")))))
@@ -299,6 +302,7 @@ command-line options processed by the returned function."
            (setf diff (resolve/ast-diff:ast-diff
                        old-sw new-sw
                        :wrap wrap :max-wrap-diff max-wrap
+                       :wrap-sequences wrap-sequences
                        :base-cost base-cost
                        :strings strings))
            ;; Special handling for SIMPLE diffs, which don't have newlines.
