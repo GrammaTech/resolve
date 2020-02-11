@@ -579,11 +579,11 @@
                            "int a; int b; int c; int d;"))
         (obj2 (from-string (make-instance 'clang)
                            "int a; int z; int b; int c; int d;")))
-    (is (= 7 (nth-value 1 (ast-diff obj1 obj2 :base-cost 0))))
-    (is (= 11 (nth-value 1 (ast-diff obj1 obj2 :base-cost 2))))
-    (is (= 5 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t
+    (is (= 8 (nth-value 1 (ast-diff obj1 obj2 :base-cost 0))))
+    (is (= 12 (nth-value 1 (ast-diff obj1 obj2 :base-cost 2))))
+    (is (= 6 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t
                                     :base-cost 0))))
-    (is (= 9 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t
+    (is (= 10 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t
                                     :base-cost 2))))))
 
 (deftest (diff-insert :long-running) ()
