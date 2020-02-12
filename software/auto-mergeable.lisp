@@ -30,7 +30,6 @@
         :resolve/ast-diff
         :software-evolution-library
         :software-evolution-library/utility
-        :software-evolution-library/software/ast
         :software-evolution-library/software/clang
         :software-evolution-library/software/file
         :software-evolution-library/software/simple

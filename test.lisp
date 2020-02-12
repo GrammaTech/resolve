@@ -11,7 +11,6 @@
         :software-evolution-library
         :software-evolution-library/utility
         :software-evolution-library/stefil-plus
-        :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
         :software-evolution-library/software/source
@@ -1081,7 +1080,7 @@
     (is (eql (car merged) 'a) "4-conflict 2")
     (is (conflict-ast-p (cadr merged))
         "4-conflict 3")
-    (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
+    (is (equal (sel/sw/parseable:conflict-ast-child-alist (cadr merged))
                '((:my b) (:your c)))
         "4-conflict 4")))
 
@@ -1091,7 +1090,7 @@
     (is (eql (car merged) 'a) "5-conflict 2")
     (is (conflict-ast-p (cadr merged))
         "5-conflict 3")
-    (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
+    (is (equal (sel/sw/parseable:conflict-ast-child-alist (cadr merged))
                '((:my b)))
         "5-conflict 4")))
 
@@ -1099,7 +1098,7 @@
   (let ((merged (converge '(a c) '(a c) '(a b c) :meld? nil :conflict t)))
     (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql c) null))))
         "5a-conflict 1")
-    (is (equal (sel/sw/ast:conflict-ast-child-alist (cadr merged))
+    (is (equal (sel/sw/parseable:conflict-ast-child-alist (cadr merged))
                '((:your b)))
         "5a-conflict 2")))
 
@@ -1301,7 +1300,7 @@
 (deftest (resolve-to-should-not-modify-conflict-nodes-in-the-original
           :long-running) ()
   ;; NOTE: This was fixed by replacing `nconc' with `append' in
-  ;; `set-ast-siblings' in SEL/SW/AST.
+  ;; `set-ast-siblings' in SEL/SW/PARSEABLE.
   (flet ((conflict-nodes (obj)
            (let ((result
                   (remove-if-not #'conflict-ast-p

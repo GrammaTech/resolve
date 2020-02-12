@@ -46,7 +46,7 @@
         :software-evolution-library/utility
         :software-evolution-library/command-line
         :software-evolution-library/command-line-rest
-        :software-evolution-library/software/ast
+        :software-evolution-library/software/parseable
         :software-evolution-library/software/simple
         :software-evolution-library/software/project
         :software-evolution-library/software/clang

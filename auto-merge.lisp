@@ -14,7 +14,6 @@
         :software-evolution-library/command-line
         :software-evolution-library/components/lexicase
         :software-evolution-library/components/test-suite
-        :software-evolution-library/software/ast
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
         :software-evolution-library/software/source
