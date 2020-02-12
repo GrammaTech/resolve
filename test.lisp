@@ -1284,15 +1284,18 @@
                '((:old (d)) (:your (e))))
         "9-conflict 2")))
 
+(defun converge-test-helper (m)
+  (sort (copy-list (unastify-lisp-diff
+                    (conflict-ast-child-alist (cadr m))))
+        #'string< :key #'car))
+
 (deftest sexpr-converge.10-conflict ()
   (let ((merged (converge '(a (d) b) '(a (d) b) '(a (e) b) :meld? nil
                           :conflict t :base-cost 0)))
     (is (typep merged '(cons (eql a) (cons conflict-ast
                                       (cons (eql b) null))))
         "10-conflict 1")
-    (is (equalp (sort (copy-list (unastify-lisp-diff
-                                  (conflict-ast-child-alist (cadr merged))))
-                      #'string< :key #'car)
+    (is (equalp (converge-test-helper merged)
                 '((:my (d)) (:old (d)) (:your (e))))
         "10-conflict 2")))
 
@@ -1302,11 +1305,46 @@
     (is (typep merged '(cons (eql a) (cons conflict-ast
                                       (cons (eql b) null))))
         "11-conflict 1")
-    (is (equalp (sort (copy-list (unastify-lisp-diff
-                                  (conflict-ast-child-alist (cadr merged))))
-                      #'string< :key #'car)
+    (is (equalp (converge-test-helper merged)
                 '((:my (e)) (:old (d)) (:your (d))))
         "11-conflict 2")))
+
+(deftest sexpr-converge.12-conflict ()
+  (let ((merged (converge '(a b c) '(a (b 1) c) '(a (b 2) c) :conflict t :wrap t)))
+    (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql c) null)))))
+    (is (equalp (converge-test-helper merged)
+                '((:my b) (:old (b 1)) (:your (b 2)))))))
+
+(deftest sexpr-converge.13-conflict ()
+  (let ((merged (converge '(a b d) '(a (b c) d) '(a c d) :conflict t :wrap t)))
+    (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql d) null)))))
+    (is (equalp (converge-test-helper merged)
+                '((:my b) (:old (b c)) (:your c))))))
+
+(deftest sexpr-converge.14-conflict ()
+  (let ((merged (converge '(a (b c 1) d) '(a b c d) '(a (b c 2) d) :conflict t :wrap t
+                          :wrap-sequences t)))
+    (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql d) null)))))
+    (is (equalp (converge-test-helper merged)
+                '((:my (b c 1)) (:old b c)
+                  (:your (b c 2)))))))
+
+(deftest sexpr-converge.15-conflict ()
+  (let ((merged (converge '(a (b c) d) '(a b c d) '(a (b) c d) :conflict t :wrap t
+                          :wrap-sequences t)))
+    (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql d) null)))))
+    (is (equal (converge-test-helper merged)
+               '((:my (b c)) (:old b c)
+                 (:your (b) c))))))
+
+(deftest sexpr-converge.16-conflict ()
+  (let ((merged (converge '(a b c e) '(a (b c d) e) '(a c d e) :conflict t :wrap t
+                          :wrap-sequences t)))
+    (is (typep merged '(cons (eql a) (cons conflict-ast (cons (eql e) null)))))
+    (is (equal (converge-test-helper merged)
+               '((:my b c) (:old (b c d))
+                 (:your c d))))))
+
 
 (deftest (json-merge3 :long-running) ()
   (with-fixture json-conflict-yargs
