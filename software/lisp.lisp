@@ -7,6 +7,7 @@
         :resolve/ast-diff
         :software-evolution-library
         :software-evolution-library/utility
+        :software-evolution-library/software/parseable
         :software-evolution-library/software/lisp))
 (in-package :resolve/software/lisp)
 (in-readtable :curry-compose-reader-macros)
