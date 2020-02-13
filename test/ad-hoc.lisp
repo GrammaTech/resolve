@@ -15,21 +15,54 @@
 	(t2 (make-test-input n 'c 'd)))
     (time (ast-diff t1 t2))))
 
+(defun remove-empty-strings-from-ast (ast)
+  (sel/sw/parseable:map-ast
+   ast
+   (lambda (a) (setf (ast-children a)
+                     (remove "" (ast-children a) :test #'equal))))
+  ast)
+
 ;; (defun diff-asts-old (a1 a2)
 ;;   (time (ast-diff-on-lists a1 a2)))
 
-(defun diff-asts (a1 a2)
-  (time (ast-diff a1 a2)))
+(defun diff-asts (a1 a2 &rest args)
+  (time (apply #'ast-diff a1 a2 args)))
 
 ;; (defun diff-files-old (f1 f2)
 ;;   (let* ((ast1 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f1)))
 ;;	 (ast2 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f2))))
 ;;    (time (ast-diff-on-lists ast1 ast2))))
 
-(defun diff-files (f1 f2)
+(defun diff-files (f1 f2 &rest args)
   (let* ((ast1 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f1)))
 	 (ast2 (sel/sw/parseable:ast-root (sel:from-file (make-instance 'sel/sw/clang:clang) f2))))
-    (time (ast-diff ast1 ast2))))
+    (time (apply #'ast-diff
+                 ast1 ast2 args))))
+
+(defun diff-octomap (&rest args)
+  (let* ((dir "/pdietz/quicklisp/local-projects/resolve")
+         (old-flags (sel/command-line:handle-comma-delimited-argument
+                     (format nil
+                             "-I ~a/test/etc/octomap/octomap-1.7.2/include,-I ~atest/etc/octomap/octomap-1.7.2/src"
+                             dir dir)))
+         (new-flags (sel/command-line:handle-comma-delimited-argument
+                     (format nil
+                             "-I ~a/test/etc/octomap/octomap-1.8.0/include,-I ~atest/etc/octomap/octomap-1.8.0/src"
+                             dir dir)))
+         (ast1 (sel/sw/parseable:ast-root
+                (sel/command-line:create-software "test/etc/octomap/octomap-1.7.2/src/test_iterators.cpp"
+                                                  :flags old-flags
+                                                  :ignore-other-paths '(list #P"compile_commands.json")
+                                                  :language 'sel/sw/clang:clang)))
+         (ast2 (sel/sw/parseable:ast-root
+                (sel/command-line:create-software "test/etc/octomap/octomap-1.8.0/src/test_iterators.cpp"
+                                                  :flags new-flags
+                                                  :ignore-other-paths '(list #P"compile_commands.json")
+                                                  :language 'sel/sw/clang:clang))))
+    (setf ast1 (remove-empty-strings-from-ast ast1))
+    (setf ast2 (remove-empty-strings-from-ast ast2))
+    (time (apply #'ast-diff ast1 ast2 args))))
+                                                   
 
 (defun diff-strings (s1 s2 &key (fn #'ast-diff))
   (flet ((%fs (s) (sel/sw/parseable:ast-root (sel:from-string (make-instance 'sel/sw/clang:clang) s))))
