@@ -228,8 +228,9 @@
 
 (deftest sexp-diff-numbers ()
   (is (equalp (multiple-value-list (ast-diff 1 2 :base-cost 0))
-		'(((:delete . 1) (:insert . 2))
-		  2))
+              '(((:insert . 2)
+                 (:delete . 1))
+                2))
 	"Diff of two numbers"))
 
 (deftest sexp-diff-numbers-same ()
