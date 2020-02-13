@@ -41,6 +41,8 @@
   (:import-from :uiop :nest)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-RST+)
+  (:shadowing-import-from :software-evolution-library/software/clang
+                          :map-ast-while)
   (:export
    :ast-equal-p
    :ast-cost
