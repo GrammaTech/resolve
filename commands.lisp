@@ -254,8 +254,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable quiet verbose split-lines
-                      old-split-lines new-split-lines))
+  (declare (ignorable quiet verbose))
   #+drop-dead
   (drop-dead-date ()
     (exit-command ast-diff 2
@@ -485,8 +484,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable quiet verbose split-lines
-                      my-split-lines your-split-lines old-split-lines))
+  (declare (ignorable quiet verbose))
   #+drop-dead
   (drop-dead-date ()
     (exit-command ast-merge 2
@@ -557,8 +555,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable manual quiet fault-loc split-lines
-                      my-split-lines your-split-lines old-split-lines))
+  (declare (ignorable manual quiet fault-loc ))
   #+drop-dead
   (drop-dead-date ()
     (exit-command auto-merge 2
