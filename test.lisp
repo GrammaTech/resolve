@@ -745,8 +745,8 @@
 (deftest diff-sequence-wrap/unwrap.1 ()
   (let* ((s1 "int f(int x, int y) { int c = 1; int z = x+y; return z+c; }")
          (s2 "int f(int x, int y, int p) { int c = 1; if (p == 0) { int z = x+y; return z+c; } return 0; }")
-         (obj1 (from-string (make-instance 'new-clang) s1))
-         (obj2 (from-string (make-instance 'new-clang) s2)))
+         (obj1 (from-string (make-instance 'clang) s1))
+         (obj2 (from-string (make-instance 'clang) s2)))
     (multiple-value-bind (diff cost)
         (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000
                   :wrap-sequences t)
@@ -812,7 +812,7 @@
 ;; more prefered, vs. fine scaled replacement inside strings
 (deftest print-diff.3a ()
   (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'new-clang) s)))
+                (flet ((%f (s) (from-string (make-instance 'clang) s)))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
                                         (%f "int a; int d; int c;")
                                         :base-cost 1)
@@ -834,7 +834,7 @@
 
 (deftest print-diff.4a ()
   (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'new-clang) s)))
+                (flet ((%f (s) (from-string (make-instance 'clang) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
                                         (%f "char *s = \"acd\";")
                                         :base-cost 3)
