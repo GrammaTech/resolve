@@ -1186,7 +1186,7 @@ value that is used instead."
   (let* ((hash (ast-hash ast))
          (old-ast (gethash hash table)))
     (when (and old-ast (not (ast-equal-p ast old-ast)))
-      (iter (incf hash) ; may be >= sel/sw/parseable::+ast-hash-base+, but is ok
+      (iter (incf hash) ; may be >= sel/sw/parseable::+ast-hash-base+, but that's ok
             (while (gethash hash table)))
       (setf (gethash hash table) ast))
     hash))
