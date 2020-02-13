@@ -494,7 +494,7 @@ differencing of specialized AST structures.; `ast-equal-p',
 
 (let ((ast-diff-cache (make-hash-table))
       (ast-diff-counter 0)
-      (hash-upper-limit 1000000))
+      (hash-upper-limit 50000000))
   (declare (type (integer 0 1000000000) ast-diff-counter))
   ;; The cache maps key pairs to values and counts
   ;; The counter is incremented to find the most recent
@@ -527,7 +527,7 @@ differencing of specialized AST structures.; `ast-equal-p',
 
   (defun thin-ast-diff-table ()
     (assert (>= ast-diff-counter hash-upper-limit))
-    (let* ((h2 (ash hash-upper-limit 1))
+    (let* ((h2 (ash hash-upper-limit -1))
            (d (- ast-diff-counter h2)))
       (maphash (lambda (k v)
                  (let* ((head (cons nil v))
@@ -1195,7 +1195,7 @@ value that is used instead."
   #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
   (if (equal ast-a ast-b)
       (values `((:same . ,ast-a)) 0)
-      (values `((:delete . ,ast-a) (:insert . ,ast-b))
+      (values `((:insert . ,ast-b) (:delete . ,ast-a))
               (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b)))))
 
 (defmethod ast-diff* ((ast-a list) (ast-b list))
