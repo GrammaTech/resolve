@@ -131,8 +131,6 @@
        :documentation "number of test cases to execute")
       (("base-cost") :type integer :initial-value 10
        :documentation "Base edit operation cost")
-      (("randomize") :type boolean :optional t
-       :documentation "Utilize a non-fixed random seed")
       (("ignore-paths") :type string :optional t
        :initial-value "compile_commands.json"
        :action #'handle-comma-delimited-argument
@@ -576,7 +574,7 @@ command-line options processed by the returned function."
   (when help (show-help-for-ast-merge))
   (unless (every #'resolve-file (list old-file my-file your-file))
     (exit-command auto-merge 2 (error "Missing source.")))
-  (setf *random-state* (if randomize (make-random-state t) *random-state*)
+  (setf *random-state* (if read-seed *random-state*  (make-random-state t))
         out-dir (or out-dir (resolve-out-dir-from-source old-file))
         old-file (namestring (truename old-file))
         my-file (namestring (truename my-file))

@@ -66,7 +66,6 @@ test_auto_merge () {
 
     auto-merge $@ \
                --out-dir ${OUT_DIR:-$TMP_OUT_DIR} \
-               --randomize \
                $TMP_MY \
                $TMP_OLD \
                $TMP_YOUR \

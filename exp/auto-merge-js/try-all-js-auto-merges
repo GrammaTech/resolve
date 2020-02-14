@@ -34,6 +34,7 @@ DEFAULT_MAX_TIME = 21600
 DEFAULT_POP_SIZE = 1024
 DEFAULT_VERBOSITY = 2
 DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_SEED = None
 
 def execute(command):
     """
@@ -115,7 +116,8 @@ def try_js_auto_merge(benchmarks, outdir, line,
                       evolve=DEFAULT_EVOLVE,
                       max_time=DEFAULT_MAX_TIME,
                       pop_size=DEFAULT_POP_SIZE,
-                      verbose=DEFAULT_VERBOSITY):
+                      verbose=DEFAULT_VERBOSITY,
+                      seed=DEFAULT_SEED):
     """
     Read the given line in the format "project base left right"
     where project is a git repository in BENCHMARKS and attempt to
@@ -126,6 +128,7 @@ def try_js_auto_merge(benchmarks, outdir, line,
     MAX_TIME: Maximum number of seconds to run the evolutionary loop.
     POP_SIZE: Size of the evolution population.
     VERBOSE: Verbosity level of auto-merge output
+    SEED: File to load random seed from
     """
     name, base, left, right = line.split()
     project_path = os.path.realpath(os.path.join(benchmarks, name))
@@ -172,6 +175,7 @@ def try_js_auto_merge(benchmarks, outdir, line,
                                                     'test.sh'),
                                        resolution)
                         args = ['--evolve'] if evolve else []
+                        args = args + ['--read-seed', seed] if seed else args
                         args = args + \
                                ['--max-time',
                                 str(max_time),
@@ -266,6 +270,10 @@ if __name__ == '__main__':
         help='Level of logging include in output.  One of ' +
              '[DEBUG,INFO,WARNING,ERROR,CRITICAL].'
     )
+    parser.add_argument(
+        '--seed', type=str, default=DEFAULT_SEED,
+        help='File to load random seed from.'
+    )
 
     # Parse arguments
     args = parser.parse_args()
@@ -298,7 +306,8 @@ if __name__ == '__main__':
                           evolve=args.evolve,
                           max_time=args.max_time,
                           pop_size=args.pop_size,
-                          verbose=args.verbose)
+                          verbose=args.verbose,
+                          seed=args.seed)
     results = p.map(f, lines)
 
     # Log totals
