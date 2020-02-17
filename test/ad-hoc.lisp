@@ -39,6 +39,19 @@
     (time (apply #'ast-diff
                  ast1 ast2 args))))
 
+(defun load-octomap (version)
+  (let* ((dir "/pdietz/quicklisp/local-projects/resolve")
+         (flags (sel/command-line:handle-comma-delimited-argument
+                 (format nil
+                         "-I ~a/test/etc/octomap/octomap-~a/include,-I ~atest/etc/octomap/octomap-~a/src"
+                         dir version dir version)))
+         (file (format nil "~a/test/etc/octomap/octomap-~a/src/test_iterators.cpp" dir version)))
+    (ast-root (sel/command-line:create-software
+               file
+               :flags flags
+               :ignore-other-paths '(list #P"compile_commands.json")
+               :language 'sel/sw/clang:clang))))
+
 (defun diff-octomap (&rest args)
   (let* ((dir "/pdietz/quicklisp/local-projects/resolve")
          (old-flags (sel/command-line:handle-comma-delimited-argument
@@ -62,7 +75,7 @@
     (setf ast1 (remove-empty-strings-from-ast ast1))
     (setf ast2 (remove-empty-strings-from-ast ast2))
     (time (apply #'ast-diff ast1 ast2 args))))
-                                                   
+
 
 (defun diff-strings (s1 s2 &key (fn #'ast-diff))
   (flet ((%fs (s) (sel/sw/parseable:ast-root (sel:from-string (make-instance 'sel/sw/clang:clang) s))))
@@ -328,3 +341,42 @@ a valid patch.  Return :FAIL (and other values) if not."
 				 (subseq s2 p2 (+ p2 l))))))
        nil
        (list s1 s2 triples)))))
+
+;;;; Check for hash collisions
+
+(defun check-for-hash-collisions (ast)
+  (let ((table (make-hash-table)))
+    (mapc-ast-and-strings
+     ast
+     (lambda (a)
+       (pushnew a (gethash (ast-hash a) table)
+                :test #'ast-equal-p)))
+    (let ((collisions
+           (sort
+            (iter (for (k v) in-hashtable table)
+                  (when (> (length v) 1)
+                    (collecting (list k (length v)))))
+            #'>
+            :key #'cadr)))
+      (values
+       collisions
+       (length collisions)
+       (hash-table-count table)))))
+
+(defun hashs-of-ast (ast)
+  (let ((table (make-hash-table)))
+    (mapc-ast-and-strings
+     ast
+     (lambda (a)
+       (let* ((h (ast-hash a))
+              (p (gethash h table)))
+         (unless p (setf p (setf (gethash h table)
+                                 (cons 0 (if (stringp a) (list a) nil)))))
+         (incf (car p)))))
+    (sort
+     (iter (for (k v) in-hashtable table)
+           (collecting (cons k v)))
+     #'>
+     :key #'cadr)))
+
+
