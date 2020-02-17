@@ -265,7 +265,7 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
 ;;; Evolution of a merge resolution.
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target num-threads
-                       strings base-cost wrap max-wrap-diff &allow-other-keys)
+                       strings base-cost wrap wrap-sequences max-wrap-diff &allow-other-keys)
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.
 Keyword argument EVOLVE? is a boolean specifying whether to attempt evolution
@@ -276,6 +276,7 @@ Keyword argument NUM-THREADS specifies the number of threads to utilize
 Keyword argument STRINGS specifies if the diff should descend into strings
 Keyword argument BASE COST specifies the basic cost of a diff
 Keyword argument WRAP specifies if wrap/unwrap actions should appear in diffs
+Keyword argument WRAP-SEQUENCES specifies if sequence wrap/unwrap actions should appear in diffs
 Keyword argument MAX-WRAP-DIFF specifies the max size difference for wrap/unwrap
 Extra keys are passed through to EVOLVE.")
   (:method ((my software) (old software) (your software) test
@@ -284,6 +285,7 @@ Extra keys are passed through to EVOLVE.")
               ((:strings *strings*) *strings*)
               ((:base-cost *base-cost*) *base-cost*)
               ((:wrap *wrap*) *wrap*)
+              ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
               ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*))
     (note 2 "Populate candidate merge resolutions.")
 
