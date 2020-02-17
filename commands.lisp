@@ -520,6 +520,7 @@ command-line options processed by the returned function."
        :strings strings
        :conflict conflict
        :wrap wrap
+       :wrap-sequences wrap-sequences
        :max-wrap-diff max-wrap
        :base-cost base-cost)
     ;; Write the result, either to out-dir or to STDOUT.
@@ -559,7 +560,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable manual quiet fault-loc ))
+  (declare (ignorable manual quiet fault-loc))
   #+drop-dead
   (drop-dead-date ()
     (exit-command auto-merge 2
@@ -589,6 +590,7 @@ command-line options processed by the returned function."
                   :strings strings
                   :base-cost base-cost
                   :wrap wrap
+                  :wrap-sequences wrap-sequences
                   :max-wrap-diff max-wrap
                   (append (when evolve (list :evolve? evolve))
                           (when max-evals (list :max-evals max-evals))
