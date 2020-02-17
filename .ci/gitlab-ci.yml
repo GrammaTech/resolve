@@ -153,9 +153,7 @@ nightly:
 cleanup:
   stage: deploy-and-cleanup
   script:
-    - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-ccl
     - docker rmi -f ${LOCAL_IMAGE_NAME}-arch-sbcl
     - docker rmi -f ${LOCAL_IMAGE_NAME}-ubuntu-sbcl
-    - docker rmi -f ${LOCAL_IMAGE_NAME}-ubuntu-ccl
   except:
     - master
