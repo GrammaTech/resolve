@@ -481,6 +481,56 @@ rewritten TO by part of the edit script"))
 
 ;;; Main interface to calculating ast differences.
 
+;;; Macro for memoizing ast-diff-like methods
+
+(defmacro defmethod-cached (name args &body body)
+  (let* ((args args)
+         (primary-args
+          (iter (while args)
+                (nest
+                 (if (not (consp args))
+                     (error "Args not a proper list"))
+                 (if (symbolp (car args))
+                     (if (member (car args) lambda-list-keywords)
+                         (finish)
+                         (collecting (pop args))))
+                 (if (consp (car args))
+                     (progn
+                       (assert (symbolp (caar args)))
+                       (collecting (car (pop args))))
+                     (error "Bad argument: ~s" (car args))))))
+         (cache (gensym "CACHE"))
+         (counter (gensym "COUNTER"))
+         (hash-upper-limit 50000000)
+         (key (gensym "KEY"))
+         (h (gensym "H"))
+         (val-alist (gensym "VAL-ALIST"))
+         (vals (gensym "VALS"))
+         (p (gensym "P"))
+         )
+    `(let ((,cache (make-hash-table))
+           (,counter 0))
+       (declare (type 0 1000000000) ,counter)
+       (defmethod ,name :around ,args
+          (let* ((,key (list ,@primary-args))
+                 (,h (ast-hash ,key)))
+            (let* ((,val-alist (gethash ,h ,cache))
+                   (,p (assoc ,key ,val-alist :test #'equal)))
+              (nest
+               (if p (let ((,vals (cadr ,p)))
+                       (values (car ,vals) (cdr ,vals))))
+               (if (>= (length ,val-alist) 10)
+                   (call-next-method))
+               (let ((return-values (multiple-value-list (call-next-method))))
+                 (when (> ,counter ,hash-upper-limit)
+                   (setf ,counter (thin-ast-diff-table ,cache ,counter)))
+                 (push (cons (list* ,key return-values ,counter)
+                             (gethash ,key ,cache)))
+                 (incf ,counter)
+                 (apply #'values return-values)))))))))
+
+
+
 (defgeneric ast-diff* (ast-a ast-b)
   (:documentation
    "Return a least-cost edit script which transforms AST-A into AST-B.
@@ -517,7 +567,8 @@ differencing of specialized AST structures.; `ast-equal-p',
              (multiple-value-bind (diff cost)
                  (call-next-method)
                (when (>= ast-diff-counter hash-upper-limit)
-                 (thin-ast-diff-table))
+                 (setf ast-diff-counter
+                       (thin-ast-diff-table ast-diff-cache ast-diff-counter)))
                (assert (< ast-diff-counter hash-upper-limit))
                (setf (gethash key ast-diff-cache)
                      (cons (list* key (cons diff cost) ast-diff-counter)
@@ -525,10 +576,10 @@ differencing of specialized AST structures.; `ast-equal-p',
                (incf ast-diff-counter)
                (values diff cost))))))))
 
-  (defun thin-ast-diff-table ()
-    (assert (>= ast-diff-counter hash-upper-limit))
+  (defun thin-ast-diff-table (cache counter)
+    (assert (>= counter hash-upper-limit))
     (let* ((h2 (ash hash-upper-limit -1))
-           (d (- ast-diff-counter h2)))
+           (d (- counter h2)))
       (maphash (lambda (k v)
                  (let* ((head (cons nil v))
                         (p head)
@@ -541,9 +592,9 @@ differencing of specialized AST structures.; `ast-equal-p',
                             (decf (cddar n) d)
                             (setf p n n (cdr n)))))
                    (unless (eql (cdr head) v)
-                     (setf (gethash k ast-diff-cache) (cdr head)))))
-               ast-diff-cache)
-      (setf ast-diff-counter h2)))
+                     (setf (gethash k cache) (cdr head)))))
+               cache)
+      (setf counter h2)))
 
   (defun clear-ast-diff-table ()
     (setf ast-diff-counter 0)
@@ -992,7 +1043,7 @@ Prefix and postfix returned as additional values."
     (assert (eql (rd-node-b node) 0))
     ops))
 
-(defun compute-best-paths (ast-a ast-b nodes vec-a vec-b parent-a parent-b)
+(defun compute-best-paths (nodes vec-a vec-b parent-a parent-b)
   (let ((fringe (make-simple-queue))
         (total-open 1))
     ;; Start at the (0,0) node, which is the () -> ()
@@ -1007,7 +1058,7 @@ Prefix and postfix returned as additional values."
       ;; Compute the costs of all arcs into this node
       (dolist (in-arc (rd-node-in-arcs node))
         (assert (eql (rd-link-dest in-arc) node))
-        (compute-arc-cost ast-a ast-b in-arc nodes vec-a vec-b parent-a parent-b)
+        (compute-arc-cost in-arc nodes vec-a vec-b parent-a parent-b)
         (let ((best (rd-node-best-in-arc node)))
           #+ast-diff-debug (format t "best = ~a~%" best)
           (when (or (null best)
@@ -1042,7 +1093,7 @@ Prefix and postfix returned as additional values."
             (incf total-open))))
       )))
 
-(defun compute-arc-cost (ast-a ast-b arc nodes vec-a vec-b parent-a parent-b)
+(defun compute-arc-cost (arc nodes vec-a vec-b parent-a parent-b)
   "Compute the cost of an RD arc"
   (declare (ignorable nodes))
   (let* ((src (aref nodes (rd-link-a arc) (rd-link-b arc)))
@@ -1087,10 +1138,10 @@ Prefix and postfix returned as additional values."
       (values op (setf (rd-link-cost arc) (reduce #'+ op :key #'diff-cost :initial-value 0)))
       )))
 
-(defun recursive-diff (ast-a total-a ast-b total-b parent-a parent-b)
+(defun recursive-diff (total-a total-b parent-a parent-b)
   (multiple-value-bind (nodes vec-a vec-b)
       (build-rd-graph total-a total-b)
-    (compute-best-paths ast-a ast-b nodes vec-a vec-b parent-a parent-b)
+    (compute-best-paths nodes vec-a vec-b parent-a parent-b)
     (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b)))))
 
 (defun diff-cost (diff &aux (base-cost *base-cost*))
@@ -1129,7 +1180,6 @@ Prefix and postfix returned as additional values."
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
 
 (defun ast-diff-on-lists (ast-a ast-b parent-a parent-b)
-  (declare (ignore parent-a parent-b))
   (assert (proper-list-p ast-a))
   (assert (proper-list-p ast-b))
   ;; Drop common prefix and postfix, just run the diff on different middle.
@@ -1176,7 +1226,7 @@ Prefix and postfix returned as additional values."
             (values (mapcar (lambda (el) (cons :delete el)) unique-a)
                     (1- (ccost unique-a)))))) ; 1- for trailing nil.
 
-      (let ((rdiff (recursive-diff ast-a unique-a ast-b unique-b parent-a parent-b)))
+      (let ((rdiff (recursive-diff unique-a unique-b parent-a parent-b)))
         (add-common rdiff (diff-cost rdiff))))))
 
 (defun ast-hash-with-check (ast table)
@@ -1248,8 +1298,7 @@ value that is used instead."
       (values overall-diff overall-cost))))
 
 (defmethod ast-diff* ((s1 string) (s2 string)
-                      &aux (ignore-whitespace *ignore-whitespace*)
-                        (base-cost *base-cost*))
+                      &aux (ignore-whitespace *ignore-whitespace*))
   "special diff method for strings"
   #+debug (format t "ast-diff[STRING]~%")
   (if *strings*
@@ -1260,27 +1309,31 @@ value that is used instead."
       ;; be present.  If whitespace is ignored, treat strings the same
       ;; if whitespace were there, except cost is computed as if whitespace
       ;; is not there.
-      (let*
-          ((ns1 (if ignore-whitespace (remove-if #'whitespacep s1) s1))
-           (ns2 (if ignore-whitespace (remove-if #'whitespacep s2) s2))
-           (p (and ignore-whitespace (string= ns1 ns2))))
-        (cond
-          ((string= s1 s2)
-           (values `((:same-sequence . ,s1)) 0))
-          ((string= s1 "")
-           (values `((:insert-sequence . ,s2))
-                   (+ base-cost (if p 0 1))))
-          ((string= s2 "")
-           (values `((:delete-sequence . ,s1))
-                   (+ base-cost (if p 0 1))))
-          (t
-           (values `((:insert-sequence . ,s2)
-                     (:delete-sequence . ,s1))
-                   (+ (* 2 base-cost)
-                      (cond (p 0)
-                            ((string= ns1 "") 1)
-                            ((string= ns2 "") 1)
-                            (t 2)))))))))
+      (string-diff-crude s1 s2 ignore-whitespace)))
+
+(defun string-diff-crude (s1 s2 ignore-whitespace)
+  (let*
+      ((base-cost *base-cost*)
+       (ns1 (if ignore-whitespace (remove-if #'whitespacep s1) s1))
+       (ns2 (if ignore-whitespace (remove-if #'whitespacep s2) s2))
+       (p (and ignore-whitespace (string= ns1 ns2))))
+    (cond
+      ((string= s1 s2)
+       (values `((:same-sequence . ,s1)) 0))
+      ((string= s1 "")
+       (values `((:insert-sequence . ,s2))
+               (+ base-cost (if p 0 1))))
+      ((string= s2 "")
+       (values `((:delete-sequence . ,s1))
+               (+ base-cost (if p 0 1))))
+      (t
+       (values `((:insert-sequence . ,s2)
+                 (:delete-sequence . ,s1))
+               (+ (* 2 base-cost)
+                  (cond (p 0)
+                        ((string= ns1 "") 1)
+                        ((string= ns2 "") 1)
+                        (t 2))))))))
 
 (defun simple-genome-pack (unpacked-g)
   "Converts list of pairs into a SIMPLE genome"
