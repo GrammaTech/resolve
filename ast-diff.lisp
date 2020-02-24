@@ -483,6 +483,7 @@ rewritten TO by part of the edit script"))
 
 ;;; Macro for memoizing ast-diff-like methods
 
+#+(or)
 (defmacro defmethod-cached (name args &body body)
   (let* ((args args)
          (primary-args
@@ -541,7 +542,6 @@ See `ast-patch' for more details on edit scripts.
 The following generic functions may be specialized to configure
 differencing of specialized AST structures.; `ast-equal-p',
 `ast-cost' and `ast-can-recurse'."))
-
 (let ((ast-diff-cache (make-hash-table))
       (ast-diff-counter 0)
       (hash-upper-limit 50000000))
@@ -570,7 +570,7 @@ differencing of specialized AST structures.; `ast-equal-p',
                  (setf ast-diff-counter
                        (thin-ast-diff-table ast-diff-cache ast-diff-counter)))
                (assert (< ast-diff-counter hash-upper-limit))
-               (setf (gethash key ast-diff-cache)
+               (setf (gethash h ast-diff-cache)
                      (cons (list* key (cons diff cost) ast-diff-counter)
                            (gethash key ast-diff-cache)))
                (incf ast-diff-counter)
@@ -653,11 +653,12 @@ of children leading down to the node."))
           (for i from 0)
           (when (ast-p c) (map-ast-while-path c fn (cons i path))))))
 
-(defgeneric ast-diff-wrap (ast-a ast-b &key skip-root)
+(defgeneric ast-diff-wrap (ast-a ast-b &key skip-root first-ast-child)
   (:documentation
    "Find a minimum cost 'wrap' edit, which wraps an AST in a larger ast"))
 
-(defmethod ast-diff-wrap ((ast-a ast) (ast-b ast) &key (skip-root t))
+(defmethod ast-diff-wrap ((ast-a ast) (ast-b ast)
+                          &key (skip-root t) first-ast-child)
   ;; search over the ASTs under ast-b that are the same class as ast-a,
   ;; and for which the size difference is not too large
   (let* ((ast-a-cost (ast-cost ast-a))
@@ -669,6 +670,8 @@ of children leading down to the node."))
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive calls
          (*wrap* nil))
+    (when (integerp first-ast-child)
+      (setf first-ast-child (elt (ast-children ast-a) first-ast-child)))
     #+ast-diff-wrap-debug (format t "(ast-class ast-a) = ~S~%" a-class)
     (nest
      (map-ast-while-path ast-b)
@@ -687,6 +690,10 @@ of children leading down to the node."))
        ;; If X is not the right class, also skip it
        ((not (eql (ast-class x) a-class))
         #+ast-diff-wrap-debug (format t "~a is wrong class~%" x)
+        t)
+       ;; If the first AST child is not found in the list of children
+       ;; with a "good" match, skip
+       ((and first-ast-child (not (ast-child-check first-ast-child x)))
         t))
      ;; Only if the size is in the right range, and the
      ;; ast-class matches, do we try to insert here
@@ -719,7 +726,8 @@ of children leading down to the node."))
   (:documentation "Find a minimum cost 'unwrap' edit, which pulls a subast
 out of one tree and turns it into another."))
 
-(defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast) &key (skip-root t))
+(defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast)
+                            &key (skip-root t) first-ast-child)
   ;; search over the ASTs under ast-a that are the same class as ast-b,
   ;; and for which the size difference is not too large
   (let* ((ast-b-cost (ast-cost ast-b))
@@ -731,6 +739,8 @@ out of one tree and turns it into another."))
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive call
          (*wrap* nil))
+    (when (integerp first-ast-child)
+      (setf first-ast-child (elt (ast-children ast-b) first-ast-child)))
     #+ast-diff-unwrap-debug (format t "(ast-class ast-b) = ~S~%" b-class)
     (nest
      (map-ast-while-path ast-a)
@@ -749,6 +759,10 @@ out of one tree and turns it into another."))
        ;; If X is not the right class, also skip it
        ((not (eql (ast-class x) b-class))
         #+ast-diff-unwrap-debug (format t "~a is wrong class~%" x)
+        t)
+       ;; If the first AST child is not found in the list of children
+       ;; with a "good" match, skip
+       ((and first-ast-child (not (ast-child-check first-ast-child x)))
         t))
      ;; Only if the size is in the right range, and the
      ;; ast-class matches, do we try to insert here
@@ -771,6 +785,19 @@ out of one tree and turns it into another."))
                      best-candidate new)))))))
     (when best-candidate
       (values best-candidate best-cost))))
+
+(defgeneric ast-child-check (a b)
+  (:documentation 
+   "Check that A is 'close enough' to some child of b")
+  (:method ((a ast) (b ast))
+    (let* ((a-cost (ast-cost a))
+           (cost-limit (floor (* *base-cost* a-cost 1/2))))
+      (some (lambda (c)
+              (and (ast-p c)
+                   (<= 1/2 (/ a-cost (ast-cost c)) 3/2)
+                   (< (nth-value 1 (ast-diff* a c)) cost-limit)))
+            (ast-children b))))
+  (:method ((a t) (b t)) (ast-equal-p a b)))
 
 (defun wraps-of-path (ast path)
   "Computes lists of children that lie on the left and right sides of a path
@@ -799,12 +826,12 @@ down from AST, as well as the classes of the nodes along the path."
   (reduce #'+ wrap :initial-value 0
           :key (lambda (w) (reduce #'+ w :key #'ast-cost :initial-value *base-cost*))))
 
-(defmethod ast-diff-wrap ((ast-a t) (ast-b t) &key skip-root)
-  (declare (ignore skip-root))
+(defmethod ast-diff-wrap ((ast-a t) (ast-b t) &key skip-root first-ast-child)
+  (declare (ignore skip-root first-ast-child))
   nil)
 
-(defmethod ast-diff-unwrap ((ast-a t) (ast-b t) &key skip-root)
-  (declare (ignore skip-root))
+(defmethod ast-diff-unwrap ((ast-a t) (ast-b t) &key skip-root first-ast-child)
+  (declare (ignore skip-root first-ast-child))
   nil)
 
 (defun ast-diff-wrap-sequence (ast-a sub-a ast-b)
@@ -812,20 +839,24 @@ down from AST, as well as the classes of the nodes along the path."
     (assert (>= len 2))
     (let ((sub-ast (copy ast-a :children (coerce sub-a 'list)))
           (*wrap-sequences* nil)
-          (*wrap* nil))
-      (let ((diff (ast-diff-wrap sub-ast ast-b :skip-root nil)))
+          (*wrap* nil)
+          (first-ast-child (position-if #'ast-p sub-a)))
+      (let ((diff (ast-diff-wrap sub-ast ast-b :skip-root nil
+                                 :first-ast-child first-ast-child)))
         (if (consp diff)
-          (let ((new-diff `(:wrap-sequence ,len ,@(cdr diff))))
-            (values new-diff (diff-cost new-diff)))
-          (values :bad most-positive-fixnum))))))
+            (let ((new-diff `(:wrap-sequence ,len ,@(cdr diff))))
+              (values new-diff (diff-cost new-diff)))
+            (values :bad most-positive-fixnum))))))
 
 (defun ast-diff-unwrap-sequence (a ast-b sub-b)
   (let ((len (length sub-b)))
     (assert (>= len 2))
     (let ((sub-ast (copy ast-b :children (coerce sub-b 'list)))
           (*wrap-sequences* nil)
-          (*wrap* nil))
-      (let ((diff (ast-diff-unwrap a sub-ast :skip-root nil)))
+          (*wrap* nil)
+          (first-ast-child (position-if #'ast-p sub-b)))
+      (let ((diff (ast-diff-unwrap a sub-ast :skip-root nil
+                                   :first-ast-child first-ast-child)))
         (if (consp diff)
             (let ((new-diff (cons :unwrap-sequence (cdr diff))))
               (values new-diff (diff-cost diff)))
