@@ -53,6 +53,7 @@
    :ast-patch
    :astify
    :unastify
+   :unastify-lisp-diff
    :print-diff
    ;; Merge functions
    :chunk
@@ -331,6 +332,14 @@ can be recursed on if STRINGS is true (defaults to true)"))
                (nconc (mapcar #'unastify (butlast c))
                       last-c))))))
 
+(defun unastify-lisp-diff (d)
+  (typecase d
+    (resolve/ast-diff::simple-lisp-ast (resolve/ast-diff::unastify d))
+    (cons
+     (cons (unastify-lisp-diff (car d))
+           (unastify-lisp-diff (cdr d))))
+    (t d)))
+
 (defmethod print-object ((obj simple-lisp-ast) stream)
   (if *print-readably*
       (call-next-method)
@@ -544,8 +553,8 @@ differencing of specialized AST structures.; `ast-equal-p',
 `ast-cost' and `ast-can-recurse'."))
 (let ((ast-diff-cache (make-hash-table))
       (ast-diff-counter 0)
-      (hash-upper-limit 50000000))
-  (declare (type (integer 0 1000000000) ast-diff-counter))
+      (hash-upper-limit 100000000))
+  (declare (type (integer 0 2000000000) ast-diff-counter))
   ;; The cache maps key pairs to values and counts
   ;; The counter is incremented to find the most recent
   ;; cached entries.
@@ -605,8 +614,8 @@ differencing of specialized AST structures.; `ast-equal-p',
                      ((:ignore-whitespace *ignore-whitespace*)
                       *ignore-whitespace*)
                      ((:strings *strings*) *strings*)
-                     ((:wrap *wrap*) *wrap*)
                      ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
+                     ((:wrap *wrap*) (or *wrap* *wrap-sequences*))
                      ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
                      ((:base-cost *base-cost*) *base-cost*)
                      &allow-other-keys)
@@ -669,7 +678,8 @@ of children leading down to the node."))
          (best-candidate nil)
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive calls
-         (*wrap* nil))
+         ; (*wrap* nil)
+         )
     (when (integerp first-ast-child)
       (setf first-ast-child (elt (ast-children ast-a) first-ast-child)))
     #+ast-diff-wrap-debug (format t "(ast-class ast-a) = ~S~%" a-class)
@@ -762,7 +772,7 @@ out of one tree and turns it into another."))
         t)
        ;; If the first AST child is not found in the list of children
        ;; with a "good" match, skip
-       ((and first-ast-child (not (ast-child-check first-ast-child x)))
+       ((and first-ast-child (not (ast-child-check first-ast-child x t)))
         t))
      ;; Only if the size is in the right range, and the
      ;; ast-class matches, do we try to insert here
@@ -786,18 +796,20 @@ out of one tree and turns it into another."))
     (when best-candidate
       (values best-candidate best-cost))))
 
-(defgeneric ast-child-check (a b)
+(defgeneric ast-child-check (a b &optional reverse?)
   (:documentation 
    "Check that A is 'close enough' to some child of b")
-  (:method ((a ast) (b ast))
+  (:method ((a ast) (b ast) &optional reverse?)
     (let* ((a-cost (ast-cost a))
            (cost-limit (floor (* *base-cost* a-cost 1/2))))
       (some (lambda (c)
               (and (ast-p c)
                    (<= 1/2 (/ a-cost (ast-cost c)) 3/2)
-                   (< (nth-value 1 (ast-diff* a c)) cost-limit)))
+                   ;; REVERSE? is used so we don't compute ast-diffs backwards
+                   ;; when checking for UNWRAP
+                   (< (nth-value 1 (if reverse? (ast-diff* c a) (ast-diff* a c))) cost-limit)))
             (ast-children b))))
-  (:method ((a t) (b t)) (ast-equal-p a b)))
+  (:method ((a t) (b t) &optional reverse?) (declare (ignore reverse?)) (ast-equal-p a b)))
 
 (defun wraps-of-path (ast path)
   "Computes lists of children that lie on the left and right sides of a path
@@ -993,7 +1005,8 @@ Prefix and postfix returned as additional values."
 (defun rd-link-a (e) (rd-node-a (rd-link-src e)))
 (defun rd-link-b (e) (rd-node-b (rd-link-src e)))
 
-(defun build-rd-graph (total-a total-b &key (wrap-sequences *wrap-sequences*))
+(defun build-rd-graph (total-a total-b &key (wrap-sequences *wrap-sequences*)
+                                         (unwrap-sequences *wrap-sequences*))
   ;; Construct the graph of a pair of lists.  The graph will have
   ;; (* (1+ (length total-a)) (1+ (length total-b))) nodes
   ;; Return the 2d array of the nodes
@@ -1035,7 +1048,8 @@ Prefix and postfix returned as additional values."
                                    :src (aref nodes x (1- b))
                                    :dest node
                                    :kind :wrap-sequence)
-                                  (rd-node-in-arcs node))))
+                                  (rd-node-in-arcs node)))))
+                  (when unwrap-sequences
                     (when (and (> a 0) (> b 1))
                       (iter (for x from 0 to (- b 2))
                             (push (make-rd-link
@@ -1170,10 +1184,77 @@ Prefix and postfix returned as additional values."
       )))
 
 (defun recursive-diff (total-a total-b parent-a parent-b)
-  (multiple-value-bind (nodes vec-a vec-b)
-      (build-rd-graph total-a total-b)
-    (compute-best-paths nodes vec-a vec-b parent-a parent-b)
-    (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b)))))
+  (flet ((%r (w uw)
+           (multiple-value-bind (nodes vec-a vec-b)
+               (build-rd-graph total-a total-b
+                               :wrap-sequences w
+                               :unwrap-sequences uw)
+             (compute-best-paths nodes vec-a vec-b parent-a parent-b)
+             (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b))))))
+    (let ((without-ws-diff (%r nil nil)))
+      ;; Only try wrap-sequences if enabled and (un)wrapping actually helped
+      (let ((w nil)
+            (uw nil)
+            (entered t)
+            (i 0) (j 0))
+        (when *wrap-sequences*
+          (iter (for d in without-ws-diff)
+                (while (or (not w) (not uw)))
+                (when (consp d)
+                  (case (car d)
+                    (:same (incf i) (incf j))
+                    (:delete (incf i))
+                    (:insert (incf j))
+                    (:recurse
+                     (case (cadr d)
+                       (:wrap
+                        (let* ((cost (diff-cost (list d)))
+                               (wrapped-cost (diff-cost (caddr d)))
+                               (from (elt total-a i))
+                               (from-cost (ast-cost from))
+                               (to (elt total-b j))
+                               (to-cost (ast-cost to)))
+                          (when (<= wrapped-cost from-cost)
+                            (setf w t)
+                            #+ast-diff-wrap-sequence-debug
+                            (progn
+                              (when entered (format t "Enter~%"))
+                              (setf entered nil)
+                              (format t ":WRAP found, ~a/~a cost ~a~%"
+                                      i j cost)
+                              (format t "From (~a):~%~a~%"
+                                      from-cost
+                                      (ast-text from))
+                              (format t "To (~a):~%~a~%"
+                                      to-cost
+                                      (ast-text to)))
+                            )))
+                       (:unwrap
+                        (let* ((cost (diff-cost (list d)))
+                               (unwrapped-cost (diff-cost (caddr d)))
+                               (from (elt total-a i))
+                               (from-cost (ast-cost from))
+                               (to (elt total-b j))
+                               (to-cost (ast-cost to)))
+                          (when (<= unwrapped-cost to-cost)
+                            (setf uw t)
+                            #+ast-diff-unwrap-sequence-debug
+                            (progn
+                              (when entered (format t "Enter~%"))
+                              (setf entered nil)
+                              (format t ":UNWRAP found, ~a/~a cost ~a~%"
+                                      i j cost)
+                              (format t "From (~a):~%~a~%"
+                                      from-cost
+                                      (ast-text from))
+                              (format t "To (~a):~%~a~%"
+                                      to-cost
+                                      (ast-text to)))
+                            ))))
+                     (incf i) (incf j))))))
+        (if (or w uw)
+            (%r w uw)
+            without-ws-diff)))))
 
 (defun diff-cost (diff &aux (base-cost *base-cost*))
   "Computes the cost of a diff"
