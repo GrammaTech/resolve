@@ -199,14 +199,6 @@
 
 (defroot test)
 
-(defun unastify-lisp-diff (d)
-  (typecase d
-    (resolve/ast-diff::simple-lisp-ast (resolve/ast-diff::unastify d))
-    (cons
-     (cons (unastify-lisp-diff (car d))
-           (unastify-lisp-diff (cdr d))))
-    (t d)))
-
 
 ;;;; AST Diff tests
 (defsuite ast-diff-tests "AST-level diffs of Sexprs.")
@@ -399,21 +391,39 @@
 
 (deftest sexp-diff-wrap-sequence.1 ()
   (is (equalp
-       (unastify-lisp-diff (ast-diff '(1 2 3 4 5) '(1 (2 3 4) 5)
+       (unastify-lisp-diff (ast-diff '(1 2 (3) 4 5) '(1 (2 (3) 4) 5)
                                      :wrap-sequences t))
        '((:same . 1)
-         (:wrap-sequence 3 ((:same . 2) (:same . 3) (:same . 4) (:insert . :nil)) nil
-          nil nil nil (2 3 4))
+         (:wrap-sequence 3 ((:same . 2) (:same 3) (:same . 4) (:insert . :nil))
+          nil nil nil nil (2 (3) 4))
          (:same . 5) (:same . :nil)))))
 
 (deftest sexp-diff-wrap-sequence.2 ()
   (is (equalp
-       (unastify-lisp-diff (ast-diff '(1 2 3 4 5) '(1 (2 3 . 4) 5)
+       (unastify-lisp-diff (ast-diff '(1 2 (3) 4 5) '(1 (2 (3) . 4) 5)
                                      :wrap-sequences t))
        '((:same . 1)
-         (:wrap-sequence 3 ((:same . 2) (:same . 3) (:same . 4)) nil
-          nil nil nil (2 3 . 4))
+         (:wrap-sequence 3 ((:same . 2) (:same 3) (:same . 4)) nil
+          nil nil nil (2 (3) . 4))
          (:same . 5) (:same . :nil)))))
+
+;; Nested sequence wrapping
+(deftest sexp-diff-wrap-sequence.3 ()
+  (is (equalp
+       (let ((l1 '(1 2 (3 :a (4) :b 5) 6 7))
+             (l2 '(1 (2 (3 (:a (4) :b) 5) 6) 7)))
+         (unastify-lisp-diff (ast-diff l1 l2 :wrap-sequences t)))
+       '((:same . 1)
+         (:wrap-sequence 3
+          ((:same . 2)
+           (:recurse (:same . 3)
+                     (:wrap-sequence 3 ((:same . :a) (:same 4)
+                                        (:same . :b) (:insert . :nil))
+                                     nil nil nil nil (:a (4) :b))
+                     (:same . 5) (:same . :nil))
+           (:same . 6) (:insert . :nil))
+          nil nil nil nil (2 (3 (:a (4) :b) 5) 6))
+         (:same . 7) (:same . :nil)))))
 
 (deftest sexp-diff-simple-sublist-test ()
   (multiple-value-bind (script cost)
