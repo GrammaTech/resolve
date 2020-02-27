@@ -162,7 +162,7 @@ of A from A-END. If no suitable points are found, return nil."
                                                       #'ast-aux-data])
                                           (get-immediate-children a)
                                           (ast-root a)))
-                        (when (find ast (ast-children (ast-root b))
+                        (when (find ast (get-immediate-children b (ast-root b))
                                     :test #'ast-equal-p)
                           (collect ast)))))
     ;; AST pool contains those ASTs at the top-level common to A and B.
