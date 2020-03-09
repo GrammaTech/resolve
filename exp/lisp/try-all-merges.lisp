@@ -1,15 +1,8 @@
 (defpackage :merge-experiment
   (:nicknames)
   (:use
-   :common-lisp
-   :iterate
-   :uiop
-   :command-line-arguments
-   :software-evolution-library/utility)
-  (:shadowing-import-from :software-evolution-library/utility :quit)
-  (:shadowing-import-from :split-sequence :split-sequence)
-  (:export
-   ))
+   :gt/all
+   :command-line-arguments)
 (in-package :merge-experiment)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

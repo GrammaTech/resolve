@@ -5,10 +5,9 @@
 ;; do not want.
 
 (defpackage :resolve/alist
-  (:use :common-lisp
-	:iterate
-	:software-evolution-library
-	:resolve/ast-diff)
+  (:use :gt/full
+        :software-evolution-library
+        :resolve/ast-diff)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:export :alist-for-diff
            :alist-of-alist-for-diff

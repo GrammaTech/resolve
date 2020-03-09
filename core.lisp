@@ -1,13 +1,7 @@
 ;;;; core.lisp -- Core software search replace implementation.
 (defpackage :resolve/core
-  (:use :common-lisp
-        :alexandria
-        :named-readtables
-        :curry-compose-reader-macros
-        :iterate
-        :split-sequence
-        :software-evolution-library/utility
-        :software-evolution-library/software-evolution-library)
+  (:use :gt/full
+        :software-evolution-library/utility/git)
   (:export :+resolve-dir+
            :+resolve-version+
            :+resolve-branch+

@@ -1,9 +1,8 @@
 ;; repair using software evolution
-(mapcar #'require '(:software-evolution-library :cl-store))
+(mapcar #'require '(:software-evolution-library))
 (defpackage :repair
-  (:use :common-lisp :alexandria :metabang-bind :curry-compose-reader-macros
-        :software-evolution-library :software-evolution-library/utility
-        :split-sequence :cl-store :cl-ppcre))
+  (:use :gt/full
+        :software-evolution-library))
 (in-package :repair)
 (in-readtable :curry-compose-reader-macros)
 

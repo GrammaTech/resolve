@@ -1,9 +1,5 @@
 (defpackage :resolve/software/parseable
-  (:use :common-lisp
-        :alexandria
-        :iterate
-        :named-readtables
-        :curry-compose-reader-macros
+  (:use :gt/full
         :resolve/ast-diff
         :software-evolution-library
         :software-evolution-library/software/parseable)

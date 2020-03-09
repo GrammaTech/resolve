@@ -1,7 +1,5 @@
 (defpackage :resolve/string
-  (:use :common-lisp
-        :iterate
-        :software-evolution-library/utility)
+  (:use :gt/full)
   (:export :string-diff))
 
 (in-package :resolve/string)

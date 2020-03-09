@@ -25,20 +25,13 @@
 ;;; @texi{ast-diff}
 (defpackage :resolve/ast-diff
   (:use
-   :common-lisp
+   :gt/full
    :software-evolution-library
-   :software-evolution-library/utility
    :software-evolution-library/software/parseable
    :software-evolution-library/software/simple
    :resolve/string
-   :alexandria
-   :named-readtables
-   :curry-compose-reader-macros
    :metabang-bind
-   :iterate
    :cl-heap)
-  (:import-from :cl-ppcre :regex-replace-all)
-  (:import-from :uiop :nest)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :software-evolution-library/software/clang
@@ -212,18 +205,8 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (let ((strings (iter (while (consp ast))
                        (collecting (ast-text (pop ast))))))
     (if ast
-        (concatenate-strings (nconc strings (list "." (ast-text ast))))
-        (concatenate-strings strings))))
-
-(defun concatenate-strings (strings)
-  (let* ((total-length (iter (for s in strings) (summing (length s))))
-         (result (make-string total-length :initial-element #\Space))
-         (i 0))
-    (iter (for s in strings)
-          (let ((l (length s)))
-            (setf (subseq result i (+ i l)) s)
-            (incf i l)))
-    result))
+        (format nil "~{~a~}" (nconc strings (list "." (ast-text ast))))
+        (format nil "~{~a~}" strings))))
 
 (defgeneric ast-to-list-form (ast)
   (:documentation "Convert ast into a more readable list form"))
@@ -326,7 +309,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
 
   (defun unastify-list (c)
     (and c
-         (let ((last-c (car (last c))))
+         (let ((last-c (lastcar c)))
            (if (eql last-c end-marker)
                (mapcar #'unastify (butlast c))
                (nconc (mapcar #'unastify (butlast c))
@@ -1818,7 +1801,7 @@ as multiple return values."
                     (extend-list
                      arg-list
                      len (when replicate?
-                           (car (last arg-list))))))))
+                           (lastcar arg-list)))))))
     (values-list (apply #'mapcar fn extended-arg-lists))))
 
 (defmacro apply-values-extend (fn &rest arg-exprs)
@@ -2930,7 +2913,7 @@ a tail of diff-a, and a tail of diff-b.")
 ;;; on elements that occur just once in each list, and grow
 ;;; subsequences from those.
 
-(defstruct gcs
+(defstruct good-common-subsequences
   (count 0 :type fixnum)
   (positions-1 nil :type list)
   (positions-2 nil :type list))
@@ -2946,11 +2929,12 @@ a tail of diff-a, and a tail of diff-b.")
                         (for i from 0)
                         (let ((g (gethash x table)))
                           (unless g
-                            (setf (gethash x table) (setf g (make-gcs))))
-                          (incf (gcs-count g))
+                            (setf (gethash x table)
+                            (setf g (make-good-common-subsequences))))
+                          (incf (good-common-subsequences-count g))
                           (push i (,fn g))))))
-      (init-table v1 gcs-positions-1)
-      (init-table v2 gcs-positions-2))
+      (init-table v1 good-common-subsequences-positions-1)
+      (init-table v2 good-common-subsequences-positions-2))
     #+gcs2-debug
     (progn
       (format t "v1 = ~A~%" v1)
@@ -2969,12 +2953,12 @@ a tail of diff-a, and a tail of diff-b.")
             (let* ((x (svref v1 i))
                    (g (gethash x table)))
               #+gcs2-debug (format t "x = ~A, g = ~A~%" x g)
-              (if (and (= (gcs-count g) 2)
-                       (gcs-positions-1 g)
-                       (gcs-positions-2 g))
+              (if (and (= (good-common-subsequences-count g) 2)
+                       (good-common-subsequences-positions-1 g)
+                       (good-common-subsequences-positions-2 g))
                 ;; x occurs precisely once in each sequence
-                (let ((j (car (gcs-positions-2 g))))
-                  (assert (= (car (gcs-positions-1 g)) i))
+                (let ((j (car (good-common-subsequences-positions-2 g))))
+                  (assert (= (car (good-common-subsequences-positions-1 g)) i))
                   (let ((start1 i)
                         (start2 j)
                         (end1 (1+ i))

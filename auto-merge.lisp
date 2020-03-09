@@ -1,16 +1,10 @@
 ;;;; auto-merge.lisp -- Main automatic merge command-line driver
 (defpackage :resolve/auto-merge
   (:documentation "Main resolve command-line driver")
-  (:use :common-lisp
-        :alexandria
-        :named-readtables
-        :curry-compose-reader-macros
-        :iterate
-        :bordeaux-threads
-        :metabang-bind
-        :uiop
+  (:use :gt/full
         :software-evolution-library
-        :software-evolution-library/utility
+        :software-evolution-library/utility/task
+        :software-evolution-library/utility/debug
         :software-evolution-library/command-line
         :software-evolution-library/components/lexicase
         :software-evolution-library/components/test-suite
@@ -25,11 +19,6 @@
         :resolve/software/project
         :resolve/software/auto-mergeable
         :resolve/software/parseable)
-  (:shadowing-import-from
-   :alexandria
-   :appendf :ensure-list :featurep :emptyp
-   :if-let :ensure-function :ensure-gethash :copy-file
-   :parse-body :simple-style-warning)
   (:export :resolve
            :auto-merge-test
            :populate

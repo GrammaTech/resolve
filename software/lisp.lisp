@@ -1,12 +1,7 @@
 (defpackage :resolve/software/lisp
-  (:use :common-lisp
-        :alexandria
-        :iterate
-        :named-readtables
-        :curry-compose-reader-macros
+  (:use :gt/full
         :resolve/ast-diff
         :software-evolution-library
-        :software-evolution-library/utility
         :software-evolution-library/software/parseable
         :software-evolution-library/software/lisp))
 (in-package :resolve/software/lisp)

@@ -19,17 +19,11 @@
 ;;;  the `ast-patch` interface to file handle insertions and
 ;;;  deletions.
 (defpackage :resolve/software/auto-mergeable
-  (:use :common-lisp
-        :alexandria
-        :iterate
-        :named-readtables
-        :closer-mop
-        :curry-compose-reader-macros
+  (:use :gt/full
         :metabang-bind
         :resolve/alist
         :resolve/ast-diff
         :software-evolution-library
-        :software-evolution-library/utility
         :software-evolution-library/software/clang
         :software-evolution-library/software/file
         :software-evolution-library/software/simple
@@ -40,12 +34,7 @@
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project)
-  (:shadowing-import-from
-   :closer-mop
-   :standard-method :standard-class :standard-generic-function
-   :defmethod :defgeneric)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
-  (:import-from :uiop :nest)
   (:export :auto-mergeable
            :auto-mergeable-simple
            :auto-mergeable-parseable

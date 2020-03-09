@@ -1,15 +1,9 @@
 ;;;; test.lisp --- Tests for software difference display and resolution
 (defpackage :resolve/test
-  (:use :common-lisp
-        :alexandria
-        :iterate
-        :named-readtables
-        :curry-compose-reader-macros
-        :split-sequence
-        :uiop
+  (:use :gt/full
         #+gt :testbot
         :software-evolution-library
-        :software-evolution-library/utility
+        :software-evolution-library/utility/debug
         :software-evolution-library/stefil-plus
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
@@ -30,12 +24,7 @@
         :resolve/software/auto-mergeable
         :resolve/software/parseable
         :resolve/software/lisp)
-  (:shadowing-import-from :uiop :getenv :quit :parameter-error)
-  (:shadowing-import-from
-   :alexandria
-   :appendf :ensure-list :featurep :emptyp
-   :if-let :ensure-function :ensure-gethash :copy-file
-   :parse-body :simple-style-warning)
+  (:import-from :uiop/stream :read-file-forms)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
                 :put-inserts-before-deletes)
   (:export :test :batch-test))

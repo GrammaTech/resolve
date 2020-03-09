@@ -1,9 +1,5 @@
 (defpackage :resolve/software/project
-  (:use :common-lisp
-        :alexandria
-        :iterate
-        :named-readtables
-        :curry-compose-reader-macros
+  (:use :gt/full
         :resolve/ast-diff
         :resolve/alist
         :software-evolution-library

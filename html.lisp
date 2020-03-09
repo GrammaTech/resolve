@@ -1,10 +1,9 @@
 ;;; ast-diff-html.lisp --- render ast diffs to html
 (defpackage :resolve/html
-  (:use :common-lisp
-        :software-evolution-library/utility
+  (:use :gt/full
         :resolve/ast-diff
         :cl-who)
-  (:shadow :escape-string)
+  (:shadowing-import-from :cl-who :fmt :escape-string)
   (:export :diff-to-html))
 (in-package :resolve/html)
 

@@ -29,12 +29,7 @@
 ;;;
 ;;; @texi{ast-diff-commands}
 (defpackage :resolve/commands
-  (:use :common-lisp
-        :alexandria
-        :named-readtables
-        :curry-compose-reader-macros
-        :iterate
-        :uiop/pathname
+  (:use :gt/full
         :resolve/core
         :resolve/ast-diff
         :resolve/auto-merge
@@ -43,7 +38,7 @@
         :resolve/software/project
         :resolve/software/lisp
         :software-evolution-library
-        :software-evolution-library/utility
+        :software-evolution-library/utility/debug
         :software-evolution-library/command-line
         :software-evolution-library/command-line-rest
         :software-evolution-library/software/parseable
@@ -60,11 +55,7 @@
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
   (:import-from :spinneret :with-html)
-  (:import-from :cl-ppcre :scan)
-  (:import-from :split-sequence :split-sequence)
-  (:import-from :uiop :nest)
   (:import-from :uiop/stream :println :writeln)
-  (:import-from :uiop/filesystem :truenamize)
   (:import-from :md5 :md5sum-string)
   (:shadow :merge :ast-diff)
   (:export :ast-diff :ast-merge))
@@ -191,6 +182,13 @@ command-line options processed by the returned function."
    (append +clang-command-line-options+
            +project-command-line-options+
            +clang-project-command-line-options+)))
+
+(defun mapt (function tree)
+  "Like `mapcar' but TREE is a cons tree instead of a proper list."
+  (if (consp tree)
+      (cons (mapt function (car tree))
+            (mapt function (cdr tree)))
+      (funcall function tree)))
 
 (defmacro expand-options-for-which-files (language which)
   "Expand the options for WHICH calling `create-software' appropriately."
@@ -499,9 +497,9 @@ command-line options processed by the returned function."
   (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file my-file your-file))
     (exit-command ast-merge 2 (error "Missing source.")))
-  (setf old-file (truenamize old-file)
-	my-file (truenamize my-file)
-	your-file (truenamize your-file)
+  (setf old-file (namestring (truename old-file))
+        my-file (namestring (truename my-file))
+        your-file (namestring (truename your-file))
         language (or language (guess-language old-file my-file your-file)))
   ;; Force OUT-DIR when running as a command line utility and merging
   ;; whole directories.  We can't write multiple files to STDOUT.
@@ -572,9 +570,9 @@ command-line options processed by the returned function."
     (exit-command auto-merge 2 (error "Missing source.")))
   (setf *random-state* (if randomize (make-random-state t) *random-state*)
         out-dir (or out-dir (resolve-out-dir-from-source old-file))
-        old-file (truenamize old-file)
-        my-file (truenamize my-file)
-        your-file (truenamize your-file)
+        old-file (namestring (truename old-file))
+        my-file (namestring (truename my-file))
+        your-file (namestring (truename your-file))
         language (or language (guess-language old-file my-file your-file))
         num-tests (resolve-num-tests-from-num-tests num-tests)
         tests (create-test-suite test-script num-tests))
