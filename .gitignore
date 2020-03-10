@@ -4,5 +4,5 @@
 *.lx64fsl
 
 system-index.txt
-
+.qlfile
 wiki/
