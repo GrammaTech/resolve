@@ -8,6 +8,7 @@ stages:
   - build
   - test-and-tag
   - binary-release
+  - dependents
   - nightly
   - deploy-and-cleanup
 
@@ -108,6 +109,13 @@ build-binary-release:
     - docker build --build-arg=DD=yes --build-arg=REF=$DOCKER_REGISTRY/$CI_PROJECT_PATH/ubuntu -f .ci/Dockerfile.binary-release -t $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release .
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
     - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release
+  only:
+    - master
+
+trigger_bug-injector:
+  stage: dependents
+  script:
+    - "curl -X POST -F token=eb76bc2f8009af7005b43bf8f63bb0 -F ref=$CI_BUILD_REF_NAME https://git.grammatech.com/api/v4/projects/347/trigger/pipeline"
   only:
     - master
 
