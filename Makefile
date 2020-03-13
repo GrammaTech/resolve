@@ -61,4 +61,4 @@ BIN_TESTS +=					\
 	rest-ast-diff-can-return-and-serve-link
 endif
 
-include cl.mk
+include .cl-make/cl.mk
