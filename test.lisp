@@ -1645,7 +1645,7 @@
                                                 '("abacus"))
                              :name "test"
                              :type "sh"))))
-    (with-temp-file (bin)
+    (with-temporary-file (:pathname bin)
       (phenome variant :bin bin)
       (multiple-value-bind (stdout stderr errno)
           (shell "~a ~a ~a"

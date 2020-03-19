@@ -234,7 +234,7 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
 ;;; Fitness testing
 (defmethod auto-merge-test ((obj software) (tests test-suite))
   "Determine the fitness of OBJ against TESTS."
-  (with-temp-file (bin)
+  (with-temporary-file (:pathname bin)
     (if (ignore-phenome-errors (phenome obj :bin bin))
         (mapcar (lambda (test-case)
                   (nth-value 2 (run-test bin test-case)))
@@ -246,7 +246,7 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
   "Setup environment so the fitness of OBJ can be evaluated against TESTS."
   ;; Bind *build-dir* so multiple builds can occur in a multi-threaded
   ;; environment.
-  (with-temp-dir (dir)
+  (with-temporary-directory (:pathname dir)
     (let ((*build-dir* dir))
       (call-next-method))))
 
