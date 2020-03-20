@@ -280,8 +280,8 @@ command-line options processed by the returned function."
                              (clang "cxx")
                              (lisp "lisp")
                              (simple "txt"))))
-                 (setf old-file-temp-path (temp-file-name type)
-                       new-file-temp-path (temp-file-name type))
+                 (setf old-file-temp-path (temp-file-name :type type)
+                       new-file-temp-path (temp-file-name :type type))
                  (string-to-file old-file old-file-temp-path)
                  (string-to-file new-file new-file-temp-path)
                  (setf old-file old-file-temp-path
