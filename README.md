@@ -5,6 +5,8 @@ TRL: 5
 
 Software AST-based diff calculation, display, and automated resolution.
 
+![Resolve Signature Graphic](.resolve.svg)
+
 ## Abstract
 Resolve implements multi-lingual semantic differencing of software
 source code and implements an automated technique of merge conflict
