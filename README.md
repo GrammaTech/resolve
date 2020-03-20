@@ -5,7 +5,47 @@ TRL: 5
 
 Software AST-based diff calculation, display, and automated resolution.
 
-![Resolve Signature Graphic](.resolve.svg)
+<div style="color: #eeeeec; background-color: #2e3436; padding:0.25em; max-width:40em;">
+<pre>
+<span style="color: #b4fa70; background-color: #2e3436;"># Example output of git configured to use Resolve's <span style="background-color: #555753;">ast-diff</span> command</span>
+<span style="color: #b4fa70; background-color: #2e3436;">$ </span><span style="background-color: #2e3436; font-weight: bold;">git diff HEAD~10..HEAD -- components/fix-compilation.lisp </span><span style="background-color: #2e3436;">
+ast-diff components/fix-compilation.lisp
+index ef102965..68b4f128 100644
+</span><span style="color: #8cc4ff; background-color: #2e3436;">line: 66</span><span style="background-color: #2e3436;">
+    (clang-tidy obj)
+    (loop :for attempt :below max-attempts :do
+       ;; Compile
+       (</span><span style="color: #b4fa70; background-color: #2e3436;">{+with-temporary-file+}</span><span style="color: #ff4b4b; background-color: #2e3436;">[-with-temp-file-]</span><span style="background-color: #2e3436;"> (</span><span style="color: #b4fa70; background-color: #2e3436;">{+:pathname +}</span><span style="background-color: #2e3436;">bin)
+         (multiple-value-bind (bin errno stderr)
+             (ignore-phenome-errors
+              (phenome obj :bin bin))
+</span><span style="color: #8cc4ff; background-color: #2e3436;">line: 163</span><span style="background-color: #2e3436;">
+        (variable-name (aref match-data variable-name-index)))
+    ;; Insert a declaration and initialization
+    (setf (lines obj)
+          (append (</span><span style="color: #b4fa70; background-color: #2e3436;">{+subseq lines 0+}</span><span style="color: #ff4b4b; background-color: #2e3436;">[-take-]</span><span style="background-color: #2e3436;"> (1- line-number)</span><span style="color: #ff4b4b; background-color: #2e3436;">[- lines-]</span><span style="background-color: #2e3436;">)
+                  (list (format nil "~a ~a;" random-type variable-name)
+                        (format nil "~a = ~a;"
+                                variable-name
+</span><span style="color: #8cc4ff; background-color: #2e3436;">line: 170</span><span style="background-color: #2e3436;">
+                                (- (random (expt 2 32)) (expt 2 31))))
+                  (</span><span style="color: #b4fa70; background-color: #2e3436;">{+subseq lines+}</span><span style="color: #ff4b4b; background-color: #2e3436;">[-drop-]</span><span style="background-color: #2e3436;"> (1- line-number)</span><span style="color: #ff4b4b; background-color: #2e3436;">[- lines-]</span><span style="background-color: #2e3436;">))))
+  obj)
+
+(register-fixer
+</span><span style="color: #8cc4ff; background-color: #2e3436;">line: 230</span><span style="background-color: #2e3436;">
+         (lines (lines obj))
+         (orig (nth (1- line-number) lines)))
+    (setf (lines obj)
+          (append (</span><span style="color: #b4fa70; background-color: #2e3436;">{+subseq lines 0+}</span><span style="color: #ff4b4b; background-color: #2e3436;">[-take-]</span><span style="background-color: #2e3436;"> (1- line-number)</span><span style="color: #ff4b4b; background-color: #2e3436;">[- lines-]</span><span style="background-color: #2e3436;">)
+                  (list (concatenate 'string
+                          (subseq orig 0 col-number)
+                          new-expression
+</span><span style="color: #8cc4ff; background-color: #2e3436;">line: 237</span><span style="background-color: #2e3436;">
+                          (subseq orig col-number)))
+                  (</span><span style="color: #b4fa70; background-color: #2e3436;">{+subseq lines+}</span><span style="color: #ff4b4b; background-color: #2e3436;">[-drop-]</span><span style="background-color: #2e3436;"> line-number</span><span style="color: #ff4b4b; background-color: #2e3436;">[- lines-]</span><span style="background-color: #2e3436;">))))
+  obj)</span></pre>
+</div>
 
 ## Abstract
 Resolve implements multi-lingual semantic differencing of software
