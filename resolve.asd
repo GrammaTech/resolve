@@ -4,15 +4,10 @@
   :version "0.0.0"
   :class :package-inferred-system
   :defsystem-depends-on (:asdf-package-system)
-  :in-order-to ((test-op (test-op "resolve/test"))))
+  :in-order-to ((test-op (load-op "resolve/test")))
+  :perform (test-op (o c) (symbol-call :resolve/test '#:run-batch)))
 
 (register-system-packages "resolve/core" '(:resolve))
-
-(defsystem "resolve/test"
-  :description "Tests for resolve"
-  :class :package-inferred-system
-  :defsystem-depends-on (:asdf-package-system)
-  :perform (test-op (o c) (symbol-call :resolve/test '#:run-batch)))
 
 (defsystem "resolve/run-ast-diff"
   :author "GrammaTech"
