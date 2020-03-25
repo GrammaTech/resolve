@@ -159,7 +159,7 @@ of A from A-END. If no suitable points are found, return nil."
   ;; homologous points at the top-level of A and B will result in a
   ;; reasonable crossover.
   (let ((ast-pool (iter (for ast in (nest (remove-if [{aget :conflict-ast}
-                                                      #'ast-aux-data])
+                                                      #'ast-annotations])
                                           (get-immediate-children a)
                                           (ast-root a)))
                         (when (find ast (get-immediate-children b (ast-root b))
@@ -277,10 +277,10 @@ of conflict ASTs."
   (:documentation "Return the resolved conflicts in OBJ.")
   (:method ((obj t)) nil)
   (:method ((obj auto-mergeable-simple))
-    (remove-if-not «and #'ast-p [{aget :conflict-ast} #'ast-aux-data]»
+    (remove-if-not «and #'ast-p [{aget :conflict-ast} #'ast-annotations]»
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
-    (remove-if-not [{aget :conflict-ast} #'ast-aux-data]
+    (remove-if-not [{aget :conflict-ast} #'ast-annotations]
                    (ast-to-list (ast-root obj))))
   (:method ((obj auto-mergeable-project))
     (mappend [#'get-resolved-conflicts #'cdr] (all-files obj))))
@@ -347,9 +347,11 @@ an insertion or deletion of the OBJ.")
           (list)
           (list)
           (cons :code)
-          (make-conflict-ast :aux-data (list (cons :top-level t)) :child-alist)
+          (make-conflict-ast :annotations (list (cons :top-level t))
+                             :child-alist)
           (list (cons conflict-child (mapcar {aget :code} (genome obj))))))
   (:method ((obj auto-mergeable-parseable) (conflict-child symbol))
     (nest (copy obj :ast-root)
-          (make-conflict-ast :aux-data (list (cons :top-level t)) :child-alist)
+          (make-conflict-ast :annotations (list (cons :top-level t))
+                             :child-alist)
           (list (list conflict-child (ast-root obj))))))

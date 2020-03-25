@@ -12,5 +12,5 @@
        (or (not (eql :expression (ast-class ast-a)))
            ;; Special handling for lisp expression ASTs.
            ;; Don't descend into atomic expressions.
-           (not (or (atom (aget :expression (ast-aux-data ast-a)))
-                    (atom (aget :expression (ast-aux-data ast-b))))))))
+           (not (or (atom (aget :expression (ast-annotations ast-a)))
+                    (atom (aget :expression (ast-annotations ast-b))))))))

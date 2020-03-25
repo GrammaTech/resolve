@@ -54,7 +54,7 @@
   (:documentation "Return a list of strategies which may be utilized
 to resolve the conflict AST.")
   (:method ((ast conflict-ast))
-    (if (aget :top-level (ast-aux-data ast))
+    (if (aget :top-level (ast-annotations ast))
         '(:V1 :NN)
         '(:V1 :V2 :C1 :C2 :NN))))
 
@@ -66,19 +66,19 @@ using STRATEGY.")
             &aux (options (conflict-ast-child-alist conflict)))
     (labels ((normalize (children)
                "Normalize CHILDREN by adding the conflict AST
-               to each child AST's aux-data.  If there are no children,
-               create a NullStmt AST with this aux-data.  The aux-data
-               is required for the `new-conflict-resolution` mutation."
+               to each child AST's annotations.  If there are no children,
+               create a NullStmt AST with this annotations.  The annotations
+               are required for the `new-conflict-resolution` mutation."
                (if children
                    (mapcar (lambda (child)
                              (if (ast-p child)
-                                 (copy child :aux-data
+                                 (copy child :annotations
                                              `((:conflict-ast . ,conflict)))
                                  (make-raw-ast :children (list child)
-                                               :aux-data
+                                               :annotations
                                                `((:conflict-ast . ,conflict)))))
                            children)
-                   (list (make-raw-ast :aux-data
+                   (list (make-raw-ast :annotations
                                        `((:conflict-ast . ,conflict)))))))
       ;; Five ways of resolving a conflict:
       (case strategy
@@ -113,7 +113,7 @@ option."))
   (:documentation "Return a conflict previously resolved in OBJ.")
   (:method ((obj auto-mergeable))
     (if-let ((conflicts (nest (remove-duplicates)
-                              (mapcar [{aget :conflict-ast} #'ast-aux-data])
+                              (mapcar [{aget :conflict-ast} #'ast-annotations])
                               (get-resolved-conflicts obj))))
       (random-elt conflicts)
       (error (make-condition 'no-mutation-targets
@@ -128,7 +128,7 @@ conflict AST resolution with an alternative option."
                        (random-elt (get-conflict-strategies conflict-ast))))
          (prior-resolution (or (remove-if-not [{eq conflict-ast}
                                                {aget :conflict-ast}
-                                               #'ast-aux-data]
+                                               #'ast-annotations]
                                               (ast-to-list (ast-root software)))
                                (list conflict-ast)))
          (new-resolution (resolve-conflict-ast conflict-ast
@@ -161,7 +161,7 @@ conflict AST resolution with an alternative option."
          (prior-resolution (or (remove-if-not «and [#'ast-p {aget :code}]
                                                    [{eq conflict-ast}
                                                     {aget :conflict-ast}
-                                                    #'ast-aux-data
+                                                    #'ast-annotations
                                                     {aget :code}]»
                                               (genome software))
                                `(((:code . ,conflict-ast)))))
