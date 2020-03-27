@@ -29,6 +29,7 @@
    :software-evolution-library
    :software-evolution-library/software/parseable
    :software-evolution-library/software/simple
+   :software-evolution-library/software/source
    :resolve/string
    :metabang-bind
    :cl-heap)
@@ -1447,6 +1448,11 @@ value that is used instead."
   (ast-diff*
    (simple-genome-unpack (genome soft1))
    (simple-genome-unpack (genome soft2))))
+
+(defmethod ast-diff* ((soft1 source) (soft2 source))
+  #+debug (format t "ast-diff[SOURCE]~%")
+  (ast-diff* (split-sequence #\Newline (genome soft1))
+             (split-sequence #\Newline (genome soft2))))
 
 (defun split-into-subsequences (seq subseq-indices &aux (n (length seq)))
   "Return subsequences of SEQ delimited by SUBSEQ-INDICES.

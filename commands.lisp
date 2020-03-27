@@ -309,9 +309,9 @@ command-line options processed by the returned function."
                        :wrap-sequences wrap-sequences
                        :base-cost base-cost
                        :strings strings))
-           ;; Special handling for SIMPLE diffs, which don't have newlines.
-           (when (and (eql 'simple (type-of old-sw))
-                      (eql 'simple (type-of new-sw)))
+           ;; Special handling for non-AST diffs, which don't have newlines.
+           (when (and (not (typep old-sw 'parseable))
+                      (not (typep new-sw 'parseable)))
              (setf diff
                    (mapt (lambda (element)
                            (if (stringp element)
