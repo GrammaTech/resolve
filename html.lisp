@@ -15,7 +15,7 @@ EDIT-SCRIPT, with highlighting of inserts and deletes.
 "
   (labels
       ((render-ast (ast)
-         (let ((text (ast-text ast)))
+         (let ((text (source-text ast)))
            (values (escape-string text) (count #\newline text))))
        (render-diff (asts script)
          (if (null script)

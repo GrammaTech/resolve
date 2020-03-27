@@ -775,8 +775,12 @@
          (ast1 (ast-root obj1))
          (ast2 (ast-root obj2))
          (ast3 (ast-patch ast1 diff)))
-    ;; (format t "AST2:~%~a~%----------------~%~s~%" (ast-text ast2) (ast-to-list-form ast2))
-    ;; (format t "AST3:~%~a~%----------------~%~s~%" (ast-text ast3) (ast-to-list-form ast3))
+    #+debug
+    (progn
+      (format t "AST2:~%~a~%----------------~%~s~%"
+              (source-text ast2) (ast-to-list-form ast2))
+      (format t "AST3:~%~a~%----------------~%~s~%"
+              (source-text ast3) (ast-to-list-form ast3)))
     (is (ast-equal-p ast2 ast3))))
 
 (deftest print-diff.1 ()
@@ -1599,12 +1603,12 @@
     ;; Recomputation (hitting the cache) gives same result
     (is (equal (ast-size a) 7))))
 
-(deftest ast-text-test ()
+(deftest source-text-test ()
   (let ((*package* (find-package :resolve/test)))
-    (is (equal (ast-text (astify '(x y))) "(X Y)"))
-    (is (equal (ast-text (astify '(x . y))) "(X . Y)"))
-    (is (equal (ast-text '("foo" "bar")) "foobar"))
-    (is (equal (ast-text '("foo" . "bar")) "foo.bar"))))
+    (is (equal (source-text (astify '(x y))) "(X Y)"))
+    (is (equal (source-text (astify '(x . y))) "(X . Y)"))
+    (is (equal (source-text '("foo" "bar")) "foobar"))
+    (is (equal (source-text '("foo" . "bar")) "foo.bar"))))
 
 (deftest print-simple-lisp-ast ()
   (with-standard-io-syntax
