@@ -40,14 +40,14 @@
      (mapc
       (lambda (ast)
         #+debug (format t "Replacing conflict at ~S~%" (ast-path ast))
-        (setf (get-ast conflicted (ast-path ast))
-              (aget option (conflict-ast-child-alist ast)))
+        (replace-ast conflicted
+                     (get-ast conflicted (ast-path ast))
+                     (aget option (conflict-ast-child-alist ast)))
         #+debug (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
         #+debug (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
         #+debug (incf counter)))
      ;; Modify conflict nodes in reverse to work up the tree.
-     (reverse (remove-if-not #'conflict-ast-p
-                             (asts conflicted))))
+     (reverse (remove-if-not {typep _ 'conflict-ast} (asts conflicted))))
     conflicted))
 
 (defgeneric get-conflict-strategies (ast)
@@ -58,39 +58,37 @@ to resolve the conflict AST.")
         '(:V1 :NN)
         '(:V1 :V2 :C1 :C2 :NN))))
 
-(defgeneric resolve-conflict-ast (conflict &key strategy)
-  (:documentation "Return a concrete resolution of CONFLICT AST
-using STRATEGY.")
-  (:method ((conflict ast)
-            &key (strategy (random-elt (get-conflict-strategies conflict)))
-            &aux (options (conflict-ast-child-alist conflict)))
-    (labels ((normalize (children)
-               "Normalize CHILDREN by adding the conflict AST
-               to each child AST's annotations.  If there are no children,
-               create a NullStmt AST with this annotations.  The annotations
-               are required for the `new-conflict-resolution` mutation."
-               (if children
-                   (mapcar (lambda (child)
-                             (if (ast-p child)
-                                 (copy child :annotations
-                                             `((:conflict-ast . ,conflict)))
-                                 (make-raw-ast :children (list child)
-                                               :annotations
-                                               `((:conflict-ast . ,conflict)))))
-                           children)
-                   (list (make-raw-ast :annotations
-                                       `((:conflict-ast . ,conflict)))))))
-      ;; Five ways of resolving a conflict:
-      (case strategy
-        ;; 1. (V1) version 1
-        (:V1 (normalize (aget :my options)))
-        ;; 2. (V2) version 2
-        (:V2 (normalize (aget :your options)))
-        ;; 3. (CC) concatenate versions (either order)
-        (:C1 (normalize (append (aget :my options) (aget :your options))))
-        (:C2 (normalize (append (aget :your options) (aget :my options))))
-        ;; 4. (NN) select the base version
-        (:NN (normalize (aget :old options)))))))
+(defun resolve-conflict-ast
+    (conflict &key (strategy (random-elt (get-conflict-strategies conflict)))
+     &aux (options (conflict-ast-child-alist conflict)))
+  "Return a concrete resolution of CONFLICT AST using STRATEGY."
+  (labels ((normalize (children)
+             "Normalize CHILDREN by adding the conflict AST
+             to each child AST's annotations.  If there are no children,
+             create a NullStmt AST with this annotations.  The annotations
+             are required for the `new-conflict-resolution` mutation."
+             (if children
+                 (mapcar (lambda (child)
+                           (if (ast-p child)
+                               (copy child :annotations
+                                           `((:conflict-ast . ,conflict)))
+                               (make-instance 'ast-stub
+                                :children (list child)
+                                :annotations `((:conflict-ast . ,conflict)))))
+                         children)
+                 (list (make-instance 'ast-stub
+                        :annotations `((:conflict-ast . ,conflict)))))))
+    ;; Five ways of resolving a conflict:
+    (case strategy
+      ;; 1. (V1) version 1
+      (:V1 (normalize (aget :my options)))
+      ;; 2. (V2) version 2
+      (:V2 (normalize (aget :your options)))
+      ;; 3. (CC) concatenate versions (either order)
+      (:C1 (normalize (append (aget :my options) (aget :your options))))
+      (:C2 (normalize (append (aget :your options) (aget :my options))))
+      ;; 4. (NN) select the base version
+      (:NN (normalize (aget :old options))))))
 
 (defgeneric resolve-conflict (conflicted conflict &key strategy)
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
@@ -129,7 +127,7 @@ conflict AST resolution with an alternative option."
          (prior-resolution (or (remove-if-not [{eq conflict-ast}
                                                {aget :conflict-ast}
                                                #'ast-annotations]
-                                              (ast-to-list (ast-root software)))
+                                              (get-resolved-conflicts software))
                                (list conflict-ast)))
          (new-resolution (resolve-conflict-ast conflict-ast
                                                :strategy strategy))

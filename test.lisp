@@ -1210,7 +1210,7 @@
   (let ((merged (converge '(a b) '(a) '(a c) :meld? nil :conflict t)))
     (is (= (length merged) 2) "4-conflict 1")
     (is (eql (car merged) 'a) "4-conflict 2")
-    (is (conflict-ast-p (cadr merged))
+    (is (typep (cadr merged) 'conflict-ast)
         "4-conflict 3")
     (is (equal (sel/sw/parseable:conflict-ast-child-alist (cadr merged))
                '((:my b) (:your c)))
@@ -1220,7 +1220,7 @@
   (let ((merged (converge '(a b) '(a) '(a) :meld? nil :conflict t)))
     (is (= (length merged) 2) "5-conflict 1")
     (is (eql (car merged) 'a) "5-conflict 2")
-    (is (conflict-ast-p (cadr merged))
+    (is (typep (cadr merged) 'conflict-ast)
         "5-conflict 3")
     (is (equal (sel/sw/parseable:conflict-ast-child-alist (cadr merged))
                '((:my b)))
@@ -1473,7 +1473,7 @@
   ;; `set-ast-siblings' in SEL/SW/PARSEABLE.
   (flet ((conflict-nodes (obj)
            (let ((result
-                  (remove-if-not #'conflict-ast-p
+                  (remove-if-not {typep _ 'conflict-ast}
                                  (ast-to-list (ast-root obj)))))
              #+debug (format t "Conflict nodes:~%")
              #+debug (dolist (cn result) (format t "~a~%" cn))
@@ -1509,7 +1509,7 @@
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested-simple
           :long-running) ()
   (with-fixture javascript-converge-conflict
-    (let ((it (lastcar (remove-if-not #'conflict-ast-p
+    (let ((it (lastcar (remove-if-not {typep _ 'conflict-ast}
                                       (asts *cnf*)))))
       (is it "There is a conflict ast")
       #+debug
@@ -1522,7 +1522,7 @@
          (for (k . a) in *variants*)
          (format t "~A:~%~s~%" k (to-list (ast-root a))))
         (format t "AST:~%~s~%" (to-list (ast-root *cnf*))))
-      (is (conflict-ast-p (get-ast *cnf* '(5 3 3)))
+      (is (typep (get-ast *cnf* '(5 3 3)) 'conflict-ast)
           "Path (5 3 3) is a conflict ast in the original.")
       (let ((new (replace-ast (copy *cnf*)
                               (ast-path it)
@@ -1530,7 +1530,7 @@
                               :literal t)))
         (is (typep (get-ast new '(5 3 3)) 'javascript-ast)
             "Path (5 3 3) is a JavaScript ast in result of replace-ast.")
-        (is (conflict-ast-p (get-ast *cnf* '(5 3 3)))
+        (is (typep (get-ast *cnf* '(5 3 3)) 'conflict-ast)
             "Path (5 3 3) is STILL a conflict-ast in the original ~
              after replace-ast.")))))
 
@@ -1540,12 +1540,12 @@
     ;; Conflicted software object has ASTs.
     (is (asts *cnf*))
     ;; Conflicted software object has conflcit ASTs.
-    (is (remove-if-not #'conflict-ast-p
+    (is (remove-if-not {typep _ 'conflict-ast}
                        (ast-to-list (ast-root *cnf*))))
     (let ((old (resolve-to (copy *cnf*) :old))
           (my (resolve-to (copy *cnf*) :my))
           (your (resolve-to (copy *cnf*) :your)))
-      (is (null (remove-if-not #'conflict-ast-p
+      (is (null (remove-if-not {typep _ 'conflict-ast}
                                (ast-to-list (ast-root old)))))
       (is (string/= (genome my) (genome old)))
       (is (string/= (genome your) (genome old)))
@@ -1579,13 +1579,13 @@
        (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
    (let* ((conflicted (nest (create-auto-mergeable)
                             (converge my old your :conflict t)))
-          (chunks (remove-if-not #'conflict-ast-p
+          (chunks (remove-if-not {typep _ 'conflict-ast}
                                  (ast-to-list (ast-root conflicted))))
           (*population* (populate conflicted))))
    (is (= (length *population*) (expt 5 (length chunks)))
        "Population has the expected size ~d = 5^|chunks| => ~d."
        (length *population*) (expt 5 (length chunks)))
-   (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
+   (is (not (some [{some {typep _ 'conflict-ast}} #'ast-to-list] *population*))
        "Population has no conflict ASTs remaining.")))
 
 (deftest can-merge-when-one-side-is-invalid ()
@@ -1632,9 +1632,7 @@
     (let ((*package* (find-package :resolve/ast-diff)))
       (is (equal (write-to-string (astify '(1 2))
                                   :readably nil)
-                 "#<SIMPLE-LISP-AST :VALUE (1 2)>"))
-      (is (equal (write-to-string (astify '(1 2)) :readably t :pretty nil)
-                 "#S(SIMPLE-LISP-AST :CHILDREN (1 2 :NIL) :ORIGINAL (1 2) :HASH NIL :COST NIL :SIZE NIL)")))))
+                 "#<SIMPLE-LISP-AST :VALUE (1 2)>")))))
 
 (deftest copy-test ()
   (is (equal (unastify (copy (astify '(x y)))) '(x y)))

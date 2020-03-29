@@ -16,11 +16,11 @@
     (time (ast-diff t1 t2))))
 
 (defun remove-empty-strings-from-ast (ast)
-  (sel/sw/parseable:map-ast
-   ast
-   (lambda (a) (setf (ast-children a)
-                     (remove "" (ast-children a) :test #'equal))))
-  ast)
+  (copy ast :children (iter (for child in (ast-children ast))
+                            (cond ((ast-p child)
+                                   (collect (remove-empty-strings-from-ast child)))
+                                  ((not (emptyp child))
+                                   (collect child))))))
 
 ;; (defun diff-asts-old (a1 a2)
 ;;   (time (ast-diff-on-lists a1 a2)))

@@ -265,10 +265,10 @@ of conflict ASTs."
   (:documentation "Return the conflicts in OBJ.")
   (:method ((obj t)) nil)
   (:method ((obj auto-mergeable-simple))
-    (remove-if-not #'conflict-ast-p
+    (remove-if-not {typep _ 'conflict-ast}
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
-    (remove-if-not #'conflict-ast-p
+    (remove-if-not {typep _ 'conflict-ast}
                    (ast-to-list (ast-root obj))))
   (:method ((obj auto-mergeable-project))
     (mappend [#'get-conflicts #'cdr] (all-files obj))))
@@ -347,11 +347,11 @@ an insertion or deletion of the OBJ.")
           (list)
           (list)
           (cons :code)
-          (make-conflict-ast :annotations (list (cons :top-level t))
-                             :child-alist)
+          (make-instance 'conflict-ast :annotations (list (cons :top-level t))
+                                       :child-alist)
           (list (cons conflict-child (mapcar {aget :code} (genome obj))))))
   (:method ((obj auto-mergeable-parseable) (conflict-child symbol))
     (nest (copy obj :ast-root)
-          (make-conflict-ast :annotations (list (cons :top-level t))
-                             :child-alist)
+          (make-instance 'conflict-ast :annotations (list (cons :top-level t))
+                                       :child-alist)
           (list (list conflict-child (ast-root obj))))))
