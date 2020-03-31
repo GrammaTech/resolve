@@ -1,9 +1,10 @@
 # Setup
 
-The benchmarks listed in the exp/results.org file for ast-merge testing
-were checked out out to a directory, js-benchmarks/.  The existing
-exp/bin/conflicting-merges script was utilized to find the merges in the
-benchmarks.
+The benchmarks listed in the `exp/results.org` file for ast-merge testing
+were checked out out to a directory, `js-benchmarks/` using the command
+`git clone git@git.grammatech.com:synthesis/benchmark/${benchmark}`.
+The existing `exp/bin/conflicting-merges` script in resolve was utilized
+to find the merges in the benchmarks.
 
 # Benchmark Evaluation
 
@@ -50,16 +51,35 @@ required for auto-merge to execute).
 
 The section below contains a listing of experiments performed on
 the benchmarks above which could be utilized with auto-merge.
-Experiments were executed on the `auto-merge-experiments`
-branches of SEL and resolve using the
-exp/auto-merge-js/try-all-js-auto-merges script.
+
+For these experiments, `auto-merge` was built with a heap size
+(`LISP_HEAP` or `--dynamic-space-size`) of 129024 (Mb) and a stack
+size (`LISP_STACK` or `--control-stack-size`) of 128 (Mb).
+Experiments were executed using the
+`exp/auto-merge-js/try-all-js-auto-merges` script.
 
 As input to the `try-all-js-auto-merges` script, the results of
 executing the `exp/bin/conflicting-merges` script on the good
-benchmarks above were filtered thru
+benchmarks above (e.g. async, bluebird, ..., yargs) were filtered thru
 `grep -v "no-conflict"|cut -f 1,3,4,5` into a
 `try-all-js-merges-input` text file.  The file follows the format
-expected by the existing `exp/bin/try-merge` script.
+expected by the existing `exp/bin/try-merge` script, as shown below:
+
+```
+<benchmark name> <merge base hash> <left branch hash> <right branch hash>
+```
+
+Example:
+```
+commander.js 41fdf892 ba74d56 4788f70
+commander.js 534c63a5 d17cf57 ebdd789
+classnames 0469d5f3 decb0ca 2a07e33
+colors.js 9f3ace44 ca0c69f 7176fc3
+moment d3f7978f 60bfa24f 0bcf8d1e
+moment aea66a8c 2cbad13c 50beb2eb
+async 914fa108 c64997e 2a13d08
+moment 6ef3e64f 49700062 ae013f90
+```
 
 ## Experiment 2020.02.01
 
