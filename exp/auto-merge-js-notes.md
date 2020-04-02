@@ -218,6 +218,45 @@ LISP - ccl
 
 In this experiment, there were no hard errors in auto-merge.
 
+# Experiment 2020.03.31
+
+This experiment was conducted with same benchmarks and properties
+as 2020.02.14 to determine if recent changes may have caused regressions
+to auto-merge.
+
+The following command line was utilized:
+
+```
+cat try-all-js-merges-input | \
+exp/auto-merge-js/try-all-js-auto-merges js-benchmarks/ \
+                                         --log-level info \
+                                         --pop-size 128 \
+                                         --evolve \
+                                         --num-threads 16 \
+                                         --max-time 43200 \
+                                         --out-dir out
+                                         --seed exp/auto-merge-js/sbcl-seed
+```
+
+In this experiment, TMP\_DIR was also set to a non-standard location
+as prior runs had issues with running out of disk space.  Additionally,
+fewer threads were utilized.  Both of these seem to have had a positive
+impact on reducing the number of hard errors.
+
+Commit hashes - SEL:64a33dc,resolve:d5dcddc
+LISP - sbcl
+
+The results breakdown was as follows:
+
+| Result Type                             | Count |
+|-----------------------------------------|-------|
+| Total no test suite                     |    19 |
+| Total setup error                       |    62 |
+| Total auto-merge error                  |     3 |
+| Total no resolution found               |    11 |
+| Total resolution found before evolution |     9 |
+| Total resolution found during evolution |     0 |
+
 # Thoughts for improvement
 
 ## Break test suites up into individual tests
