@@ -25,6 +25,13 @@
     :build-pathname "bin/serve-ast-diff"
     :entry-point "resolve/commands::run-serve-ast-diff")
 
+(defsystem "resolve/run-serve-auto-merge"
+    :description "REST `auto-merge' server from resolve."
+    :depends-on (resolve/commands)
+    :build-operation "asdf:program-op"
+    :build-pathname "bin/serve-auto-merge"
+    :entry-point "resolve/commands::run-serve-auto-merge")
+
 (defsystem "resolve/run-ast-merge"
   :author "GrammaTech"
   :description "Merge two programs that diverge from a common ancestor."

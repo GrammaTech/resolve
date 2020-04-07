@@ -543,7 +543,7 @@ command-line options processed by the returned function."
     (wait-on-manual manual)
     (exit-command ast-merge (if unstable 1 0) new-merged)))
 
-(define-command auto-merge (my-file old-file your-file test-script
+(define-command-rest auto-merge (my-file old-file your-file test-script
                                     &spec +auto-merge-command-line-options+
                                     &aux tests)
   "Merge MY-FILE and YOUR-FILE, from OLD-FILE, with TEST-SCRIPT.
