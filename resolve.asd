@@ -20,14 +20,14 @@
 
 (defsystem "resolve/run-serve-ast-diff"
     :description "REST `ast-diff' server from resolve."
-    :depends-on (resolve/commands)
+    :depends-on ("resolve/routes/diff")
     :build-operation "asdf:program-op"
     :build-pathname "bin/serve-ast-diff"
     :entry-point "resolve/commands::run-serve-ast-diff")
 
 (defsystem "resolve/run-serve-auto-merge"
     :description "REST `auto-merge' server from resolve."
-    :depends-on (resolve/commands)
+    :depends-on ("resolve/routes/merge")
     :build-operation "asdf:program-op"
     :build-pathname "bin/serve-auto-merge"
     :entry-point "resolve/commands::run-serve-auto-merge")

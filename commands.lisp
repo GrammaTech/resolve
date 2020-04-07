@@ -58,7 +58,12 @@
   (:import-from :uiop/stream :println :writeln)
   (:import-from :md5 :md5sum-string)
   (:shadow :merge :ast-diff)
-  (:export :ast-diff :ast-merge))
+  (:export :ast-diff
+           :ast-merge
+           :rest-diff
+           :render-json-diff-to-html
+           :lookup-json-diff-hash
+           :+javascript-directory+))
 (in-package :resolve/commands)
 (in-readtable :curry-compose-reader-macros)
 ;;; TODO: Work on clang-diff tool's git configuration (or maybe this
@@ -407,6 +412,9 @@ command-line options processed by the returned function."
 
 (defvar *json-diffs* (make-hash-table :test #'equalp))
 
+(defplace lookup-json-diff-hash (hash)
+  (gethash hash *json-diffs* "\"MISSING DIFF\""))
+
 (defun rest-diff (&rest additional-ast-diff-params)
   (destructuring-bind (&key old-file new-file language link)
       (alist-plist (decode-json-from-string (payload-as-string)))
@@ -419,19 +427,10 @@ command-line options processed by the returned function."
           (let* ((json (with-output-to-string (*standard-output*)
                          (process :json t)))
                  (key (md5string json)))
-            (setf (gethash key *json-diffs*) json)
+            (setf (lookup-json-diff-hash key) json)
             (format t "http://~a~:[~;:~]~a/show/~a"
                     *address* *port* *port* key))
           (apply #'process additional-ast-diff-params)))))
-
-(defroute diff (:post :application/json)
-  (with-output-to-string (*standard-output*)
-    (rest-diff :json t)))
-
-(defroute diff (:post :text/plain)
-  (with-output-to-string (*standard-output*)
-    (rest-diff)
-    (format t "~&")))
 
 (defun render-json-diff-to-html (json)
   (with-output-to-string (*standard-output*)
@@ -444,13 +443,6 @@ command-line options processed by the returned function."
               (:script :type "text/javascript" :src "/javascript/ast-diff.js")
               (:link :rel "stylesheet" :href "/css/ast-diff.css"))
              (:body :onload "renderDiff()" (:pre (:code :id "page")))))))
-
-(defroute show (:get :text/html hash)
-  (render-json-diff-to-html (gethash (symbol-name hash) *json-diffs* "\"MISSING DIFF\"")))
-
-(defroute diff (:post :text/html)
-  (render-json-diff-to-html (with-output-to-string (*standard-output*)
-                              (rest-diff :json t))))
 
 (define-constant +javascript-directory+
     (append (pathname-directory
