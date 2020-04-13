@@ -565,6 +565,7 @@ command-line options processed by the returned function."
                          (finish-output *error-output*)
                          (quit 2))))
   (when help (show-help-for-ast-merge))
+  (setf *note-out* (list *error-output*))
   (unless (every #'resolve-file (list old-file my-file your-file))
     (exit-command auto-merge 2 (error "Missing source.")))
   (setf *random-state* (if read-seed *random-state*  (make-random-state t))
