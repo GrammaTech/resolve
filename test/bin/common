@@ -41,7 +41,7 @@ done
 # $@ - Remaining arguments to pass thru to auto-merge
 test_auto_merge () {
     BASE_DIR=$1
-    TMP_STDOUT=$(mktemp)
+    TMP_OUTPUT=$(mktemp)
 
     if [ -d $BASE_DIR/$2 ]; then
         TMP_MY=$(mktemp -d)
@@ -70,9 +70,9 @@ test_auto_merge () {
                $TMP_OLD \
                $TMP_YOUR \
                "$TEST_SCRIPT" \
-               | tee $TMP_STDOUT
+               2>&1 | tee $TMP_OUTPUT
 
-    grep -q "Merge resolution found" $TMP_STDOUT
+    grep -q "Merge resolution found" $TMP_OUTPUT
 }
 
 function exit_hook (){
@@ -82,7 +82,7 @@ function exit_hook (){
         rm -rf $TMP_YOUR
         rm -rf $TMP_DIR
         rm -rf $TMP_OUT_DIR
-        rm -rf $TMP_STDOUT
+        rm -rf $TMP_OUTPUT
     fi
 }
 trap exit_hook EXIT SIGHUP SIGINT SIGTERM
