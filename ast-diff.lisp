@@ -1176,8 +1176,9 @@ Prefix and postfix returned as additional values."
       ;; Only try wrap-sequences if enabled and (un)wrapping actually helped
       (let ((w nil)
             (uw nil)
-            (entered t)
-            (i 0) (j 0))
+            (i 0) (j 0)
+            #+ast-diff-wrap-sequence-debug
+            (entered t))
         (when *wrap-sequences*
           (iter (for d in without-ws-diff)
                 (while (or (not w) (not uw)))
@@ -1189,16 +1190,15 @@ Prefix and postfix returned as additional values."
                     (:recurse
                      (case (cadr d)
                        (:wrap
-                        (let* ((cost (diff-cost (list d)))
-                               (wrapped-cost (diff-cost (caddr d)))
+                        (let* ((wrapped-cost (diff-cost (caddr d)))
                                (from (elt total-a i))
-                               (from-cost (ast-cost from))
-                               (to (elt total-b j))
-                               (to-cost (ast-cost to)))
+                               (from-cost (ast-cost from)))
                           (when (<= wrapped-cost from-cost)
                             (setf w t)
                             #+ast-diff-wrap-sequence-debug
-                            (progn
+                            (let* ((cost (diff-cost (list d)))
+                                   (to (elt total-b j))
+                                   (to-cost (ast-cost to)))
                               (when entered (format t "Enter~%"))
                               (setf entered nil)
                               (format t ":WRAP found, ~a/~a cost ~a~%"
@@ -1211,16 +1211,15 @@ Prefix and postfix returned as additional values."
                                       (source-text to)))
                             )))
                        (:unwrap
-                        (let* ((cost (diff-cost (list d)))
-                               (unwrapped-cost (diff-cost (caddr d)))
-                               (from (elt total-a i))
-                               (from-cost (ast-cost from))
+                        (let* ((unwrapped-cost (diff-cost (caddr d)))
                                (to (elt total-b j))
                                (to-cost (ast-cost to)))
                           (when (<= unwrapped-cost to-cost)
                             (setf uw t)
                             #+ast-diff-unwrap-sequence-debug
-                            (progn
+                            (let* ((cost (diff-cost (list d)))
+                                   (from (elt total-a i))
+                                   (from-cost (ast-cost from)))
                               (when entered (format t "Enter~%"))
                               (setf entered nil)
                               (format t ":UNWRAP found, ~a/~a cost ~a~%"
