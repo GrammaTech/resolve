@@ -27,6 +27,9 @@
   (:import-from :uiop/stream :read-file-forms)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
                 :put-inserts-before-deletes)
+  (:import-from :software-evolution-library/command-line
+                :create-software
+                :create-test-suite)
   (:export :test :batch-test))
 (in-package :resolve/test)
 (in-readtable :curry-compose-reader-macros)
@@ -1589,6 +1592,25 @@
        (length *population*) (expt 5 (length chunks)))
    (is (not (some [{some #'conflict-ast-p} #'ast-to-list] *population*))
        "Population has no conflict ASTs remaining.")))
+
+(deftest can-merge-when-one-side-is-invalid ()
+  (nest
+   (with-temporary-directory (:pathname orig))
+   (with-temporary-directory (:pathname my))
+   (with-temporary-directory (:pathname your))
+   (let ((bad "{")
+         (good (fmt "{~%}"))
+         (dirs (list orig my your)))
+     (dolist (dir dirs)
+       (write-string-into-file good (path-join dir "package.json")))
+     (dolist (dir (remove my dirs))
+       (write-string-into-file good (path-join dir "problem.js")))
+     (write-string-into-file bad (path-join my "problem.js")))
+   (finishes
+     (resolve (create-auto-mergeable (create-software my))
+              (create-auto-mergeable (create-software orig))
+              (create-auto-mergeable (create-software your))
+              {auto-merge-test _ (create-test-suite "true" 1)}))))
 
 
 ;;; Additional tests of internals

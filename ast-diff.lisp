@@ -1453,6 +1453,16 @@ value that is used instead."
   (ast-diff* (split-sequence #\Newline (genome soft1))
              (split-sequence #\Newline (genome soft2))))
 
+(defmethod ast-diff* ((simple simple) (soft source))
+  #+debug (format t "ast-diff[SOURCE]~%")
+  (ast-diff* (simple-genome-unpack (genome simple))
+             (split-sequence #\Newline (genome soft))))
+
+(defmethod ast-diff* ((soft source) (simple simple))
+  #+debug (format t "ast-diff[SOURCE]~%")
+  (ast-diff* (split-sequence #\Newline (genome soft))
+             (simple-genome-unpack (genome simple))))
+
 (defun split-into-subsequences (seq subseq-indices &aux (n (length seq)))
   "Return subsequences of SEQ delimited by SUBSEQ-INDICES.
 Given list SEQ and a list of pairs SUBSEQ-INDICES, which are
