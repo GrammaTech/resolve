@@ -575,8 +575,7 @@
 
 
 ;;;; Clang AST Diff tests
-(defsuite clang-ast-diff-tests "AST-level diffs of clang objects."
-            (clang-mutate-available-p))
+(defsuite clang-ast-diff-tests "AST-level diffs of clang objects.")
 
 (deftest (diff-gets-back-on-track :long-running) ()
   (let ((obj1 (from-string (make-instance 'clang)
@@ -945,11 +944,7 @@
 
 
 ;;;; AST merge3 tests
-(defun clang-mutate-available-p ()
-  (zerop (nth-value 2 (shell "which clang-mutate"))))
-
-(defsuite ast-merge3 "Tests of MERGE3"
-  (clang-mutate-available-p))
+(defsuite ast-merge3 "Tests of MERGE3")
 
 (deftest sexp-merge3-empty ()
   (is (equalp (multiple-value-list (merge3 nil nil nil))
