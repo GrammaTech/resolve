@@ -14,7 +14,8 @@ DOC_PACKAGES =				\
 		resolve/string
 
 LISP_DEPS =				\
-	$(wildcard *.lisp)
+	$(wildcard *.lisp)		\
+	$(wildcard software/*.lisp)
 
 BINS = ast-diff ast-merge auto-merge serve-ast-diff serve-auto-merge
 
