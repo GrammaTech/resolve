@@ -23,6 +23,7 @@
         :metabang-bind
         :resolve/alist
         :resolve/ast-diff
+        :resolve/software/parseable
         :software-evolution-library
         :software-evolution-library/software/clang
         :software-evolution-library/software/file

@@ -3,9 +3,25 @@
         :resolve/ast-diff
         :software-evolution-library
         :software-evolution-library/software/parseable)
-  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*))
+  (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
+  (:export ast-stub))
 (in-package :resolve/software/parseable)
 (in-readtable :curry-compose-reader-macros)
+
+(defclass ast-stub (ast)
+  ((children :reader children
+             :type list
+             :initarg :children
+             :initform nil
+             :documentation "The list of children of the node,
+which may be more nodes, or other values.")
+   (child-slots :initform '(children) :allocation :class))
+  (:documentation "Minimal concrete subclass of AST useful a placeholder
+where an AST is expected.  ast-stub is used to represent a conflict
+resolution where the AST is removed.  A stub is inserted and the
+original conflict AST is stored as an annotation; in future mutations,
+we can try a different conflict solution by examining the ast stub's
+conflict AST annotation and selecting a different resolution"))
 
 (defmethod ast-diff* ((parseable-a parseable) (parseable-b parseable))
   #+debug (format t "ast-diff[PARSEABLE]~%")
