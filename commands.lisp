@@ -46,8 +46,6 @@
         :software-evolution-library/software/project
         :software-evolution-library/software/clang
         :software-evolution-library/software/clang-project
-        :software-evolution-library/software/java
-        :software-evolution-library/software/java-project
         :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/json
@@ -285,7 +283,6 @@ command-line options processed by the returned function."
                (setf language
                      (resolve-language-from-language-and-source language))
                (let ((type (case language
-                             (java "java")
                              (javascript "js")
                              (json "json")
                              (clang "cxx")
