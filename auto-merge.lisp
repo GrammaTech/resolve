@@ -10,7 +10,6 @@
         :software-evolution-library/components/test-suite
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
-        :software-evolution-library/software/source
         :software-evolution-library/software/clang
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/simple
@@ -50,46 +49,6 @@
      (reverse (remove-if-not {typep _ 'conflict-ast} (asts conflicted))))
     conflicted))
 
-(defgeneric get-conflict-strategies (ast)
-  (:documentation "Return a list of strategies which may be utilized
-to resolve the conflict AST.")
-  (:method ((ast conflict-ast))
-    (if (aget :top-level (ast-annotations ast))
-        '(:V1 :NN)
-        '(:V1 :V2 :C1 :C2 :NN))))
-
-(defun resolve-conflict-ast
-    (conflict &key (strategy (random-elt (get-conflict-strategies conflict)))
-     &aux (options (conflict-ast-child-alist conflict)))
-  "Return a concrete resolution of CONFLICT AST using STRATEGY."
-  (labels ((normalize (children)
-             "Normalize CHILDREN by adding the conflict AST
-             to each child AST's annotations.  If there are no children,
-             create a NullStmt AST with this annotations.  The annotations
-             are required for the `new-conflict-resolution` mutation."
-             (if children
-                 (mapcar (lambda (child)
-                           (if (ast-p child)
-                               (copy child :annotations
-                                           `((:conflict-ast . ,conflict)))
-                               (make-instance 'ast-stub
-                                :children (list child)
-                                :annotations `((:conflict-ast . ,conflict)))))
-                         children)
-                 (list (make-instance 'ast-stub
-                        :annotations `((:conflict-ast . ,conflict)))))))
-    ;; Five ways of resolving a conflict:
-    (case strategy
-      ;; 1. (V1) version 1
-      (:V1 (normalize (aget :my options)))
-      ;; 2. (V2) version 2
-      (:V2 (normalize (aget :your options)))
-      ;; 3. (CC) concatenate versions (either order)
-      (:C1 (normalize (append (aget :my options) (aget :your options))))
-      (:C2 (normalize (append (aget :your options) (aget :my options))))
-      ;; 4. (NN) select the base version
-      (:NN (normalize (aget :old options))))))
-
 (defgeneric resolve-conflict (conflicted conflict &key strategy)
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
@@ -98,81 +57,6 @@ to resolve the conflict AST.")
                     (make-instance 'new-conflict-resolution
                       :targets conflict
                       :strategy strategy))))
-
-
-;;; Mutations for the auto-merge evolutionary loop
-(define-mutation new-conflict-resolution (parseable-mutation)
-  ((targeter :initform #'find-resolved-conflict)
-   (strategy :initarg :strategy :reader strategy :initform nil))
-  (:documentation "Replace a conflict AST resolution with an alternative
-option."))
-
-(defgeneric find-resolved-conflict (obj)
-  (:documentation "Return a conflict previously resolved in OBJ.")
-  (:method ((obj auto-mergeable))
-    (if-let ((conflicts (nest (remove-duplicates)
-                              (mapcar [{aget :conflict-ast} #'ast-annotations])
-                              (get-resolved-conflicts obj))))
-      (random-elt conflicts)
-      (error (make-condition 'no-mutation-targets
-                             :obj obj :text "No resolved conflict asts to pick from.")))))
-
-(defmethod build-op ((mutation new-conflict-resolution)
-                     (software auto-mergeable-parseable))
-  "Return a list of parseable mutation operations to replace an existing
-conflict AST resolution with an alternative option."
-  (let* ((conflict-ast (targets mutation))
-         (strategy (or (strategy mutation)
-                       (random-elt (get-conflict-strategies conflict-ast))))
-         (prior-resolution (or (remove-if-not [{eq conflict-ast}
-                                               {aget :conflict-ast}
-                                               #'ast-annotations]
-                                              (get-resolved-conflicts software))
-                               (list conflict-ast)))
-         (new-resolution (resolve-conflict-ast conflict-ast
-                                               :strategy strategy))
-         (conflict-path (ast-path (car prior-resolution)))
-         (parent (get-ast software (butlast conflict-path))))
-    ;; Replace the prior resolution children with the new resolution
-    (if (null conflict-path)
-        `((:set (:stmt1 . ,conflict-path)
-                (:literal1 . ,(car new-resolution))))
-        `((:set (:stmt1 . ,parent)
-                (:literal1 .
-                           ,(copy parent :children
-                                  (append (subseq (ast-children parent)
-                                                  0
-                                                  (lastcar conflict-path))
-                                          new-resolution
-                                          (subseq (ast-children parent)
-                                                  (+ (lastcar conflict-path)
-                                                     (length prior-resolution)))))))))))
-
-(defmethod apply-mutation ((software auto-mergeable-simple)
-                           (mutation new-conflict-resolution))
-  "Apply the NEW-CONFLICT-RESOLUTION mutation to SOFTWARE."
-  ;; Simple software objects are a more primitive representation and therefore,
-  ;; we need to override `apply-mutation` instead of `build-op`.
-  (let* ((conflict-ast (targets mutation))
-         (strategy (or (strategy mutation)
-                       (random-elt (get-conflict-strategies conflict-ast))))
-         (prior-resolution (or (remove-if-not «and [#'ast-p {aget :code}]
-                                                   [{eq conflict-ast}
-                                                    {aget :conflict-ast}
-                                                    #'ast-annotations
-                                                    {aget :code}]»
-                                              (genome software))
-                               `(((:code . ,conflict-ast)))))
-         (new-resolution (mapcar [#'list {cons :code}]
-                                 (resolve-conflict-ast conflict-ast
-                                                       :strategy strategy)))
-         (index (search prior-resolution (genome software) :test #'equalp)))
-    (setf (genome software)
-          (append (subseq (genome software) 0 index)
-                  new-resolution
-                  (subseq (genome software)
-                          (+ index (length prior-resolution)))))
-    software))
 
 
 ;;; Generation of the initial population.
@@ -282,9 +166,7 @@ Extra keys are passed through to EVOLVE.")
                                   «and #'fitness [{every #'zerop} #'fitness]»))
           (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
           (*fitness-evals* 0)
-          (*fitness-predicate* #'<)
-          (*parseable-mutation-types* '((new-conflict-resolution . 1)))
-          (*simple-mutation-types* '((new-conflict-resolution . 1))))
+          (*fitness-predicate* #'<))
 
       (if (null (remove-if-not #'get-resolved-conflicts *population*))
           ;; Special case - there are no conflicts to be resolved

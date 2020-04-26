@@ -28,40 +28,53 @@
         :software-evolution-library/software/clang
         :software-evolution-library/software/file
         :software-evolution-library/software/simple
-        :software-evolution-library/software/source
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/clang
+        :software-evolution-library/software/javascript
+        :software-evolution-library/software/lisp
         :software-evolution-library/software/project
         :software-evolution-library/software/parseable-project
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
-  (:export :auto-mergeable
+  (:export ;; auto-mergeable data structures
+           :auto-mergeable
            :auto-mergeable-simple
            :auto-mergeable-parseable
+           :auto-mergeable-clang
+           :auto-mergeable-javascript
+           :auto-mergeable-lisp
            :auto-mergeable-project
            :auto-mergeable-clang-project
            :auto-mergeable-javascript-project
            :auto-mergeable-lisp-project
            :create-auto-mergeable
+           ;; auto-mergeable mutations
            :get-conflicts
-           :get-resolved-conflicts))
+           :get-resolved-conflicts
+           :get-conflict-strategies
+           :new-conflict-resolution))
 (in-package :resolve/software/auto-mergeable)
 (in-readtable :curry-compose-reader-macros)
 
 
 ;;; Auto-merge mixin and data structures.
 ;;
-;;  Note: Some subclasses of project (e.g. javascript-project)
-;;  override methods outside of project creation (e.g. phenome).
-;;  Because of this, we need to retain the specific subclass of
-;;  the project when creating the auto-mergeable mixin variant
-;;  to ensure proper operation when calling overridden routines.
+;;  Note: subclasses of parseable and project (e.g. clang,
+;;  javascript-project) override methods outside of project creation
+;;  (e.g. phenome).  Because of this, we need to retain the specific
+;;  subclass of the software object when creating the auto-mergeable
+;;  mixin variant to ensure proper operation when calling overridden
+;;  routines.
 (define-software auto-mergeable () ())
 (define-software auto-mergeable-simple (auto-mergeable simple) ())
 (define-software auto-mergeable-parseable (auto-mergeable parseable) ())
-(define-software auto-mergeable-project (auto-mergeable parseable-project) ())
+(define-software auto-mergeable-clang (auto-mergeable-parseable clang) ())
+(define-software auto-mergeable-javascript (auto-mergeable-parseable javascript) ())
+(define-software auto-mergeable-lisp (auto-mergeable-parseable lisp) ())
 
+(define-software auto-mergeable-project (auto-mergeable parseable-project) ())
 (define-software auto-mergeable-clang-project
     (auto-mergeable-project clang-project) ())
 (define-software auto-mergeable-javascript-project
@@ -73,12 +86,14 @@
 ;;; Creation routine
 (defgeneric create-auto-mergeable (soft)
   (:documentation "Create an auto-mergeable software object from SOFT.")
-  (:method ((obj software))
-    obj)
   (:method ((obj simple))
     (change-class (copy obj) 'auto-mergeable-simple))
-  (:method ((obj parseable))
-    (change-class (copy obj) 'auto-mergeable-parseable))
+  (:method ((obj clang))
+    (change-class (copy obj) 'auto-mergeable-clang))
+  (:method ((obj javascript))
+    (change-class (copy obj) 'auto-mergeable-javascript))
+  (:method ((obj lisp))
+    (change-class (copy obj) 'auto-mergeable-lisp))
   (:method ((obj project))
     (labels ((parseable-file-p (file-obj-pair)
                "Filter files which can be parsed into ASTs."
@@ -90,8 +105,7 @@
                "Return a list of `auto-mergeable-parseable` software objects
                representing source files which have been parsed into ASTs."
                (mapcar (lambda-bind ((file . obj))
-                         (cons file
-                               (change-class obj 'auto-mergeable-parseable)))
+                         (cons file (create-auto-mergeable obj)))
                        (remove-if-not #'parseable-file-p (all-files obj))))
              (other-files ()
                "Return a list of `auto-mergeable-simple` software objects
@@ -261,6 +275,114 @@ of conflict ASTs."
                                   (length (get-resolved-conflicts obj)))))
 
 
+;;; Auto-merge mutations
+(defmethod pick-mutation-type ((obj auto-mergeable))
+  'new-conflict-resolution)
+
+(define-mutation new-conflict-resolution (parseable-mutation)
+  ((targeter :initform #'get-resolved-conflict)
+   (strategy :initarg :strategy :reader strategy :initform nil))
+  (:documentation "Replace a conflict AST resolution with an alternative
+option."))
+
+(defmethod build-op ((mutation new-conflict-resolution)
+                     (software auto-mergeable-parseable))
+  "Return a list of parseable mutation operations to replace an existing
+conflict AST resolution with an alternative option."
+  (let* ((conflict-ast (targets mutation))
+         (strategy (or (strategy mutation)
+                       (random-elt (get-conflict-strategies conflict-ast))))
+         (prior-resolution (or (remove-if-not [{eq conflict-ast}
+                                               {aget :conflict-ast}
+                                               #'ast-annotations]
+                                              (get-resolved-conflicts software))
+                               (list conflict-ast)))
+         (new-resolution (resolve-conflict-ast conflict-ast
+                                               :strategy strategy))
+         (conflict-path (ast-path (car prior-resolution)))
+         (parent (get-ast software (butlast conflict-path))))
+    ;; Replace the prior resolution children with the new resolution
+    (if (null conflict-path)
+        `((:set (:stmt1 . ,conflict-path)
+                (:literal1 . ,(car new-resolution))))
+        `((:set (:stmt1 . ,parent)
+                (:literal1 .
+                           ,(copy parent :children
+                                  (append (subseq (ast-children parent)
+                                                  0
+                                                  (lastcar conflict-path))
+                                          new-resolution
+                                          (subseq (ast-children parent)
+                                                  (+ (lastcar conflict-path)
+                                                     (length prior-resolution)))))))))))
+
+(defmethod apply-mutation ((software auto-mergeable-simple)
+                           (mutation new-conflict-resolution))
+  "Apply the NEW-CONFLICT-RESOLUTION mutation to SOFTWARE."
+  ;; Simple software objects are a more primitive representation and therefore,
+  ;; we need to override `apply-mutation` instead of `build-op`.
+  (let* ((conflict-ast (targets mutation))
+         (strategy (or (strategy mutation)
+                       (random-elt (get-conflict-strategies conflict-ast))))
+         (prior-resolution (or (remove-if-not «and [#'ast-p {aget :code}]
+                                                   [{eq conflict-ast}
+                                                    {aget :conflict-ast}
+                                                    #'ast-annotations
+                                                    {aget :code}]»
+                                              (genome software))
+                               `(((:code . ,conflict-ast)))))
+         (new-resolution (mapcar [#'list {cons :code}]
+                                 (resolve-conflict-ast conflict-ast
+                                                       :strategy strategy)))
+         (index (search prior-resolution (genome software) :test #'equalp)))
+    (setf (genome software)
+          (append (subseq (genome software) 0 index)
+                  new-resolution
+                  (subseq (genome software)
+                          (+ index (length prior-resolution)))))
+    software))
+
+(defgeneric get-conflict-strategies (ast)
+  (:documentation "Return a list of strategies which may be utilized
+to resolve the conflict AST.")
+  (:method ((ast conflict-ast))
+    (if (aget :top-level (ast-annotations ast))
+        '(:V1 :NN)
+        '(:V1 :V2 :C1 :C2 :NN))))
+
+(defun resolve-conflict-ast
+    (conflict &key (strategy (random-elt (get-conflict-strategies conflict)))
+     &aux (options (conflict-ast-child-alist conflict)))
+  "Return a concrete resolution of CONFLICT AST using STRATEGY."
+  (labels ((normalize (children)
+             "Normalize CHILDREN by adding the conflict AST
+             to each child AST's annotations.  If there are no children,
+             create a NullStmt AST with this annotations.  The annotations
+             are required for the `new-conflict-resolution` mutation."
+             (if children
+                 (mapcar (lambda (child)
+                           (if (ast-p child)
+                               (copy child :annotations
+                                           `((:conflict-ast . ,conflict)))
+                               (make-instance 'ast-stub
+                                :children (list child)
+                                :annotations `((:conflict-ast . ,conflict)))))
+                         children)
+                 (list (make-instance 'ast-stub
+                        :annotations `((:conflict-ast . ,conflict)))))))
+    ;; Five ways of resolving a conflict:
+    (case strategy
+      ;; 1. (V1) version 1
+      (:V1 (normalize (aget :my options)))
+      ;; 2. (V2) version 2
+      (:V2 (normalize (aget :your options)))
+      ;; 3. (CC) concatenate versions (either order)
+      (:C1 (normalize (append (aget :my options) (aget :your options))))
+      (:C2 (normalize (append (aget :your options) (aget :my options))))
+      ;; 4. (NN) select the base version
+      (:NN (normalize (aget :old options))))))
+
+
 ;;; Auto-mergeable specific methods
 (defgeneric get-conflicts (obj)
   (:documentation "Return the conflicts in OBJ.")
@@ -285,6 +407,17 @@ of conflict ASTs."
                    (ast-to-list (ast-root obj))))
   (:method ((obj auto-mergeable-project))
     (mappend [#'get-resolved-conflicts #'cdr] (all-files obj))))
+
+(defgeneric get-resolved-conflict (obj)
+  (:documentation "Return a conflict previously resolved in OBJ.")
+  (:method ((obj t)) nil)
+  (:method ((obj auto-mergeable))
+    (if-let ((conflicts (nest (remove-duplicates)
+                              (mapcar [{aget :conflict-ast} #'ast-annotations])
+                              (get-resolved-conflicts obj))))
+      (random-elt conflicts)
+      (error (make-condition 'no-mutation-targets
+                             :obj obj :text "No resolved conflict asts.")))))
 
 
 ;;; AST diff interface overrides

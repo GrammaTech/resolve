@@ -1503,18 +1503,13 @@ value that is used instead."
    (simple-genome-unpack (genome soft1))
    (simple-genome-unpack (genome soft2))))
 
-(defmethod ast-diff* ((soft1 source) (soft2 source))
-  #+debug (format t "ast-diff[SOURCE]~%")
-  (ast-diff* (split-sequence #\Newline (genome soft1))
-             (split-sequence #\Newline (genome soft2))))
-
-(defmethod ast-diff* ((simple simple) (soft source))
-  #+debug (format t "ast-diff[SOURCE]~%")
+(defmethod ast-diff* ((simple simple) (soft parseable))
+  #+debug (format t "ast-diff[SIMPLE,PARSEABLE]~%")
   (ast-diff* (simple-genome-unpack (genome simple))
              (split-sequence #\Newline (genome soft))))
 
-(defmethod ast-diff* ((soft source) (simple simple))
-  #+debug (format t "ast-diff[SOURCE]~%")
+(defmethod ast-diff* ((soft parseable) (simple simple))
+  #+debug (format t "ast-diff[PARSEABLE,SIMPLE]~%")
   (ast-diff* (split-sequence #\Newline (genome soft))
              (simple-genome-unpack (genome simple))))
 

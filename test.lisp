@@ -7,7 +7,6 @@
         :software-evolution-library/stefil-plus
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
-        :software-evolution-library/software/source
         :software-evolution-library/software/clang
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/javascript
