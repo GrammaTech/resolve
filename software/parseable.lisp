@@ -39,9 +39,6 @@ conflict AST annotation and selecting a different resolution"))
 
 (defmethod converge ((obj2 parseable) (obj1 parseable) (obj3 parseable)
                      &rest args &key &allow-other-keys)
-  (make-instance (class-of obj1)
-    :genome nil
-    :ast-root (apply #'converge (ast-root obj2)
-                     (ast-root obj1)
-                     (ast-root obj3)
-                     args)))
+  (nest (copy obj1 :genome nil :ast-root)
+        (populate-fingers)
+        (apply #'converge (ast-root obj2) (ast-root obj1) (ast-root obj3) args)))
