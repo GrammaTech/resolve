@@ -17,7 +17,7 @@
 
 (defun remove-empty-strings-from-ast (ast)
   (copy ast :children (iter (for child in (ast-children ast))
-                            (cond ((ast-p child)
+                            (cond ((typep child 'ast)
                                    (collect (remove-empty-strings-from-ast child)))
                                   ((not (emptyp child))
                                    (collect child))))))

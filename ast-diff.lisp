@@ -164,10 +164,7 @@ wrapping and unwrapping to be considered.")
   (:documentation "Return cost of AST."))
 
 (defmethod ast-cost ((ast ast))
-  (actual-ast-cost ast))
-
-(defmethod ast-cost ((ast clang-ast))
-  (actual-ast-cost ast))
+  (reduce #'+ (ast-children ast) :key #'ast-cost :initial-value 1))
 
 (defmethod ast-cost ((ast t))
   1)
@@ -190,9 +187,6 @@ wrapping and unwrapping to be considered.")
      ;; cost of terminal NIL is 0
      (if ast (ast-cost ast) 0)))
 
-(defun actual-ast-cost (ast)
-  (reduce #'+ (ast-children ast) :key #'ast-cost :initial-value 1))
-
 (defgeneric ast-can-recurse (ast-a ast-b)
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
 can be recursed on if STRINGS is true (defaults to true)"))
@@ -202,8 +196,6 @@ can be recursed on if STRINGS is true (defaults to true)"))
 (defmethod ast-can-recurse ((ast-a t) (ast-b t))
   nil)
 (defmethod ast-can-recurse ((ast-a ast) (ast-b ast))
-  t)
-(defmethod ast-can-recurse ((ast-a clang-ast) (ast-b clang-ast))
   t)
 
 (defmethod source-text ((ast cons))
@@ -216,25 +208,15 @@ can be recursed on if STRINGS is true (defaults to true)"))
 (defgeneric ast-to-list-form (ast)
   (:documentation "Convert ast into a more readable list form")
   (:method ((ast ast))
-    (actual-ast-to-list-form ast))
-  (:method ((ast clang-ast))
-    (actual-ast-to-list-form ast))
+    (cons (ast-class ast)
+          (mapcar #'ast-to-list-form (ast-children ast))))
   (:method ast-to-list-form (ast) ast))
-
-(defun actual-ast-to-list-form (ast)
-  (cons (ast-class ast)
-        (mapcar #'ast-to-list-form (ast-children ast))))
 
 (defgeneric ast-size (node)
   (:documentation "Number of nodes and leaves in an AST or ast-like thing")
   (:method ((node ast))
-    (actual-ast-size node))
-  (:method ((node clang-ast))
-    (actual-ast-size node))
+    (reduce #'+ (ast-children node) :key #'ast-size :initial-value 1))
   (:method ((node t)) 1))
-
-(defun actual-ast-size (ast)
-  (reduce #'+ (ast-children ast) :key #'ast-size :initial-value 1))
 
 
 ;;; Wrapper for Lisp lists in simple ASTs
@@ -249,7 +231,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
 ;;; (if the list is proper).   This will collide on improper lists
 ;;; that end in :NIL, but there is nothing special about :NIL, so fix
 ;;; this up later.
-(defclass simple-lisp-ast (ast)
+(defclass simple-lisp-ast (functional-tree-ast)
   ((children :initarg :children :initform nil :reader children)
    (child-slots :initform '(children) :allocation :class)
    ;; Slots for caching
@@ -627,14 +609,6 @@ differencing of specialized AST structures.; `ast-equal-p',
 (defmethod ast-diff* ((ast-a ast) (ast-b ast))
   #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
                   (ast-can-recurse ast-a ast-b))
-  (ast-diff*-asts ast-a ast-b))
-
-(defmethod ast-diff* ((ast-a clang-ast) (ast-b clang-ast))
-  #+debug (format t "ast-diff[CLANG-AST] AST-CAN-RECURSE: ~S~%"
-                  (ast-can-recurse ast-a ast-b))
-  (ast-diff*-asts ast-a ast-b))
-
-(defun ast-diff*-asts (ast-a ast-b)
   (let (diff cost)
     (when (eql (ast-class ast-a) (ast-class ast-b))
       (setf (values diff cost)
@@ -653,10 +627,7 @@ differencing of specialized AST structures.; `ast-equal-p',
                 cost unwrap-cost))))
     (if diff
         (values diff cost)
-        (if (equal ast-a ast-b)
-            (values `((:same . ,ast-a)) 0)
-            (values `((:insert . ,ast-b) (:delete . ,ast-a))
-                    (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b)))))))
+        (call-next-method))))
 
 
 (defun map-ast-while-path (ast fn &optional path)
@@ -667,7 +638,7 @@ of children leading down to the node."
   (when (funcall fn ast path)
     (iter (for c in (ast-children ast))
           (for i from 0)
-          (when (ast-p c) (map-ast-while-path c fn (cons i path))))))
+          (when (typep c 'ast) (map-ast-while-path c fn (cons i path))))))
 
 (defgeneric ast-diff-wrap (ast-a ast-b &key skip-root first-ast-child)
   (:documentation
@@ -675,17 +646,6 @@ of children leading down to the node."
 
 (defmethod ast-diff-wrap ((ast-a ast) (ast-b ast)
                           &key (skip-root t) first-ast-child)
-  (actual-ast-diff-wrap ast-a ast-b
-                        :skip-root skip-root
-                        :first-ast-child first-ast-child))
-
-(defmethod ast-diff-wrap ((ast-a clang-ast) (ast-b clang-ast)
-                          &key (skip-root t) first-ast-child)
-  (actual-ast-diff-wrap ast-a ast-b
-                        :skip-root skip-root
-                        :first-ast-child first-ast-child))
-
-(defun actual-ast-diff-wrap (ast-a ast-b &key (skip-root t) first-ast-child)
   ;; search over the ASTs under ast-b that are the same class as ast-a,
   ;; and for which the size difference is not too large
   (let* ((ast-a-cost (ast-cost ast-a))
@@ -756,17 +716,6 @@ out of one tree and turns it into another."))
 
 (defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast)
                             &key (skip-root t) first-ast-child)
-  (actual-ast-diff-unwrap ast-a ast-b
-                          :skip-root skip-root
-                          :first-ast-child first-ast-child))
-
-(defmethod ast-diff-unwrap ((ast-a clang-ast) (ast-b clang-ast)
-                            &key (skip-root t) first-ast-child)
-  (actual-ast-diff-unwrap ast-a ast-b
-                          :skip-root skip-root
-                          :first-ast-child first-ast-child))
-
-(defun actual-ast-diff-unwrap (ast-a ast-b &key (skip-root t) first-ast-child)
   ;; search over the ASTs under ast-a that are the same class as ast-b,
   ;; and for which the size difference is not too large
   (let* ((ast-b-cost (ast-cost ast-b))
@@ -829,22 +778,17 @@ out of one tree and turns it into another."))
   (:documentation 
    "Check that A is 'close enough' to some child of b")
   (:method ((a ast) (b ast) &optional reverse?)
-    (actual-ast-child-check a b reverse?))
-  (:method ((a clang-ast) (b clang-ast) &optional reverse?)
-    (actual-ast-child-check a b reverse?))
+    (let* ((a-cost (ast-cost a))
+           (cost-limit (floor (* *base-cost* a-cost 1/2))))
+      (some (lambda (c)
+              (and (typep c 'ast)
+                   (<= 1/2 (/ a-cost (ast-cost c)) 3/2)
+                   ;; REVERSE? is used so we don't compute ast-diffs backwards
+                   ;; when checking for UNWRAP
+                   (< (nth-value 1 (if reverse? (ast-diff* c a) (ast-diff* a c))) cost-limit)))
+            (ast-children b))))
   (:method ((a t) (b t) &optional reverse?) (declare (ignore reverse?))
     (ast-equal-p a b)))
-
-(defun actual-ast-child-check (a b &optional reverse?)
-  (let* ((a-cost (ast-cost a))
-         (cost-limit (floor (* *base-cost* a-cost 1/2))))
-    (some (lambda (c)
-            (and (ast-p c)
-                 (<= 1/2 (/ a-cost (ast-cost c)) 3/2)
-                 ;; REVERSE? is used so we don't compute ast-diffs backwards
-                 ;; when checking for UNWRAP
-                 (< (nth-value 1 (if reverse? (ast-diff* c a) (ast-diff* a c))) cost-limit)))
-          (ast-children b))))
 
 (defun wraps-of-path (ast path)
   "Computes lists of children that lie on the left and right sides of a path
@@ -852,7 +796,7 @@ down from AST, as well as the classes of the nodes along the path."
   ;; (format t "Wraps of PATH = ~s in ~s~%" path (ast-to-list-form ast))
   (let (left right classes)
     (iter (while path)
-          (assert (ast-p ast))
+          (assert (typep ast 'ast))
           (let ((c (ast-children ast))
                 (i (pop path)))
             (assert (<= 0 i))
@@ -861,7 +805,7 @@ down from AST, as well as the classes of the nodes along the path."
             (push (subseq c 0 i) left)
             (push (subseq c (1+ i)) right)
             (setf ast (elt c i))
-            (assert (ast-p ast))))
+            (assert (typep ast 'ast))))
     (setf left (reverse left)
           right (reverse right)
           classes (reverse classes))
@@ -887,7 +831,7 @@ down from AST, as well as the classes of the nodes along the path."
     (let ((sub-ast (copy ast-a :children (coerce sub-a 'list)))
           (*wrap-sequences* nil)
           (*wrap* nil)
-          (first-ast-child (position-if #'ast-p sub-a)))
+          (first-ast-child (position-if {typep _ 'ast} sub-a)))
       (let ((diff (ast-diff-wrap sub-ast ast-b :skip-root nil
                                  :first-ast-child first-ast-child)))
         (if (consp diff)
@@ -901,7 +845,7 @@ down from AST, as well as the classes of the nodes along the path."
     (let ((sub-ast (copy ast-b :children (coerce sub-b 'list)))
           (*wrap-sequences* nil)
           (*wrap* nil)
-          (first-ast-child (position-if #'ast-p sub-b)))
+          (first-ast-child (position-if {typep _ 'ast} sub-b)))
       (let ((diff (ast-diff-unwrap a sub-ast :skip-root nil
                                    :first-ast-child first-ast-child)))
         (if (consp diff)
@@ -957,9 +901,11 @@ Prefix and postfix returned as additional values."
   (labels ((prefix (list-a list-b)
              (iter (for a in list-a)
                    (for b in list-b)
-                   (cond ((and (ast-p a) (ast-p b) (ast-equal-p a b))
+                   (cond ((and (typep a 'ast) (typep b 'ast)
+                               (ast-equal-p a b))
                           (collect a into common))
-                         ((and (not (ast-p a)) (not (ast-p b)) (equalp a b))
+                         ((and (not (typep a 'ast)) (not (typep b 'ast))
+                               (equalp a b))
                           (collect a into common))
                          (t (return common))))))
     (let* ((prefix (prefix list-a list-b))
@@ -1559,8 +1505,8 @@ source, build the edit tree corresponding to the script."))
 (defmethod create-edit-tree (source target (script cons)
                              &key &allow-other-keys)
   ;; The script is a list of actions on the AST's children
-  (if (and (ast-p source)
-           (ast-p target))
+  (if (and (typep source 'ast)
+           (typep target 'ast))
       (change-segments-on-seqs
        (ast-children source)
        (ast-children target)
@@ -2008,16 +1954,10 @@ be applied in that context."))
       (apply #'actual-ast-patch ast script keys)
       (call-next-method)))
 
-(defmethod ast-patch* ((ast clang-ast) (script list) &rest keys
-                       &key &allow-other-keys)
-  (if (listp (car script))
-      (apply #'actual-ast-patch ast script keys)
-      (call-next-method)))
-
 (defmethod ast-patch* ((original t) (script cons)
                        &rest keys &key (delete? t) &allow-other-keys)
   (declare (ignorable delete? keys))
-  (if (ast-p original)
+  (if (typep original 'ast)
       (case (car script)
         (:wrap
          (apply #'ast-patch-wrap original (cdr script) keys))
@@ -2141,13 +2081,6 @@ process with the rest of the script."
 
 (defmethod ast-patch-wrap ((ast ast) (args list) &rest keys
                            &key &allow-other-keys)
-  (apply #'actual-ast-patch-wrap ast args keys))
-
-(defmethod ast-patch-wrap ((ast clang-ast) (args list) &rest keys
-                           &key &allow-other-keys)
-  (apply #'actual-ast-patch-wrap ast args keys))
-
-(defun actual-ast-patch-wrap (ast args &rest keys &key &allow-other-keys)
   (destructuring-bind (sub-action path left-wrap right-wrap classes base-ast)
       args
     (assert (= (length path) (length left-wrap) (length right-wrap)))
@@ -2155,7 +2088,6 @@ process with the rest of the script."
      (mapcar
       (lambda (a) (ast-wrap a left-wrap right-wrap classes base-ast))
       (multiple-value-list (apply #'ast-patch* ast sub-action keys))))))
-
 
 (defmethod ast-patch-wrap ((ast list) (args list) &rest keys &key &allow-other-keys)
   (destructuring-bind (sub-action path left-wrap right-wrap classes base-ast)
@@ -2170,13 +2102,6 @@ process with the rest of the script."
 
 (defmethod ast-patch-unwrap ((ast ast) (args list) &rest keys
                              &key &allow-other-keys)
-  (apply #'actual-ast-patch-unwrap ast args keys))
-
-(defmethod ast-patch-unwrap ((ast clang-ast) (args list) &rest keys
-                             &key &allow-other-keys)
-  (apply #'actual-ast-patch-unwrap ast args keys))
-
-(defun actual-ast-patch-unwrap (ast args &rest keys &key &allow-other-keys)
   (destructuring-bind (sub-action path left-wrap right-wrap)
       args
     (assert (= (length path) (length left-wrap) (length right-wrap)))
@@ -2236,29 +2161,23 @@ process with the rest of the script."
 ;; This is not handling meld?
 (defgeneric ast-patch-unwrap-sequence (ast args &key &allow-other-keys)
   (:method ((ast ast) (args list) &rest keys &key &allow-other-keys)
-    (apply #'actual-ast-patch-unwrap-sequence ast args keys))
-  (:method ((ast clang-ast) (args list) &rest keys &key &allow-other-keys)
-    (apply #'actual-ast-patch-unwrap-sequence ast args keys)))
-
-(defun actual-ast-patch-unwrap-sequence (ast args &rest keys
-                                         &key &allow-other-keys)
-  (destructuring-bind (sub-action path left-wrap right-wrap)
-      args
-    (assert (= (1+ (length path)) (length left-wrap) (length right-wrap)))
-    (iter (while path)
-          (setf ast (nth (pop path) (ast-children ast)))
-          (pop left-wrap)
-          (pop right-wrap))
-    (assert (= (length left-wrap) 1))
-    (assert (= (length right-wrap) 1))
-    (let* ((c (ast-children ast))
-           (total-len (length c))
-           (left-len (length (car left-wrap)))
-           (right-len (length (car right-wrap))))
-      (assert (>= total-len (+ left-len right-len)))
-      (let ((new-ast (copy ast :children (subseq c left-len (- total-len right-len)))))
-        (ast-children
-         (apply #'ast-patch* new-ast sub-action keys))))))
+    (destructuring-bind (sub-action path left-wrap right-wrap)
+        args
+      (assert (= (1+ (length path)) (length left-wrap) (length right-wrap)))
+      (iter (while path)
+            (setf ast (nth (pop path) (ast-children ast)))
+            (pop left-wrap)
+            (pop right-wrap))
+      (assert (= (length left-wrap) 1))
+      (assert (= (length right-wrap) 1))
+      (let* ((c (ast-children ast))
+             (total-len (length c))
+             (left-len (length (car left-wrap)))
+             (right-len (length (car right-wrap))))
+        (assert (>= total-len (+ left-len right-len)))
+        (let ((new-ast (copy ast :children (subseq c left-len (- total-len right-len)))))
+          (ast-children
+           (apply #'ast-patch* new-ast sub-action keys)))))))
 
 (defmethod ast-patch* ((original cons) (script list)
                        &rest keys
@@ -2579,7 +2498,7 @@ and replicating the others."
 (defgeneric ast-meld-p (ast)
   (:documentation
    "Returns true if the children of AST are to be combined on merge conflict.")
-  (:method (ast)
+  (:method ((ast ast))
     (ast-class-meld? (ast-class ast) ast)))
 
 (defgeneric ast-class-meld? (ast-class ast)

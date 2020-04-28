@@ -221,7 +221,7 @@ at BIN."
 genome."
   (nest (remove nil)
         (mapcar (lambda (line)
-                  (if (ast-p line)
+                  (if (typep line 'ast)
                       (source-text line)
                       line)))
         (mapcar {aget :code} (genome obj))))
@@ -246,7 +246,7 @@ with the auto-merge evolutionary loop."
              "Return a list of integer indices into the genome of OBJ which
              are non-conflict points."
              (nest (mapcar #'car)
-                   (remove-if [#'ast-p {aget :code} #'cadr])
+                   (remove-if [{typep _ 'ast} {aget :code} #'cadr])
                    (indexed (genome obj)))))
     (let ((pool (iter (for a-index in (non-conflict-indices a))
                       (for b-index in (non-conflict-indices b))
@@ -324,7 +324,7 @@ conflict AST resolution with an alternative option."
   (let* ((conflict-ast (targets mutation))
          (strategy (or (strategy mutation)
                        (random-elt (get-conflict-strategies conflict-ast))))
-         (prior-resolution (or (remove-if-not «and [#'ast-p {aget :code}]
+         (prior-resolution (or (remove-if-not «and [{typep _ 'ast} {aget :code}]
                                                    [{eq conflict-ast}
                                                     {aget :conflict-ast}
                                                     #'ast-annotations
@@ -350,37 +350,39 @@ to resolve the conflict AST.")
         '(:V1 :NN)
         '(:V1 :V2 :C1 :C2 :NN))))
 
-(defun resolve-conflict-ast
-    (conflict &key (strategy (random-elt (get-conflict-strategies conflict)))
-     &aux (options (conflict-ast-child-alist conflict)))
-  "Return a concrete resolution of CONFLICT AST using STRATEGY."
-  (labels ((normalize (children)
-             "Normalize CHILDREN by adding the conflict AST
-             to each child AST's annotations.  If there are no children,
-             create a NullStmt AST with this annotations.  The annotations
-             are required for the `new-conflict-resolution` mutation."
-             (if children
-                 (mapcar (lambda (child)
-                           (if (ast-p child)
-                               (copy child :annotations
-                                           `((:conflict-ast . ,conflict)))
-                               (make-instance 'ast-stub
-                                :children (list child)
-                                :annotations `((:conflict-ast . ,conflict)))))
-                         children)
-                 (list (make-instance 'ast-stub
-                        :annotations `((:conflict-ast . ,conflict)))))))
-    ;; Five ways of resolving a conflict:
-    (case strategy
-      ;; 1. (V1) version 1
-      (:V1 (normalize (aget :my options)))
-      ;; 2. (V2) version 2
-      (:V2 (normalize (aget :your options)))
-      ;; 3. (CC) concatenate versions (either order)
-      (:C1 (normalize (append (aget :my options) (aget :your options))))
-      (:C2 (normalize (append (aget :your options) (aget :my options))))
-      ;; 4. (NN) select the base version
-      (:NN (normalize (aget :old options))))))
+(defgeneric resolve-conflict-ast (conflict &key strategy)
+  (:documentation "Return a concrete resolution of CONFLICT AST
+using STRATEGY.")
+  (:method ((conflict ast)
+            &key (strategy (random-elt (get-conflict-strategies conflict)))
+            &aux (options (conflict-ast-child-alist conflict)))
+    (labels ((normalize (children)
+               "Normalize CHILDREN by adding the conflict AST
+               to each child AST's annotations.  If there are no children,
+               create a NullStmt AST with this annotations.  The annotations
+               are required for the `new-conflict-resolution` mutation."
+               (if children
+                   (mapcar (lambda (child)
+                             (if (typep child 'ast)
+                                 (copy child :annotations
+                                             `((:conflict-ast . ,conflict)))
+                                 (make-instance 'ast-stub
+                                  :children (list child)
+                                  :annotations `((:conflict-ast . ,conflict)))))
+                           children)
+                   (list (make-instance 'ast-stub
+                          :annotations `((:conflict-ast . ,conflict)))))))
+      ;; Five ways of resolving a conflict:
+      (case strategy
+        ;; 1. (V1) version 1
+        (:V1 (normalize (aget :my options)))
+        ;; 2. (V2) version 2
+        (:V2 (normalize (aget :your options)))
+        ;; 3. (CC) concatenate versions (either order)
+        (:C1 (normalize (append (aget :my options) (aget :your options))))
+        (:C2 (normalize (append (aget :your options) (aget :my options))))
+        ;; 4. (NN) select the base version
+        (:NN (normalize (aget :old options)))))))
 
 
 ;;; Auto-mergeable specific methods
@@ -400,7 +402,7 @@ to resolve the conflict AST.")
   (:documentation "Return the resolved conflicts in OBJ.")
   (:method ((obj t)) nil)
   (:method ((obj auto-mergeable-simple))
-    (remove-if-not «and #'ast-p [{aget :conflict-ast} #'ast-annotations]»
+    (remove-if-not «and {typep _ 'ast} [{aget :conflict-ast} #'ast-annotations]»
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not [{aget :conflict-ast} #'ast-annotations]

@@ -8,7 +8,7 @@
 (in-package :resolve/software/parseable)
 (in-readtable :curry-compose-reader-macros)
 
-(defclass ast-stub (ast)
+(defclass ast-stub (functional-tree-ast)
   ((children :reader children
              :type list
              :initarg :children

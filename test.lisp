@@ -1513,7 +1513,7 @@
       (is it "There is a conflict ast")
       #+debug
       (labels ((to-list (x)
-                 (if (ast-p x)
+                 (if (typep x 'ast)
                      (cons (ast-class x)
                            (mapcar #'to-list (ast-children x)))
                      x)))
