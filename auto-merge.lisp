@@ -159,26 +159,25 @@ Extra keys are passed through to EVOLVE.")
               ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
               ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*))
     (note 2 "Populate candidate merge resolutions.")
+    (let* ((converged (converge my old your :conflict t))
+           (*population* (populate converged))
+           (*target-fitness-p* (if target-supplied-p
+                                   [{equalp target} #'fitness]
+                                   «and #'fitness [{every #'zerop} #'fitness]»))
+           (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
+           (*fitness-evals* 0)
+           (*fitness-predicate* #'<))
 
-    (let ((*population* (populate (converge my old your :conflict t)))
-          (*target-fitness-p* (if target-supplied-p
-                                  [{equalp target} #'fitness]
-                                  «and #'fitness [{every #'zerop} #'fitness]»))
-          (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
-          (*fitness-evals* 0)
-          (*fitness-predicate* #'<))
-
-      (if (null (remove-if-not #'get-resolved-conflicts *population*))
-          ;; Special case - there are no conflicts to be resolved
-          (progn
-            (note 2 "No conflicts found.")
-            (return-from resolve (first *population*)))
-          ;; Normal case - print the number of conflicts
-          (note 2 "Number of conflicts found: ~d."
-                (length (get-resolved-conflicts (first *population*)))))
+      ;; Special case - there are no conflicts to be resolved
+      (unless (get-conflicts converged)
+        (note 2 "No conflicts found.")
+        (return-from resolve converged))
 
       ;; Evaluate the fitness of the initial population
-      (note 2 "Evaluate ~d population members." (length *population*))
+      (note 2 "Number of conflicts found: ~d."
+              (length (get-conflicts converged)))
+      (note 2 "Evaluate ~d population members."
+              (length *population*))
       (task-map num-threads
                 (lambda (variant)
                   (unless (some {funcall *target-fitness-p*} *population*)
