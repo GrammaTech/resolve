@@ -561,47 +561,48 @@ command-line options processed by the returned function."
                   (progn (format *error-output* "Software no longer valid.~%")
                          (finish-output *error-output*)
                          (quit 2))))
-  (when help (show-help-for-ast-merge))
-  (setf *note-out* (list *error-output*))
-  (unless (every #'resolve-file (list old-file my-file your-file))
-    (exit-command auto-merge 2 (error "Missing source.")))
-  (setf *random-state* (if read-seed *random-state*  (make-random-state t))
-        out-dir (or out-dir (resolve-out-dir-from-source old-file))
-        old-file (namestring (truename old-file))
-        my-file (namestring (truename my-file))
-        your-file (namestring (truename your-file))
-        language (or language (guess-language old-file my-file your-file))
-        num-tests (resolve-num-tests-from-num-tests num-tests)
-        tests (create-test-suite test-script num-tests))
-  (note 2 "Create software objects.")
-  (to-file (apply #'resolve
-                  (create-auto-mergeable
-                   (expand-options-for-which-files language "MY"
-                    :ignore-paths ignore-paths
-                    :ignore-other-paths ignore-paths
-                    :threads num-threads))
-                  (create-auto-mergeable
-                   (expand-options-for-which-files language "OLD"
-                    :ignore-paths ignore-paths
-                    :ignore-other-paths ignore-paths
-                    :threads num-threads))
-                  (create-auto-mergeable
-                   (expand-options-for-which-files language "YOUR"
-                    :ignore-paths ignore-paths
-                    :ignore-other-paths ignore-paths
-                    :threads num-threads))
-                  {auto-merge-test _ tests}
-                  :num-threads num-threads
-                  :strings strings
-                  :base-cost base-cost
-                  :wrap wrap
-                  :wrap-sequences wrap-sequences
-                  :max-wrap-diff max-wrap
-                  (append (when evolve (list :evolve? evolve))
-                          (when max-evals (list :max-evals max-evals))
-                          (when max-time (list :max-time max-time))))
-           (if (directory-pathname-p my-file)
-               (make-pathname :directory (append out-dir (list "auto-merged")))
-               (make-pathname :directory out-dir
-                              :name "auto-merged"
-                              :type (pathname-type my-file)))))
+  (with-prof profile
+    (when help (show-help-for-ast-merge))
+    (setf *note-out* (list *error-output*))
+    (unless (every #'resolve-file (list old-file my-file your-file))
+      (exit-command auto-merge 2 (error "Missing source.")))
+    (setf *random-state* (if read-seed *random-state*  (make-random-state t))
+          out-dir (or out-dir (resolve-out-dir-from-source old-file))
+          old-file (namestring (truename old-file))
+          my-file (namestring (truename my-file))
+          your-file (namestring (truename your-file))
+          language (or language (guess-language old-file my-file your-file))
+          num-tests (resolve-num-tests-from-num-tests num-tests)
+          tests (create-test-suite test-script num-tests))
+    (note 2 "Create software objects.")
+    (to-file (apply #'resolve
+                    (create-auto-mergeable
+                     (expand-options-for-which-files language "MY"
+                      :ignore-paths ignore-paths
+                      :ignore-other-paths ignore-paths
+                      :threads num-threads))
+                    (create-auto-mergeable
+                     (expand-options-for-which-files language "OLD"
+                      :ignore-paths ignore-paths
+                      :ignore-other-paths ignore-paths
+                      :threads num-threads))
+                    (create-auto-mergeable
+                     (expand-options-for-which-files language "YOUR"
+                      :ignore-paths ignore-paths
+                      :ignore-other-paths ignore-paths
+                      :threads num-threads))
+                    {auto-merge-test _ tests}
+                    :num-threads num-threads
+                    :strings strings
+                    :base-cost base-cost
+                    :wrap wrap
+                    :wrap-sequences wrap-sequences
+                    :max-wrap-diff max-wrap
+                    (append (when evolve (list :evolve? evolve))
+                            (when max-evals (list :max-evals max-evals))
+                            (when max-time (list :max-time max-time))))
+             (if (directory-pathname-p my-file)
+                 (make-pathname :directory (append out-dir '("auto-merged")))
+                 (make-pathname :directory out-dir
+                                :name "auto-merged"
+                                :type (pathname-type my-file))))))
