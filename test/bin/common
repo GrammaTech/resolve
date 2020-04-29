@@ -64,13 +64,13 @@ test_auto_merge () {
     TMP_OUT_DIR=$(mktemp -d)
     shift 4;
 
-    auto-merge $@ \
-               --out-dir ${OUT_DIR:-$TMP_OUT_DIR} \
-               $TMP_MY \
-               $TMP_OLD \
-               $TMP_YOUR \
-               "$TEST_SCRIPT" \
-               2>&1 | tee $TMP_OUTPUT
+    timeout 15m auto-merge $@ \
+                           --out-dir ${OUT_DIR:-$TMP_OUT_DIR} \
+                           $TMP_MY \
+                           $TMP_OLD \
+                           $TMP_YOUR \
+                           "$TEST_SCRIPT" \
+                           2>&1 | tee $TMP_OUTPUT
 
     grep -q "Merge resolution found" $TMP_OUTPUT
 }
