@@ -232,7 +232,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
 ;;; that end in :NIL, but there is nothing special about :NIL, so fix
 ;;; this up later.
 (defclass simple-lisp-ast (functional-tree-ast)
-  ((children :initarg :children :initform nil :reader children)
+  ((children :initarg :children :initform nil)
    (child-slots :initform '(children) :allocation :class)
    ;; Slots for caching
    (cost-cache :initarg :cost-cache

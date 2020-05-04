@@ -9,8 +9,7 @@
 (in-readtable :curry-compose-reader-macros)
 
 (defclass ast-stub (functional-tree-ast)
-  ((children :reader children
-             :type list
+  ((children :type list
              :initarg :children
              :initform nil
              :documentation "The list of children of the node,
