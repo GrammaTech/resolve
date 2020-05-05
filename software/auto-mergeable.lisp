@@ -109,7 +109,7 @@
                "Filter files which can be parsed into ASTs."
                (when (typep (cdr file-obj-pair) 'parseable)
                  (handler-case
-                     (ast-root (cdr file-obj-pair))
+                     (genome (cdr file-obj-pair))
                    (mutate (c) (declare (ignorable c)) nil))))
              (evolve-files ()
                "Return a list of `auto-mergeable-parseable` software objects
@@ -162,10 +162,10 @@ yours2() was crossed over from the genome of B into A."
   (multiple-value-bind (a-begin a-end b-begin b-end)
       (select-crossover-points a b)
     (if (and a-begin a-end b-begin b-end)
-        (let ((a-children (ast-children (ast-root a)))
-              (b-children (ast-children (ast-root b))))
-          (nest (copy a :ast-root)
-                (copy (ast-root a) :children)
+        (let ((a-children (ast-children (genome a)))
+              (b-children (ast-children (genome b))))
+          (nest (copy a :genome)
+                (copy (genome a) :children)
                 (append (subseq a-children 0 a-begin)     ;; (1)
                         (subseq b-children b-begin b-end) ;; (2)
                         (subseq a-children a-end))))      ;; (3)
@@ -186,14 +186,14 @@ of A from A-END. If no suitable points are found, return nil."
   (let ((ast-pool (iter (for ast in (nest (remove-if [{aget :conflict-ast}
                                                       #'ast-annotations])
                                           (get-immediate-children a)
-                                          (ast-root a)))
-                        (when (find ast (get-immediate-children b (ast-root b))
+                                          (genome a)))
+                        (when (find ast (get-immediate-children b (genome b))
                                     :test #'ast-equal-p)
                           (collect ast)))))
     ;; AST pool contains those ASTs at the top-level common to A and B.
     (when (<= 2 (length ast-pool))
-      (bind ((a-children (ast-children (ast-root a)))
-             (b-children (ast-children (ast-root b)))
+      (bind ((a-children (ast-children (genome a)))
+             (b-children (ast-children (genome b)))
              ((:values begin end) (select-begin-and-end ast-pool)))
             (values (position begin a-children :test #'ast-equal-p)
                     (position end a-children :test #'ast-equal-p)
@@ -210,12 +210,12 @@ of A from A-END. If no suitable points are found, return nil."
 (defmethod size ((obj auto-mergeable-parseable))
   "Override size to allow include the AST root in the calculation as
 it may be mutated by auto-merge."
-  (length (ast-to-list (ast-root obj))))
+  (length (ast-to-list (genome obj))))
 
 (defmethod to-file ((obj auto-mergeable-parseable) path)
   "Override to-file to avoid writing to disk those objects with an
 AST stub root indicating they were deleted from the project."
-  (if (typep (ast-root obj) 'ast-stub)
+  (if (typep (genome obj) 'ast-stub)
       (when (probe-file path)
         (delete-file path))
       (call-next-method)))
@@ -404,7 +404,7 @@ using STRATEGY.")
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not {typep _ 'conflict-ast}
-                   (ast-to-list (ast-root obj))))
+                   (ast-to-list (genome obj))))
   (:method ((obj auto-mergeable-project))
     (mappend [#'get-conflicts #'cdr] (all-files obj))))
 
@@ -416,7 +416,7 @@ using STRATEGY.")
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not [{aget :conflict-ast} #'ast-annotations]
-                   (ast-to-list (ast-root obj))))
+                   (ast-to-list (genome obj))))
   (:method ((obj auto-mergeable-project))
     (mappend [#'get-resolved-conflicts #'cdr] (all-files obj))))
 
@@ -497,7 +497,7 @@ an insertion or deletion of the OBJ.")
                                        :child-alist)
           (list (cons conflict-child (mapcar {aget :code} (genome obj))))))
   (:method ((obj auto-mergeable-parseable) (conflict-child symbol))
-    (nest (copy obj :ast-root)
+    (nest (copy obj :genome)
           (make-instance 'conflict-ast :annotations (list (cons :top-level t))
                                        :child-alist)
-          (list (list conflict-child (ast-root obj))))))
+          (list (list conflict-child (genome obj))))))

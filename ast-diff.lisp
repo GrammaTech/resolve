@@ -1452,11 +1452,11 @@ value that is used instead."
 (defmethod ast-diff* ((simple simple) (soft parseable))
   #+debug (format t "ast-diff[SIMPLE,PARSEABLE]~%")
   (ast-diff* (simple-genome-unpack (genome simple))
-             (split-sequence #\Newline (genome soft))))
+             (split-sequence #\Newline (genome-string soft))))
 
 (defmethod ast-diff* ((soft parseable) (simple simple))
   #+debug (format t "ast-diff[PARSEABLE,SIMPLE]~%")
-  (ast-diff* (split-sequence #\Newline (genome soft))
+  (ast-diff* (split-sequence #\Newline (genome-string soft))
              (simple-genome-unpack (genome simple))))
 
 (defun split-into-subsequences (seq subseq-indices &aux (n (length seq)))

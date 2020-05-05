@@ -599,24 +599,24 @@
                         "int x; int y; int z; int c;")))
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
-      (is (ast-equal-p (ast-root (ast-patch (copy orig) diff-a))
-                       (ast-root a)))
+      (is (ast-equal-p (genome (ast-patch (copy orig) diff-a))
+                       (genome a)))
       (is (equalp (mapcar #'car diff-a)
                   '(:same :insert :insert :same :same
                     :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-b))
-           (ast-root b)))
+           (genome (ast-patch (copy orig) diff-b))
+           (genome b)))
       (is (equalp (mapcar #'car diff-b)
                   '(:same :same :insert :insert :same
                     :same :same :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-c))
-           (ast-root c)))
+           (genome (ast-patch (copy orig) diff-c))
+           (genome c)))
       (is (equalp (mapcar #'car diff-c)
                   '(:same :same :same :same :same
                     :same :insert :insert :same))))))
@@ -633,22 +633,22 @@
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-a))
-           (ast-root a)))
+           (genome (ast-patch (copy orig) diff-a))
+           (genome a)))
       (is (equalp (mapcar #'car diff-a)
                   '(:same :delete :delete :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-b))
-           (ast-root b)))
+           (genome (ast-patch (copy orig) diff-b))
+           (genome b)))
       (is (equalp (mapcar #'car diff-b)
                   '(:same :same :same :delete :delete :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-c))
-           (ast-root c)))
+           (genome (ast-patch (copy orig) diff-c))
+           (genome c)))
       (is (equalp (mapcar #'car diff-c)
                   '(:same :same :same :same :delete :delete :same))))))
 
@@ -659,8 +659,8 @@
                            "int x = 1; int y = 5; int z = 3;"))
          (diff (ast-diff orig new)))
     (is diff)
-    (is (ast-equal-p (ast-root (ast-patch (copy orig) diff))
-                     (ast-root new)))
+    (is (ast-equal-p (genome (ast-patch (copy orig) diff))
+                     (genome new)))
     (is (equalp (mapcar #'car diff)
                 '(:same :same :same :recurse :same :same :same)))))
 
@@ -676,22 +676,22 @@
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-a))
-           (ast-root a)))
+           (genome (ast-patch (copy orig) diff-a))
+           (genome a)))
       (is (equalp (mapcar #'car diff-a)
                   '(:recurse :same :same :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-b))
-           (ast-root b)))
+           (genome (ast-patch (copy orig) diff-b))
+           (genome b)))
       (is (equalp (mapcar #'car diff-b)
                   '(:same :same :recurse :same :same :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
       (is (ast-equal-p
-           (ast-root (ast-patch (copy orig) diff-c))
-           (ast-root c)))
+           (genome (ast-patch (copy orig) diff-c))
+           (genome c)))
       (is (equalp (mapcar #'car diff-c)
                   '(:same :same :same :same :same :same :recurse))))))
 
@@ -773,8 +773,8 @@
          (obj1 (from-string (make-instance 'clang) s1))
          (obj2 (from-string (make-instance 'clang) s2))
          (diff (ast-diff obj1 obj2 :wrap t))
-         (ast1 (ast-root obj1))
-         (ast2 (ast-root obj2))
+         (ast1 (genome obj1))
+         (ast2 (genome obj2))
          (ast3 (ast-patch ast1 diff)))
     #+debug
     (progn
@@ -1352,9 +1352,9 @@
   (with-fixture json-conflict-yargs
     (multiple-value-bind (merged unstable)
         (converge *my* *old* *your*)
-      (is (null unstable))                     ; No conflicts.
-      (is (search "minimist" (genome merged))) ; Something from my.
-      (is (search "3\"," (genome merged))))))  ; Something from your.
+      (is (null unstable))                            ; No conflicts.
+      (is (search "minimist" (genome-string merged))) ; Something from my.
+      (is (search "3\"," (genome-string merged))))))  ; Something from your.
 
 (deftest (gcd-conflict-merge3 :long-running) ()
   (with-fixture gcd-conflict-clang
@@ -1453,18 +1453,18 @@
 
 (deftest (resolve-to-single-equals-original/old :long-running) ()
   (with-fixture javascript-converge-conflict
-    (is (string= (genome (astyle (resolve-to (copy *cnf*) :old)))
-                 (genome (astyle (aget :orig *variants*)))))))
+    (is (string= (genome-string (astyle (resolve-to (copy *cnf*) :old)))
+                 (genome-string (astyle (aget :orig *variants*)))))))
 
 (deftest (resolve-to-single-equals-original/my :long-running) ()
   (with-fixture javascript-converge-conflict
-    (is (string= (genome (astyle (resolve-to (copy *cnf*) :my)))
-                 (genome (astyle (aget :borders *variants*)))))))
+    (is (string= (genome-string (astyle (resolve-to (copy *cnf*) :my)))
+                 (genome-string (astyle (aget :borders *variants*)))))))
 
 (deftest (resolve-to-single-equals-original/your :long-running) ()
   (with-fixture javascript-converge-conflict
-    (is (string= (genome (astyle (resolve-to (copy *cnf*) :your)))
-                 (genome (astyle (aget :min-lines *variants*)))))))
+    (is (string= (genome-string (astyle (resolve-to (copy *cnf*) :your)))
+                 (genome-string (astyle (aget :min-lines *variants*)))))))
 
 (deftest (resolve-to-should-not-modify-conflict-nodes-in-the-original
           :long-running) ()
@@ -1473,7 +1473,7 @@
   (flet ((conflict-nodes (obj)
            (let ((result
                   (remove-if-not {typep _ 'conflict-ast}
-                                 (ast-to-list (ast-root obj)))))
+                                 (ast-to-list (genome obj)))))
              #+debug (format t "Conflict nodes:~%")
              #+debug (dolist (cn result) (format t "~a~%" cn))
              result)))
@@ -1491,19 +1491,14 @@
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested
           :long-running) ()
   (with-fixture javascript-converge-conflict
-    (let* (;; (orig-asts (mapc-ast (ast-root *cnf*) #'copy))
-           (orig-genome (genome *cnf*))
+    (let* ((orig-genome-string (genome-string *cnf*))
            (my (resolve-to (copy *cnf*) :my)))
-      (is (not (string= orig-genome (genome my)))
+      (is (not (string= orig-genome-string (genome-string my)))
           "Resolved should have a different genome from original.~% ~
-           orig:~Snew:~%~S~%" orig-genome (genome my))
-      (is (string= orig-genome (genome *cnf*))
+           orig:~Snew:~%~S~%" orig-genome-string (genome-string my))
+      (is (string= orig-genome-string (genome-string *cnf*))
           "Original should *NOT* have a different genome from original.~% ~
-           orig:~Snew:~%~S~%" orig-genome (genome *cnf*))
-      ;; (is (equal-it orig-asts (mapc-ast (ast-root *cnf*) #'copy))
-      ;;     "Original should *NOT* have different ASTs from original.~% ~
-      ;;      orig:~Snew:~%~S~%" orig-asts (mapc-ast (ast-root *cnf*) #'copy))
-      )))
+           orig:~Snew:~%~S~%" orig-genome-string (genome-string *cnf*)))))
 
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested-simple
           :long-running) ()
@@ -1519,8 +1514,8 @@
                      x)))
         (iter
          (for (k . a) in *variants*)
-         (format t "~A:~%~s~%" k (to-list (ast-root a))))
-        (format t "AST:~%~s~%" (to-list (ast-root *cnf*))))
+         (format t "~A:~%~s~%" k (to-list (genome a))))
+        (format t "AST:~%~s~%" (to-list (genome *cnf*))))
       (is (typep (get-ast *cnf* '(5 3 3)) 'conflict-ast)
           "Path (5 3 3) is a conflict ast in the original.")
       (let ((new (replace-ast (copy *cnf*)
@@ -1540,32 +1535,32 @@
     (is (asts *cnf*))
     ;; Conflicted software object has conflcit ASTs.
     (is (remove-if-not {typep _ 'conflict-ast}
-                       (ast-to-list (ast-root *cnf*))))
+                       (ast-to-list (genome *cnf*))))
     (let ((old (resolve-to (copy *cnf*) :old))
           (my (resolve-to (copy *cnf*) :my))
           (your (resolve-to (copy *cnf*) :your)))
       (is (null (remove-if-not {typep _ 'conflict-ast}
-                               (ast-to-list (ast-root old)))))
-      (is (string/= (genome my) (genome old)))
-      (is (string/= (genome your) (genome old)))
-      (is (string/= (genome my) (genome your)))
-      (is (string= (genome (astyle old))
-                   (genome (astyle (aget :orig *variants*)))))
+                               (ast-to-list (genome old)))))
+      (is (string/= (genome-string my) (genome-string old)))
+      (is (string/= (genome-string your) (genome-string old)))
+      (is (string/= (genome-string my) (genome-string your)))
+      (is (string= (genome-string (astyle old))
+                   (genome-string (astyle (aget :orig *variants*)))))
       ;; TODO: These next two should probably be passing.  In both
       ;;       (my and your) cases the trailing "}" closing the
       ;;       "board" function (in which the conflict was resolved)
       ;;       is being dropped.  This must be due to us somehow
       ;;       losing string siblings of resolved conflict nodes.
       ;;
-      ;; NOTE: One could call `astyle' before calling `genome' to
-      ;;       ensure more uniformity, but it doesn't matter yet.
+      ;; NOTE: One could call `astyle' before calling `genome-string'
+      ;;       to ensure more uniformity, but it doesn't matter yet.
       ;;
       ;; NOTE: It may be that replace-ast is actually modifying the
       ;;       original program's AST.  This is something to check.
-      (is (string= (genome my)
-                   (genome (aget :borders *variants*))))
-      (is (string= (genome your)
-                   (genome (aget :min-lines *variants*)))))))
+      (is (string= (genome-string my)
+                   (genome-string (aget :borders *variants*))))
+      (is (string= (genome-string your)
+                   (genome-string (aget :min-lines *variants*)))))))
 
 #+manual          ; This test is only useful for manual investigation.
 (deftest targeted-populate-run ()
@@ -1579,7 +1574,7 @@
    (let* ((conflicted (nest (create-auto-mergeable)
                             (converge my old your :conflict t)))
           (chunks (remove-if-not {typep _ 'conflict-ast}
-                                 (ast-to-list (ast-root conflicted))))
+                                 (ast-to-list (genome conflicted))))
           (*population* (populate conflicted))))
    (is (= (length *population*) (expt 5 (length chunks)))
        "Population has the expected size ~d = 5^|chunks| => ~d."
