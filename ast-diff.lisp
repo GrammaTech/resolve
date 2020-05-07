@@ -198,12 +198,11 @@ can be recursed on if STRINGS is true (defaults to true)"))
 (defmethod ast-can-recurse ((ast-a ast) (ast-b ast))
   t)
 
-(defmethod source-text ((ast cons))
-  (let ((strings (iter (while (consp ast))
-                       (collecting (source-text (pop ast))))))
-    (if ast
-        (format nil "~{~a~}" (nconc strings (list "." (source-text ast))))
-        (format nil "~{~a~}" strings))))
+(defmethod source-text ((ast cons) &optional stream)
+  (iter (while (consp ast)) (source-text (pop ast) stream))
+  (when ast
+    (write-string "." stream)
+    (source-text ast stream)))
 
 (defgeneric ast-to-list-form (ast)
   (:documentation "Convert ast into a more readable list form")
@@ -246,11 +245,11 @@ can be recursed on if STRINGS is true (defaults to true)"))
                    :accessor unastify-cache)))
 
 (defmethod ast-class ((ast simple-lisp-ast)) :list)
-(defmethod source-text ((ast simple-lisp-ast))
+(defmethod source-text ((ast simple-lisp-ast) &optional stream)
   (let ((v (unastify ast)))
     (if v
-        (with-output-to-string (s) (format s "~a" (unastify v)))
-        "()")))
+        (format stream "~a" (unastify v))
+        (write-string "()" stream))))
 (defmethod ast-equal-p ((a simple-lisp-ast) (b simple-lisp-ast))
   (equalp (unastify a) (unastify b)))
 
