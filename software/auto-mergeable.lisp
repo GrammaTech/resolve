@@ -38,6 +38,7 @@
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
+  (:import-from :software-evolution-library/utility/task :task-map)
   (:export ;; auto-mergeable data structures
            :auto-mergeable
            :auto-mergeable-simple
@@ -84,18 +85,27 @@
 
 
 ;;; Creation routine
-(defgeneric create-auto-mergeable (soft)
+(defgeneric create-auto-mergeable (soft &key &allow-other-keys)
   (:documentation "Create an auto-mergeable software object from SOFT.")
-  (:method ((obj simple))
+  (:method ((obj simple) &key)
     (change-class (copy obj) 'auto-mergeable-simple))
-  (:method ((obj clang))
+  (:method ((obj clang) &key)
     (change-class (copy obj) 'auto-mergeable-clang))
-  (:method ((obj javascript))
+  (:method ((obj javascript) &key)
     (change-class (copy obj) 'auto-mergeable-javascript))
-  (:method ((obj lisp))
+  (:method ((obj lisp) &key)
     (change-class (copy obj) 'auto-mergeable-lisp))
-  (:method ((obj project))
-    (labels ((parseable-file-p (file-obj-pair)
+  (:method ((obj project) &key (threads 1))
+    (labels ((task-filter (fn objects)
+               (nest
+                (map 'list #'cdr)
+                ((lambda (xs) (remove nil xs :key #'car)))
+                (fbind fn)
+                (task-map threads
+                          (lambda (obj)
+                            (cons (fn obj) obj))
+                          objects)))
+             (parseable-file-p (file-obj-pair)
                "Filter files which can be parsed into ASTs."
                (when (typep (cdr file-obj-pair) 'parseable)
                  (handler-case
@@ -106,7 +116,7 @@
                representing source files which have been parsed into ASTs."
                (mapcar (lambda-bind ((file . obj))
                          (cons file (create-auto-mergeable obj)))
-                       (remove-if-not #'parseable-file-p (all-files obj))))
+                       (task-filter #'parseable-file-p (all-files obj))))
              (other-files ()
                "Return a list of `auto-mergeable-simple` software objects
                representing flat text files."

@@ -578,15 +578,18 @@ command-line options processed by the returned function."
                   (create-auto-mergeable
                    (expand-options-for-which-files language "MY"
                     :ignore-paths ignore-paths
-                    :ignore-other-paths ignore-paths))
+                    :ignore-other-paths ignore-paths
+                    :threads num-threads))
                   (create-auto-mergeable
                    (expand-options-for-which-files language "OLD"
                     :ignore-paths ignore-paths
-                    :ignore-other-paths ignore-paths))
+                    :ignore-other-paths ignore-paths
+                    :threads num-threads))
                   (create-auto-mergeable
                    (expand-options-for-which-files language "YOUR"
                     :ignore-paths ignore-paths
-                    :ignore-other-paths ignore-paths))
+                    :ignore-other-paths ignore-paths
+                    :threads num-threads))
                   {auto-merge-test _ tests}
                   :num-threads num-threads
                   :strings strings
