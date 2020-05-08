@@ -271,7 +271,8 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (:documentation "Convert a SIMPLE-LISP-AST to a Lisp data structure"))
 
 (let ((end-marker :nil))
-  (defmethod source-text ((x (eql end-marker))) "")
+  (defmethod source-text ((x (eql end-marker)) &optional stream)
+    (source-text "" stream))
   (defmethod astify ((x list))
     (if (proper-list-p x)
         ;; Add an end marker to represent the NIL
@@ -380,21 +381,20 @@ special representation as edit-segments, recording both the position
 of the leaf in the children of its parent in the tree, and the position
 of the substring inside the string."))
 
-(defmethod source-text ((segment edit-segment))
+(defmethod source-text ((segment edit-segment) &optional stream)
   (let ((start (edit-segment-start segment))
         (len (edit-segment-length segment))
         (ast-node (edit-segment-node segment)))
-    (apply #'concatenate 'string
-           (mapcar #'source-text
-                   (subseq (ast-children ast-node)
-                           start (+ start len))))))
+    (mapc {source-text _ stream}
+          (subseq (ast-children ast-node) start (+ start len)))))
 
-(defmethod source-text ((segment string-edit-segment))
+(defmethod source-text ((segment string-edit-segment) &optional stream)
   (with-slots (node start string-start string-length)
       segment
     (assert node)
-    (subseq (elt (ast-children node) start)
-            string-start (+ string-start string-length))))
+    (write-string (elt (ast-children node) start) stream
+                  :start string-start
+                  :end (+ string-start string-length))))
 
 (defmethod ast-to-list-form ((segment string-edit-segment))
   (source-text segment))
