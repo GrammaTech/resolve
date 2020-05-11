@@ -1503,36 +1503,24 @@
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested-simple
           :long-running) ()
   (with-fixture javascript-converge-conflict
-    (let ((it (lastcar (remove-if-not {typep _ 'conflict-ast}
-                                      (asts *cnf*)))))
-      (is it "There is a conflict ast")
-      #+debug
-      (labels ((to-list (x)
-                 (if (typep x 'ast)
-                     (cons (ast-class x)
-                           (mapcar #'to-list (ast-children x)))
-                     x)))
-        (iter
-         (for (k . a) in *variants*)
-         (format t "~A:~%~s~%" k (to-list (genome a))))
-        (format t "AST:~%~s~%" (to-list (genome *cnf*))))
+    (is (typep (get-ast *cnf* '(5 3 3)) 'conflict-ast)
+        "Path (5 3 3) is a conflict ast in the original.")
+    (let* ((old (get-ast *cnf* '(5 3 3)))
+           (new (replace-ast (copy *cnf*)
+                             (ast-path old)
+                             (aget :my (conflict-ast-child-alist old))
+                             :literal t)))
+      (is (typep (get-ast new '(5 3 3)) 'javascript-ast)
+          "Path (5 3 3) is a JavaScript ast in result of replace-ast.")
       (is (typep (get-ast *cnf* '(5 3 3)) 'conflict-ast)
-          "Path (5 3 3) is a conflict ast in the original.")
-      (let ((new (replace-ast (copy *cnf*)
-                              (ast-path it)
-                              (aget :my (conflict-ast-child-alist it))
-                              :literal t)))
-        (is (typep (get-ast new '(5 3 3)) 'javascript-ast)
-            "Path (5 3 3) is a JavaScript ast in result of replace-ast.")
-        (is (typep (get-ast *cnf* '(5 3 3)) 'conflict-ast)
-            "Path (5 3 3) is STILL a conflict-ast in the original ~
-             after replace-ast.")))))
+          "Path (5 3 3) is STILL a conflict-ast in the original ~
+           after replace-ast."))))
 
 (deftest (resolve-to-selects-alternatives-of-conflicts
           :long-running) ()
   (with-fixture javascript-converge-conflict
     ;; Conflicted software object has ASTs.
-    (is (asts *cnf*))
+    (is (not (zerop (size *cnf*))))
     ;; Conflicted software object has conflcit ASTs.
     (is (remove-if-not {typep _ 'conflict-ast}
                        (ast-to-list (genome *cnf*))))
