@@ -203,9 +203,11 @@ of A from A-END. If no suitable points are found, return nil."
 (defun select-begin-and-end (pool)
   "Return two ordered ASTs from POOL."
   (let* ((ast1 (random-elt pool))
-         (ast2 (random-elt (remove ast1 pool))))
-    (values (if (ast-later-p ast2 ast1) ast1 ast2)
-            (if (ast-later-p ast2 ast1) ast2 ast1))))
+         (ast2 (random-elt (remove ast1 pool)))
+         (index1 (position ast1 pool))
+         (index2 (position ast2 pool)))
+    (values (if (< index1 index2) ast1 ast2)
+            (if (< index1 index2) ast2 ast1))))
 
 (defmethod size ((obj auto-mergeable-parseable))
   "Override size to allow include the AST root in the calculation as
@@ -309,7 +311,7 @@ conflict AST resolution with an alternative option."
                                (list conflict-ast)))
          (new-resolution (resolve-conflict-ast conflict-ast
                                                :strategy strategy))
-         (conflict-path (ast-path (car prior-resolution)))
+         (conflict-path (ast-path software (car prior-resolution)))
          (parent (get-ast software (butlast conflict-path))))
     ;; Replace the prior resolution children with the new resolution
     (if (null conflict-path)

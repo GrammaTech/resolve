@@ -1481,7 +1481,7 @@
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
              (progn (replace-ast (copy *cnf*)
-                                 (ast-path (first (conflict-nodes *cnf*)))
+                                 (first (conflict-nodes *cnf*))
                                  (aget :my (conflict-ast-child-alist
                                             (first (conflict-nodes *cnf*))))
                                  :literal t)
@@ -1507,7 +1507,7 @@
         "Path (5 3 3) is a conflict ast in the original.")
     (let* ((old (get-ast *cnf* '(5 3 3)))
            (new (replace-ast (copy *cnf*)
-                             (ast-path old)
+                             (ast-path *cnf* old)
                              (aget :my (conflict-ast-child-alist old))
                              :literal t)))
       (is (typep (get-ast new '(5 3 3)) 'javascript-ast)

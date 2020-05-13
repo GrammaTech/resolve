@@ -38,10 +38,8 @@
      ;; Modify the parent of all conflict nodes to replace with OPTION.
      (mapc
       (lambda (ast)
-        #+debug (format t "Replacing conflict at ~S~%" (ast-path ast))
-        (replace-ast conflicted
-                     (get-ast conflicted (ast-path ast))
-                     (aget option (conflict-ast-child-alist ast)))
+        #+debug (format t "Replacing conflict at ~S~%" (ast-path conflicted ast))
+        (replace-ast conflicted ast (aget option (conflict-ast-child-alist ast)))
         #+debug (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
         #+debug (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
         #+debug (incf counter)))
