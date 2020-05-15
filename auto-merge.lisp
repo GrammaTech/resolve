@@ -161,9 +161,15 @@ Extra keys are passed through to EVOLVE.")
     (note 2 "Populate candidate merge resolutions.")
     (let* ((converged (converge my old your :conflict t))
            (*population* (populate converged))
+           ;; Because each variant is tested against a test suite,
+           ;; where the test script may be repeated over an index, the
+           ;; return value of `fitness' is not a number but a list of
+           ;; numbers. A list of zeros means all the tests have passed
+           ;; (exited 0).
            (*target-fitness-p* (if target-supplied-p
                                    [{equalp target} #'fitness]
                                    «and #'fitness [{every #'zerop} #'fitness]»))
+           (failed? «and #'fitness [{every #'plusp} #'fitness]»)
            (*worst-fitness-p* [{every {equalp most-positive-fixnum}} #'fitness])
            (*fitness-evals* 0)
            (*fitness-predicate* #'<))
@@ -184,7 +190,10 @@ Extra keys are passed through to EVOLVE.")
                     (evaluate test variant)))
                 *population*)
 
-      ;; Update global vars after evaluating initial population
+      ;; Update global vars after evaluating initial population. If we
+      ;; hit the target fitness early there may be variants that were
+      ;; never evaluated (whose fitness is null). These must be
+      ;; removed.
       (setf *population* (remove-if [#'null #'fitness] *population*))
       (incf *fitness-evals* (length *population*))
 
@@ -196,8 +205,10 @@ Extra keys are passed through to EVOLVE.")
               (note 2 "Merge resolution found.")
               (return-from resolve best))
             (note 2 "Best fitness: ~a." (fitness best))))
+      (when (every failed? *population*)
+        (error "No variant has survived selection."))
 
-      ;; Perform the evolutionary search
+      ;; Perform the evolutionary search if one was requested
       (labels ((best ()
                  (extremum *population* #'fitness-better-p :key #'fitness))
                (periodic ()
