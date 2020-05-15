@@ -205,7 +205,8 @@ Extra keys are passed through to EVOLVE.")
               (note 2 "Merge resolution found.")
               (return-from resolve best))
             (note 2 "Best fitness: ~a." (fitness best))))
-      (when (every failed? *population*)
+      (when (and (not evolve?)
+                 (every failed? *population*))
         (error "No variant has survived selection."))
 
       ;; Perform the evolutionary search if one was requested
