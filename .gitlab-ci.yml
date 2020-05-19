@@ -1,0 +1,66 @@
+variables:
+  DOCKER_REGISTRY: "docker.grammatech.com"
+  GIT_SUBMODULE_STRATEGY: recursive
+
+default:
+  image: $DOCKER_REGISTRY/$CI_PROJECT_PATH
+  tags: ["kubernetes", "cluster"]
+  before_script:
+    - cp -r $(pwd)/ /root/quicklisp/local-projects/
+
+check-format:
+  stage: .pre
+  script:
+    - git lisp-format
+  except:
+    - schedules
+
+build-manual:
+  stage: test
+  script:
+    - GT=yes make doc
+  except:
+    - schedules
+
+.test-template: &test
+  stage: test
+  script:
+    - LISP=$LISP GT=yes make check
+  except:
+    - schedules
+
+test-sbcl:
+  variables:
+    LISP: 'sbcl'
+  <<: *test
+
+test-ccl:
+  variables:
+    LISP: 'ccl'
+  <<: *test
+
+dependents:
+  stage: deploy
+  inherit:
+    default: false
+  script:
+    - "curl -X POST -F token=eb76bc2f8009af7005b43bf8f63bb0 -F ref=$CI_BUILD_REF_NAME https://git.grammatech.com/api/v4/projects/347/trigger/pipeline" # bug-injector
+  only:
+    - master
+  except:
+    - schedules
+
+build-nightly:
+  stage: build
+  inherit:
+    default: false
+  script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
+    - docker pull $DOCKER_REGISTRY/$CI_PROJECT_NAMESPACE/sel
+    - docker build --no-cache -t $DOCKER_REGISTRY/$CI_PROJECT_PATH .
+    - docker build --no-cache -t $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release -f Dockerfile.binary-release .
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
+    - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH
+    - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release
+  only:
+    - schedules

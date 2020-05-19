@@ -1,4 +1,5 @@
 git command-line-arguments https://github.com/fare/command-line-arguments.git
-git trace-db https://github.com/grammatech/trace-db.git
+git gt http://git.grammatech.com/synthesis/gt.git
+git functional-trees http://git.grammatech.com/synthesis/functional-trees.git
 git sel http://git.grammatech.com/synthesis/sel.git
 git testbot http://git.grammatech.com/synthesis/testbot.git
