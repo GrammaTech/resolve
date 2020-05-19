@@ -199,7 +199,7 @@ Extra keys are passed through to EVOLVE.")
       (setf *population* (remove-if [#'null #'fitness] *population*))
       (incf *fitness-evals* (length *population*))
 
-      ;; Determine if a soluation has been found and if so, return.  Otherwise,
+      ;; Determine if a solution has been found and if so, return.  Otherwise,
       ;; report the best initial fitness.
       (let ((best (extremum *population* #'fitness-better-p :key #'fitness)))
         (if (funcall *target-fitness-p* best)
