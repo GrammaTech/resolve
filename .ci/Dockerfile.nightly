@@ -1,3 +1,0 @@
-FROM docker.grammatech.com/synthesis/resolve/ubuntu
-
-# TODO: Add any required dependencies for the nightly tests here
