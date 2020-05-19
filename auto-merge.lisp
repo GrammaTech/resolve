@@ -190,6 +190,8 @@ Extra keys are passed through to EVOLVE.")
                     (evaluate test variant)))
                 *population*)
 
+      (note 2 "Evaluated ~a variant~:p" (count-if #'fitness *population*))
+
       ;; Update global vars after evaluating initial population. If we
       ;; hit the target fitness early there may be variants that were
       ;; never evaluated (whose fitness is null). These must be
