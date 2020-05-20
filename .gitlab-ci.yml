@@ -11,22 +11,16 @@ check-format:
   stage: .pre
   script:
     - git lisp-format
-  except:
-    - schedules
 
 build-manual:
   stage: test
   script:
     - GT=yes make doc
-  except:
-    - schedules
 
 .test-template: &test
   stage: test
   script:
     - LISP=$LISP GT=yes make check
-  except:
-    - schedules
 
 test-sbcl:
   variables:
@@ -46,5 +40,3 @@ dependents:
     - "curl -X POST -F token=eb76bc2f8009af7005b43bf8f63bb0 -F ref=$CI_BUILD_REF_NAME https://git.grammatech.com/api/v4/projects/347/trigger/pipeline" # bug-injector
   only:
     - master
-  except:
-    - schedules
