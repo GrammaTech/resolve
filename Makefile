@@ -25,7 +25,6 @@ BIN_TESTS =						\
 	ast-diff-on-lisp-has-lines			\
 	ast-diff-on-simple-has-lines			\
 	clang-diff-on-gcd				\
-	java-diff-on-gcd				\
 	javascript-diff-on-gcd				\
 	lisp-diff-on-gcd				\
 	lisp-diff-on-gcd-raw				\
