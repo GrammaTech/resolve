@@ -55,12 +55,9 @@ build-nightly:
   inherit:
     default: false
   script:
-    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
     - docker pull $DOCKER_REGISTRY/$CI_PROJECT_NAMESPACE/sel
     - docker build --no-cache -t $DOCKER_REGISTRY/$CI_PROJECT_PATH .
-    - docker build --no-cache -t $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release -f Dockerfile.binary-release .
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
     - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH
-    - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH/binary-release
   only:
     - schedules
