@@ -3,7 +3,7 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
 default:
-  image: $DOCKER_REGISTRY/$CI_PROJECT_PATH
+  image: $DOCKER_REGISTRY/$CI_PROJECT_NAMESPACE/sel
   tags: ["kubernetes", "cluster"]
   before_script:
     - cp -r $(pwd)/ /root/quicklisp/local-projects/
@@ -48,16 +48,4 @@ dependents:
   only:
     - master
   except:
-    - schedules
-
-build-nightly:
-  stage: build
-  inherit:
-    default: false
-  script:
-    - docker pull $DOCKER_REGISTRY/$CI_PROJECT_NAMESPACE/sel
-    - docker build --no-cache -t $DOCKER_REGISTRY/$CI_PROJECT_PATH .
-    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $DOCKER_REGISTRY
-    - docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH
-  only:
     - schedules
