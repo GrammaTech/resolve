@@ -2,6 +2,8 @@
 #
 # Ensure the REST ast-diff interface is able to return JSON
 #
+. $(dirname $0)/common
+
 left=$(mktemp)
 right=$(mktemp)
 port=$(shuf -i 9000-9200 -n 1)

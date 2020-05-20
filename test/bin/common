@@ -2,6 +2,8 @@
 
 SCRIPT="$0"
 ETC_DIR="$(readlink -f $(dirname $0)/../etc/)"
+export PATH=$PATH:${QUICK_LISP:-${HOME}/quicklisp}/local-projects/resolve/bin
+
 help(){
     local DESCRIPTION=$(cat "$SCRIPT" \
         |sed '/^[^#]/q' \

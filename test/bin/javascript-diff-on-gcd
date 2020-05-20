@@ -1,4 +1,5 @@
 #!/bin/bash
+. $(dirname $0)/common
 
 if $(which acorn >/dev/null 2>/dev/null);then
     NUM_DIFFS="$(ast-diff test/etc/gcd/gcd.js test/etc/gcd/gcd-fix.js|grep -c "{+")"

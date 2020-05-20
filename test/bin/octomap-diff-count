@@ -1,5 +1,4 @@
 #!/bin/bash
-
 NUM_DIFFS="$(test/bin/octomap-diff|grep -c "{+")"
 if [ "$NUM_DIFFS" == "13" ];then
     echo PASS

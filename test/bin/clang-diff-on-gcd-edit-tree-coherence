@@ -1,4 +1,5 @@
 #!/bin/bash
+. $(dirname $0)/common
 
 C=`(ast-diff --edit-tree --coherence 0.04 test/etc/gcd/gcd-wo-curlies.c test/etc/gcd/gcd-wo-curlies-fix.c|grep Coherence|wc -l)`
 if [ "$C" == "1" ];then

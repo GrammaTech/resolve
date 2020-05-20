@@ -2,6 +2,8 @@
 #
 # Due to a temporary bug, diff files did not have newlines.
 #
+. $(dirname $0)/common
+
 DIFF="$(ast-diff test/etc/gcd/gcd.lisp \
                  test/etc/gcd/gcd-fix.lisp)"
 if [ $(echo "$DIFF"|wc -l) -gt 10 ];then

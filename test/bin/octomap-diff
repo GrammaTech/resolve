@@ -6,8 +6,9 @@
 # --eval "(setf *profile-flame-graph* t)" \
 # --profile "/tmp/ast-diff-flame.data" \
 #
+DIR=$(readlink -f $(dirname $0)/../../)
+export PATH=$PATH:${QUICK_LISP:-${HOME}/quicklisp}/local-projects/resolve/bin
 
-DIR=`pwd`
 ast-diff $1 $2 \
   --old-flags="-I $DIR/test/etc/octomap/octomap-1.7.2/include,-I $DIR/test/etc/octomap/octomap-1.7.2/src" \
   --new-flags="-I $DIR/test/etc/octomap/octomap-1.8.0/include,-I $DIR/test/etc/octomap/octomap-1.8.0/src" \

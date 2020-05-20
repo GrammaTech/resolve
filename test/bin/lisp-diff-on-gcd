@@ -1,4 +1,5 @@
 #!/bin/bash
+. $(dirname $0)/common
 
 COUNT="$(ast-diff test/etc/gcd/gcd.lisp test/etc/gcd/gcd-fix.lisp|grep -c "DEFUN EUCLIDS-GCD")"
 if [ "$COUNT" == "1" ];then

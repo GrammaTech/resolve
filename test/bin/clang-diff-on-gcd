@@ -1,4 +1,5 @@
 #!/bin/bash
+. $(dirname $0)/common
 
 NUM_DIFFS="$(ast-diff --strings test/etc/gcd/gcd-wo-curlies.c test/etc/gcd/gcd-wo-curlies-fix.c|grep -c "{+")"
 if [ "$NUM_DIFFS" == "1" ];then

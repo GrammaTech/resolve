@@ -2,6 +2,8 @@
 #
 # Ensure the REST ast-diff interface takes full strings
 #
+. $(dirname $0)/common
+
 port=$(shuf -i 9000-9200 -n 1)
 EXIT=0
 

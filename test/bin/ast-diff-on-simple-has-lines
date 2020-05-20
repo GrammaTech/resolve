@@ -2,6 +2,8 @@
 #
 # Due to a temporary bug, diff files did not have newlines.
 #
+. $(dirname $0)/common
+
 DIFF="$(ast-diff test/etc/simple/seq-10.txt \
                  test/etc/simple/seq-10-edit.txt)"
 if [ $(echo "$DIFF"|wc -l) -gt 9 ];then
