@@ -31,6 +31,7 @@
         :software-evolution-library/software/parseable
         :software-evolution-library/software/clang
         :software-evolution-library/software/javascript
+        :software-evolution-library/software/json
         :software-evolution-library/software/lisp
         :software-evolution-library/software/project
         :software-evolution-library/software/parseable-project
@@ -73,6 +74,7 @@
 (define-software auto-mergeable-parseable (auto-mergeable parseable) ())
 (define-software auto-mergeable-clang (auto-mergeable-parseable clang) ())
 (define-software auto-mergeable-javascript (auto-mergeable-parseable javascript) ())
+(define-software auto-mergeable-json (auto-mergeable-javascript json) ())
 (define-software auto-mergeable-lisp (auto-mergeable-parseable lisp) ())
 
 (define-software auto-mergeable-project (auto-mergeable parseable-project) ())
@@ -93,6 +95,8 @@
     (change-class (copy obj) 'auto-mergeable-clang))
   (:method ((obj javascript) &key)
     (change-class (copy obj) 'auto-mergeable-javascript))
+  (:method ((obj json) &key)
+    (change-class (copy obj) 'auto-mergeable-json))
   (:method ((obj lisp) &key)
     (change-class (copy obj) 'auto-mergeable-lisp))
   (:method ((obj project) &key (threads 1))
@@ -221,6 +225,42 @@ AST stub root indicating they were deleted from the project."
       (when (probe-file path)
         (delete-file path))
       (call-next-method)))
+
+(defmethod to-file :before ((obj auto-mergeable-json) path)
+  (setf (genome obj)
+        (fixup-json-ast (genome obj))))
+
+(defun fixup-json-ast (ast)
+  "Ensure that AST is a valid JSON AST."
+  (mapcar (lambda (node)
+            (if (and (typep node 'javascript-ast)
+                     (eql :objectexpression (ast-class node)))
+                (nest
+                 (copy node :children)
+                 (fixup-object-children (children node)))
+                node))
+          ast))
+
+(defun fixup-object-children (children)
+  "Given CHILDREN, a list of the properties of a JSON object, ensure the validity of the JSON by preserving two invariants:
+
+1. There must always be a non-AST node between adjacent AST nodes.
+2. There must not be more than one non-AST node in a row."
+  (nest
+   (let ((separator #.(fmt ",~%"))
+         (runs (runs children :key (of-type 'javascript-ast)))))
+   (iter (for run in runs))
+   (if (typep (first run) 'javascript-ast)
+       (nconcing (intersperse separator run))
+       (let* ((run (mapcar #'source-text run))
+              (sep
+               (if (single run) (first run)
+                   ;; Remove any duplicate commas
+                   (let ((run (nub run :key (curry #'find #\,))))
+                     (apply #'concatenate 'string run)))))
+         (when (find #\, sep)
+           (setf separator sep))
+         (collect sep)))))
 
 (defmethod phenome ((obj auto-mergeable-simple) &key bin)
   "Override phenome to write the simple text software object to disk
