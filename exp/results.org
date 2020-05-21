@@ -224,14 +224,14 @@ grep -Pc "\tconflict" results/cc-merges.txt
 : 5295
 ** Builds in every version
 Try to build a compilation database for every version of every program.
-Using this docker image docker.grammatech.com/synthesis/sel/ubuntu-sbcl:master.
+Using this docker image DOCKER_REGISTRY/synthesis/sel/ubuntu-sbcl:master.
 
 Launch the docker image (so we have =bear= available) with needed directories.
 #+begin_src sh :eval never
   docker run -it \
          -v $(pwd)/../benchmark:/benchmark \
          -v $(pwd):/merge-experiment \
-         docker.grammatech.com/synthesis/sel/ubuntu-sbcl:master
+         DOCKER_REGISTRY/synthesis/sel/ubuntu-sbcl:master
 #+end_src
 
 Inside the image run try-cdbs to collect all compilation databases
