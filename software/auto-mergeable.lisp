@@ -228,16 +228,21 @@ AST stub root indicating they were deleted from the project."
 
 (defmethod to-file :before ((obj auto-mergeable-json) path)
   (setf (genome obj)
-        (fixup-json-ast (genome obj))))
+        (fixup-json-ast (genome obj)
+                        (if (string$= "package.json"
+                                      (namestring (original-path obj)))
+                            (compose #'fixup-object-children
+                                     #'remove-duplicate-keys)
+                            #'fixup-object-children))))
 
-(defun fixup-json-ast (ast)
-  "Ensure that AST is a valid JSON AST."
+(defun fixup-json-ast (ast fixer)
+  "Ensure that AST is a valid JSON AST by calling FIXER on the list of children of each AST node."
   (mapcar (lambda (node)
             (if (and (typep node 'javascript-ast)
                      (eql :objectexpression (ast-class node)))
                 (nest
                  (copy node :children)
-                 (fixup-object-children (children node)))
+                 (funcall fixer (children node)))
                 node))
           ast))
 
@@ -247,8 +252,8 @@ AST stub root indicating they were deleted from the project."
 1. There must always be a non-AST node between adjacent AST nodes.
 2. There must not be more than one non-AST node in a row."
   (nest
-   (let ((separator #.(fmt ",~%"))
-         (runs (runs children :key (of-type 'javascript-ast)))))
+   (let* ((separator #.(fmt ",~%"))
+          (runs (runs children :key (of-type 'javascript-ast)))))
    (iter (for run in runs))
    (if (typep (first run) 'javascript-ast)
        (nconcing (intersperse separator run))
@@ -256,11 +261,42 @@ AST stub root indicating they were deleted from the project."
               (sep
                (if (single run) (first run)
                    ;; Remove any duplicate commas
-                   (let ((run (nub run :key (curry #'find #\,))))
+                   (let* ((run (nub run
+                                    :test (lambda (x y)
+                                            (and (or (find #\{ x)
+                                                     (find #\, x))
+                                                 (find #\, y))))))
                      (apply #'concatenate 'string run)))))
          (when (find #\, sep)
            (setf separator sep))
          (collect sep)))))
+
+(defun remove-duplicate-keys (children)
+  "Remove duplicate keys from CHILDREN, the children of a JavaScript
+object.
+
+When a property node is removed, any subsequent children that are not JavaScript AST nodes are also removed.
+
+Only the last occurrence of each child is retained (per the behavior of Node.js)."
+  (nest
+   (flet ((property-name (p)
+            (nest
+             (source-text)
+             (find-if (of-type 'javascript-ast))
+             (children p)))))
+   (let ((runs
+          (runs children
+                :test (lambda (x y)
+                        (and (typep x 'javascript-ast)
+                             (typep y '(not javascript-ast))))))))
+   (apply #'nconc)
+   (delete-duplicates runs :test)
+   (lambda (x y)
+     (multiple-value-match (values (first x) (first y))
+       (((and x (class javascript-ast (class :property)))
+         (and y (class javascript-ast (class :property))))
+        (equal (property-name x)
+               (property-name y)))))))
 
 (defmethod phenome ((obj auto-mergeable-simple) &key bin)
   "Override phenome to write the simple text software object to disk
