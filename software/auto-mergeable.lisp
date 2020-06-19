@@ -25,8 +25,8 @@
         :resolve/ast-diff
         :resolve/software/parseable
         :software-evolution-library
+        :software-evolution-library/components/file
         :software-evolution-library/software/clang
-        :software-evolution-library/software/file
         :software-evolution-library/software/simple
         :software-evolution-library/software/parseable
         :software-evolution-library/software/clang
