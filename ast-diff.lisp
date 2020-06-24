@@ -209,7 +209,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (:method ((ast ast))
     (cons (ast-class ast)
           (mapcar #'ast-to-list-form (ast-children ast))))
-  (:method ast-to-list-form (ast) ast))
+  (:method (ast) ast))
 
 (defgeneric ast-size (node)
   (:documentation "Number of nodes and leaves in an AST or ast-like thing")
