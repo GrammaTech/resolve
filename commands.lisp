@@ -554,7 +554,7 @@ command-line options processed by the returned function."
                 (get-decoded-time)
               (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
                       year month date hour minute second)))
-  (declare (ignorable manual quiet fault-loc))
+  (declare (ignorable manual quiet))
   #+drop-dead
   (drop-dead-date ()
     (exit-command auto-merge 2
