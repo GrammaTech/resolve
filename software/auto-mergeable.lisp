@@ -389,7 +389,7 @@ conflict AST resolution with an alternative option."
          (new-resolution (resolve-conflict-ast conflict-ast
                                                :strategy strategy))
          (conflict-path (ast-path software (car prior-resolution)))
-         (parent (get-ast software (butlast conflict-path))))
+         (parent (@ software (butlast conflict-path))))
     ;; Replace the prior resolution children with the new resolution
     (if (null conflict-path)
         `((:set (:stmt1 . ,conflict-path)

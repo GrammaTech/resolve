@@ -1503,16 +1503,16 @@
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested-simple
           :long-running) ()
   (with-fixture javascript-converge-conflict
-    (is (typep (get-ast *cnf* '(3)) 'conflict-ast)
+    (is (typep (@ *cnf* '(3)) 'conflict-ast)
         "Path (3) is a conflict ast in the original.")
-    (let* ((old (get-ast *cnf* '(3)))
+    (let* ((old (@ *cnf* '(3)))
            (new (replace-ast (copy *cnf*)
                              (ast-path *cnf* old)
                              (aget :my (conflict-ast-child-alist old))
                              :literal t)))
-      (is (typep (get-ast new '(3)) 'javascript-ast)
+      (is (typep (@ new '(3)) 'javascript-ast)
           "Path (3) is a JavaScript ast in result of replace-ast.")
-      (is (typep (get-ast *cnf* '(3)) 'conflict-ast)
+      (is (typep (@ *cnf* '(3)) 'conflict-ast)
           "Path (3) is STILL a conflict-ast in the original ~
            after replace-ast."))))
 
