@@ -192,17 +192,17 @@ of A from A-END. If no suitable points are found, return nil."
                                           (child-asts)
                                           (genome a)))
                         (when (find ast (child-asts (genome b))
-                                    :test #'ast-equal-p)
+                                    :test #'equal?)
                           (collect ast)))))
     ;; AST pool contains those ASTs at the top-level common to A and B.
     (when (<= 2 (length ast-pool))
       (bind ((a-children (children (genome a)))
              (b-children (children (genome b)))
              ((:values begin end) (select-begin-and-end ast-pool)))
-            (values (position begin a-children :test #'ast-equal-p)
-                    (position end a-children :test #'ast-equal-p)
-                    (position begin b-children :test #'ast-equal-p)
-                    (position end b-children :test #'ast-equal-p))))))
+            (values (position begin a-children :test #'equal?)
+                    (position end a-children :test #'equal?)
+                    (position begin b-children :test #'equal?)
+                    (position end b-children :test #'equal?))))))
 
 (defun select-begin-and-end (pool)
   "Return two ordered ASTs from POOL."

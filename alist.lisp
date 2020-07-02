@@ -60,7 +60,7 @@ elements of the alist."
       (mapcar (lambda (p) `(:delete-alist . ,p)) only-in-1)
       (mapcar (lambda (p)
 		(let ((p2 (gethash (car p) table2)))
-		  (if (ast-equal-p (cdr p) (cdr p2))
+		  (if (equal? (cdr p) (cdr p2))
 		      `(:same-alist . ,p)
 		      `(:recurse-alist
 			,(car p)
@@ -85,7 +85,7 @@ elements of the alist."
 		   (:delete-alist
                     (let ((cdrx (cdr x))
                           (lookup (gethash (cadr x) table)))
-                      (assert (ast-equal-p cdrx lookup)
+                      (assert (equal? cdrx lookup)
                               ()
                               ":DELETE-ALIST value not the same as the value in the alist: ~a, ~a, ~a"
                               (cadr x) cdrx lookup))
@@ -93,7 +93,7 @@ elements of the alist."
 		   (:same-alist
                     (let ((cdrx (cdr x))
                           (lookup (gethash (cadr x) table)))
-                      (assert (ast-equal-p cdrx lookup)
+                      (assert (equal? cdrx lookup)
                               ()
                               ":SAME value not the same as the value in the alist: ~a, ~a, ~a"
                               (cadr x) cdrx lookup))

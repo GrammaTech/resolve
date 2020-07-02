@@ -453,7 +453,7 @@
     (is (equalp '(:recurse :same :same) (mapcar #'car diff)))))
 
 (defun ast-diff-and-patch-equal-p (orig new &rest args &key &allow-other-keys)
-  (ast-equal-p new (ast-patch orig (apply #'ast-diff orig new args))))
+  (equal? new (ast-patch orig (apply #'ast-diff orig new args))))
 
 (deftest ast-diff-and-patch-is-equal-simple ()
   (is (ast-diff-and-patch-equal-p '(1 2 3 4) '(1 2 z 4))))
@@ -599,25 +599,25 @@
                         "int x; int y; int z; int c;")))
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
-      (is (ast-equal-p (genome (ast-patch (copy orig) diff-a))
-                       (genome a)))
-      (is (equalp (mapcar #'car diff-a)
+      (is (equal? (genome (ast-patch (copy orig) diff-a))
+                  (genome a)))
+      (is (equal? (mapcar #'car diff-a)
                   '(:same :insert :insert :same :same
                     :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-b))
            (genome b)))
-      (is (equalp (mapcar #'car diff-b)
+      (is (equal? (mapcar #'car diff-b)
                   '(:same :same :insert :insert :same
                     :same :same :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-c))
            (genome c)))
-      (is (equalp (mapcar #'car diff-c)
+      (is (equal? (mapcar #'car diff-c)
                   '(:same :same :same :same :same
                     :same :insert :insert :same))))))
 
@@ -632,24 +632,24 @@
                         "int x; int y;")))
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-a))
            (genome a)))
-      (is (equalp (mapcar #'car diff-a)
+      (is (equal? (mapcar #'car diff-a)
                   '(:same :delete :delete :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-b))
            (genome b)))
-      (is (equalp (mapcar #'car diff-b)
+      (is (equal? (mapcar #'car diff-b)
                   '(:same :same :same :delete :delete :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-c))
            (genome c)))
-      (is (equalp (mapcar #'car diff-c)
+      (is (equal? (mapcar #'car diff-c)
                   '(:same :same :same :same :delete :delete :same))))))
 
 (deftest (diff-recursive :long-running) ()
@@ -659,9 +659,9 @@
                            "int x = 1; int y = 5; int z = 3;"))
          (diff (ast-diff orig new)))
     (is diff)
-    (is (ast-equal-p (genome (ast-patch (copy orig) diff))
-                     (genome new)))
-    (is (equalp (mapcar #'car diff)
+    (is (equal? (genome (ast-patch (copy orig) diff))
+                (genome new)))
+    (is (equal? (mapcar #'car diff)
                 '(:same :same :same :recurse :same :same :same)))))
 
 (deftest (diff-text-changes :long-running) ()
@@ -675,24 +675,24 @@
                         "/* 1 */ int x; /* 2 */ int y; int z; /* X */")))
     (let ((diff-a (ast-diff orig a)))
       (is diff-a)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-a))
            (genome a)))
-      (is (equalp (mapcar #'car diff-a)
+      (is (equal? (mapcar #'car diff-a)
                   '(:recurse :same :same :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-b))
            (genome b)))
-      (is (equalp (mapcar #'car diff-b)
+      (is (equal? (mapcar #'car diff-b)
                   '(:same :same :recurse :same :same :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
-      (is (ast-equal-p
+      (is (equal?
            (genome (ast-patch (copy orig) diff-c))
            (genome c)))
-      (is (equalp (mapcar #'car diff-c)
+      (is (equal? (mapcar #'car diff-c)
                   '(:same :same :same :same :same :same :recurse))))))
 
 (deftest diff-real-text ()
@@ -782,7 +782,7 @@
               (source-text ast2) (ast-to-list-form ast2))
       (format t "AST3:~%~a~%----------------~%~s~%"
               (source-text ast3) (ast-to-list-form ast3)))
-    (is (ast-equal-p ast2 ast3))))
+    (is (equal? ast2 ast3))))
 
 (deftest print-diff.1 ()
   (is (equalp (with-output-to-string (s)

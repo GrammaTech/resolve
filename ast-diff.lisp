@@ -37,7 +37,6 @@
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:export
-   :ast-equal-p
    :ast-cost
    :ast-size
    :ast-can-recurse
@@ -250,7 +249,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
     (if v
         (format stream "~a" (unastify v))
         (write-string "()" stream))))
-(defmethod ast-equal-p ((a simple-lisp-ast) (b simple-lisp-ast))
+(defmethod equal? ((a simple-lisp-ast) (b simple-lisp-ast))
   (equalp (unastify a) (unastify b)))
 
 (defmethod ast-cost :around ((ast simple-lisp-ast))
@@ -527,7 +526,7 @@ Also return a second value indicating the cost of the edit.
 See `ast-patch' for more details on edit scripts.
 
 The following generic functions may be specialized to configure
-differencing of specialized AST structures.; `ast-equal-p',
+differencing of specialized AST structures.; `equal?',
 `ast-cost' and `ast-can-recurse'."))
 (let ((ast-diff-cache (make-hash-table))
       (ast-diff-counter 0)
@@ -787,7 +786,7 @@ out of one tree and turns it into another."))
                    (< (nth-value 1 (if reverse? (ast-diff* c a) (ast-diff* a c))) cost-limit)))
             (children b))))
   (:method ((a t) (b t) &optional reverse?) (declare (ignore reverse?))
-    (ast-equal-p a b)))
+    (equal? a b)))
 
 (defun wraps-of-path (ast path)
   "Computes lists of children that lie on the left and right sides of a path
@@ -901,7 +900,7 @@ Prefix and postfix returned as additional values."
              (iter (for a in list-a)
                    (for b in list-b)
                    (cond ((and (typep a 'ast) (typep b 'ast)
-                               (ast-equal-p a b))
+                               (equal? a b))
                           (collect a into common))
                          ((and (not (typep a 'ast)) (not (typep b 'ast))
                                (equalp a b))
@@ -1135,7 +1134,7 @@ Prefix and postfix returned as additional values."
              (:same-or-recurse
               (assert a)
               (assert b)
-              (if (ast-equal-p a b)
+              (if (equal? a b)
                   (list (cons :same a))
                   ;; Recursive -- we exploit the caching :around method
                   ;; of ast-diff*
@@ -1327,7 +1326,7 @@ they are actually equal.  If not, the second one gets a new, fresh hash
 value that is used instead."
   (let* ((hash (ast-hash ast))
          (old-ast (gethash hash table)))
-    (when (and old-ast (not (ast-equal-p ast old-ast)))
+    (when (and old-ast (not (equal? ast old-ast)))
       (iter (incf hash) ; may be >= sel/sw/parseable::+ast-hash-base+, but that's ok
             (while (gethash hash table)))
       (setf (gethash hash table) ast))
@@ -1378,8 +1377,6 @@ value that is used instead."
       (iter (for da in (reverse diff-a))
             (for db in (reverse diff-b))
             (for ca in (reverse (cons nil common-a)))
-            ;; (for cb in (reverse (cons nil common-b)))
-            ;; (assert (ast-equal-p ca cb))
             (multiple-value-bind (diff cost)
                 (ast-diff-on-lists da db parent-a parent-b)
               (setf overall-diff (append diff overall-diff))
@@ -1973,7 +1970,7 @@ be applied in that context."))
         (:recurse-tail
          (ast-patch* original (cdr script)))
         (:same
-         (assert (ast-equal-p original (cdr script))
+         (assert (equal? original (cdr script))
                  ()
                  "AST-PATCH*: :SAME not same as in script: ~a, ~a"
                  original
@@ -1988,21 +1985,21 @@ be applied in that context."))
          (let ((keys (mapcar #'car script)))
            (cond
              ((equal keys '(:same))
-              (assert (ast-equal-p original (cdar script))
+              (assert (equal? original (cdar script))
                       ()
                       "AST-PATCH*: :SAME not same as in script(2): ~a, ~a"
                       original
                       (cdar script))
               (cdar script))
              ((equal keys '(:insert :delete))
-              (assert (ast-equal-p original (cdadr script))
+              (assert (equal? original (cdadr script))
                       ()
                       "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
                       keys
                       original (cdadr script))
               (cdar script))
              ((equal keys '(:delete :insert))
-              (assert (ast-equal-p original (cdar script))
+              (assert (equal? original (cdar script))
                       ()
                       "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
                       keys
@@ -2267,14 +2264,14 @@ process with the rest of the script."
                                    (edit (cdr asts) (cdr script))))
                (:same-tail
                 (assert (null (cdr script))) ;; :same-tail always occurs last
-                (assert (ast-equal-p asts args) () "AST-PATCH* (CONS): ~
+                (assert (equal? asts args) () "AST-PATCH* (CONS): ~
                         :SAME-TAIL not as as in script: ~a, ~a" asts args)
                 asts)
                (:recurse-tail
                 (assert (null (cdr script)))
                 (ast-patch* asts args))
                (:delete
-                (assert (ast-equal-p (car asts) args) () "AST-PATCH* (CONS): ~
+                (assert (equal? (car asts) args) () "AST-PATCH* (CONS): ~
                         :DELETE not same as in script: ~a,~a" (car asts) args)
                 (cond
                   (tag
@@ -2317,7 +2314,7 @@ process with the rest of the script."
                  meld?
                  (iter (while (consp args))
                        (assert asts)
-                       (assert (ast-equal-p (car asts) (car args)) ()
+                       (assert (equal? (car asts) (car args)) ()
                                "AST-PATCH* (CONS): ~
                                :DELETE-SEQUENCE not same as in script: ~a, ~a"
                                (car asts) (car args))
@@ -2352,7 +2349,7 @@ and replicating the others."
               ;; Don't do :same-tail, :recurse-tail here
               (let ((val (list action1 action2)))
                 (flet ((%check (s1 s2)
-                         (assert (ast-equal-p s1 s2) () "MELD-SCRIPTS ~a: ~
+                         (assert (equal? s1 s2) () "MELD-SCRIPTS ~a: ~
                                  should have been the same: ~a, ~a" val s1 s2)))
                   (switch (val :test #'equal)
                     ('(:same :same)

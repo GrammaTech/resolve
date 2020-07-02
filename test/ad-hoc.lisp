@@ -350,7 +350,7 @@ a valid patch.  Return :FAIL (and other values) if not."
      ast
      (lambda (a)
        (pushnew a (gethash (ast-hash a) table)
-                :test #'ast-equal-p)))
+                :test #'equal?)))
     (let ((collisions
            (sort
             (iter (for (k v) in-hashtable table)
