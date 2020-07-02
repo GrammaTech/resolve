@@ -227,6 +227,7 @@ AST stub root indicating they were deleted from the project."
       (call-next-method)))
 
 (defmethod to-file :before ((obj auto-mergeable-json) path)
+  (declare (ignorable path))
   (setf (genome obj)
         (fixup-json-ast (genome obj)
                         (if (string$= "package.json"
