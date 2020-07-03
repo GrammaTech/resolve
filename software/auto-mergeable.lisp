@@ -166,8 +166,8 @@ yours2() was crossed over from the genome of B into A."
   (multiple-value-bind (a-begin a-end b-begin b-end)
       (select-crossover-points a b)
     (if (and a-begin a-end b-begin b-end)
-        (let ((a-children (ast-children (genome a)))
-              (b-children (ast-children (genome b))))
+        (let ((a-children (children (genome a)))
+              (b-children (children (genome b))))
           (nest (copy a :genome)
                 (copy (genome a) :children)
                 (append (subseq a-children 0 a-begin)     ;; (1)
@@ -189,15 +189,15 @@ of A from A-END. If no suitable points are found, return nil."
   ;; reasonable crossover.
   (let ((ast-pool (iter (for ast in (nest (remove-if [{aget :conflict-ast}
                                                       #'ast-annotations])
-                                          (get-immediate-children a)
+                                          (child-asts)
                                           (genome a)))
-                        (when (find ast (get-immediate-children b (genome b))
+                        (when (find ast (child-asts (genome b))
                                     :test #'ast-equal-p)
                           (collect ast)))))
     ;; AST pool contains those ASTs at the top-level common to A and B.
     (when (<= 2 (length ast-pool))
-      (bind ((a-children (ast-children (genome a)))
-             (b-children (ast-children (genome b)))
+      (bind ((a-children (children (genome a)))
+             (b-children (children (genome b)))
              ((:values begin end) (select-begin-and-end ast-pool)))
             (values (position begin a-children :test #'ast-equal-p)
                     (position end a-children :test #'ast-equal-p)
@@ -216,7 +216,7 @@ of A from A-END. If no suitable points are found, return nil."
 (defmethod size ((obj auto-mergeable-parseable))
   "Override size to allow include the AST root in the calculation as
 it may be mutated by auto-merge."
-  (length (ast-to-list (genome obj))))
+  (length (child-asts (genome obj) :recursive t)))
 
 (defmethod to-file ((obj auto-mergeable-parseable) path)
   "Override to-file to avoid writing to disk those objects with an
@@ -397,11 +397,11 @@ conflict AST resolution with an alternative option."
         `((:set (:stmt1 . ,parent)
                 (:literal1 .
                            ,(copy parent :children
-                                  (append (subseq (ast-children parent)
+                                  (append (subseq (children parent)
                                                   0
                                                   (lastcar conflict-path))
                                           new-resolution
-                                          (subseq (ast-children parent)
+                                          (subseq (children parent)
                                                   (+ (lastcar conflict-path)
                                                      (length prior-resolution)))))))))))
 
@@ -483,7 +483,7 @@ using STRATEGY.")
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not {typep _ 'conflict-ast}
-                   (ast-to-list (genome obj))))
+                   (cons (genome obj) (child-asts (genome obj) :recursive t))))
   (:method ((obj auto-mergeable-project))
     (mappend [#'get-conflicts #'cdr] (all-files obj))))
 
@@ -495,7 +495,7 @@ using STRATEGY.")
                    (mapcar {aget :code} (genome obj))))
   (:method ((obj auto-mergeable-parseable))
     (remove-if-not [{aget :conflict-ast} #'ast-annotations]
-                   (ast-to-list (genome obj))))
+                   (cons (genome obj) (child-asts (genome obj) :recursive t))))
   (:method ((obj auto-mergeable-project))
     (mappend [#'get-resolved-conflicts #'cdr] (all-files obj))))
 

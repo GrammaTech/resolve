@@ -1473,7 +1473,7 @@
   (flet ((conflict-nodes (obj)
            (let ((result
                   (remove-if-not {typep _ 'conflict-ast}
-                                 (ast-to-list (genome obj)))))
+                                 (child-asts (genome obj) :recursive t))))
              #+debug (format t "Conflict nodes:~%")
              #+debug (dolist (cn result) (format t "~a~%" cn))
              result)))
@@ -1523,12 +1523,12 @@
     (is (not (zerop (size *cnf*))))
     ;; Conflicted software object has conflcit ASTs.
     (is (remove-if-not {typep _ 'conflict-ast}
-                       (ast-to-list (genome *cnf*))))
+                       (child-asts (genome *cnf*) :recursive t)))
     (let ((old (resolve-to (copy *cnf*) :old))
           (my (resolve-to (copy *cnf*) :my))
           (your (resolve-to (copy *cnf*) :your)))
       (is (null (remove-if-not {typep _ 'conflict-ast}
-                               (ast-to-list (genome old)))))
+                               (child-asts (genome old) :recursive t))))
       (is (string/= (genome-string my) (genome-string old)))
       (is (string/= (genome-string your) (genome-string old)))
       (is (string/= (genome-string my) (genome-string your)))
@@ -1562,12 +1562,13 @@
    (let* ((conflicted (nest (create-auto-mergeable)
                             (converge my old your :conflict t)))
           (chunks (remove-if-not {typep _ 'conflict-ast}
-                                 (ast-to-list (genome conflicted))))
+                                 (child-asts (genome conflicted) :recursive t)))
           (*population* (populate conflicted))))
    (is (= (length *population*) (expt 5 (length chunks)))
        "Population has the expected size ~d = 5^|chunks| => ~d."
        (length *population*) (expt 5 (length chunks)))
-   (is (not (some [{some {typep _ 'conflict-ast}} #'ast-to-list] *population*))
+   (is (not (some [{some {typep _ 'conflict-ast}} {child-asts _ :recursive t}]
+                  *population*))
        "Population has no conflict ASTs remaining.")))
 
 (deftest can-merge-when-one-side-is-invalid ()

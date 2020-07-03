@@ -164,7 +164,7 @@ wrapping and unwrapping to be considered.")
   (:documentation "Return cost of AST."))
 
 (defmethod ast-cost ((ast ast))
-  (reduce #'+ (ast-children ast) :key #'ast-cost :initial-value 1))
+  (reduce #'+ (children ast) :key #'ast-cost :initial-value 1))
 
 (defmethod ast-cost ((ast t))
   1)
@@ -208,13 +208,13 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (:documentation "Convert ast into a more readable list form")
   (:method ((ast ast))
     (cons (ast-class ast)
-          (mapcar #'ast-to-list-form (ast-children ast))))
+          (mapcar #'ast-to-list-form (children ast))))
   (:method (ast) ast))
 
 (defgeneric ast-size (node)
   (:documentation "Number of nodes and leaves in an AST or ast-like thing")
   (:method ((node ast))
-    (reduce #'+ (ast-children node) :key #'ast-size :initial-value 1))
+    (reduce #'+ (children node) :key #'ast-size :initial-value 1))
   (:method ((node t)) 1))
 
 
@@ -299,7 +299,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (defmethod astify (x) x)
   (defmethod unastify ((ast simple-lisp-ast))
     (or (unastify-cache ast)
-        (unastify-list (ast-children ast))))
+        (unastify-list (children ast))))
   (defmethod unastify (val) val)
 
   (defun unastify-list (c)
@@ -386,13 +386,13 @@ of the substring inside the string."))
         (len (edit-segment-length segment))
         (ast-node (edit-segment-node segment)))
     (mapc {source-text _ stream}
-          (subseq (ast-children ast-node) start (+ start len)))))
+          (subseq (children ast-node) start (+ start len)))))
 
 (defmethod source-text ((segment string-edit-segment) &optional stream)
   (with-slots (node start string-start string-length)
       segment
     (assert node)
-    (write-string (elt (ast-children node) start) stream
+    (write-string (elt (children node) start) stream
                   :start string-start
                   :end (+ string-start string-length))))
 
@@ -406,10 +406,10 @@ of the substring inside the string."))
     `(,(ast-class ast-node)
        ,@(unless (eql start 0) '(|...|))
        ,@(mapcar #'ast-to-list-form
-                 (subseq (ast-children ast-node)
+                 (subseq (children ast-node)
                          start (+ start len)))
        ,@(unless (eql (+ start len)
-                      (length (ast-children ast-node)))
+                      (length (children ast-node)))
            '(|...|)))))
 
 (defclass edit-tree-node-base (size-mixin)
@@ -461,7 +461,7 @@ rewritten TO by part of the edit script"))
   (let* ((node (edit-segment-node segment))
          (length (edit-segment-length segment))
          (start (edit-segment-start segment))
-         (children (subseq (ast-children node) start (+ start length)))
+         (children (subseq (children node) start (+ start length)))
          (value (reduce #'+ children :key #'ast-size :initial-value 1)))
     (setf (slot-value segment slot) value)))
 
@@ -611,7 +611,7 @@ differencing of specialized AST structures.; `ast-equal-p',
   (let (diff cost)
     (when (eql (ast-class ast-a) (ast-class ast-b))
       (setf (values diff cost)
-            (ast-diff*-lists (ast-children ast-a) (ast-children ast-b)
+            (ast-diff*-lists (children ast-a) (children ast-b)
                              ast-a ast-b)))
     (when *wrap*
       (multiple-value-bind (wrap-diff wrap-cost)
@@ -635,7 +635,7 @@ the descent when FN returns NIL.  FN is also passed a PATH
 argument, which is a list (in reverse order) of the indices
 of children leading down to the node."
   (when (funcall fn ast path)
-    (iter (for c in (ast-children ast))
+    (iter (for c in (children ast))
           (for i from 0)
           (when (typep c 'ast) (map-ast-while-path c fn (cons i path))))))
 
@@ -658,7 +658,7 @@ of children leading down to the node."
          ; (*wrap* nil)
          )
     (when (integerp first-ast-child)
-      (setf first-ast-child (elt (ast-children ast-a) first-ast-child)))
+      (setf first-ast-child (elt (children ast-a) first-ast-child)))
     #+ast-diff-wrap-debug (format t "(ast-class ast-a) = ~S~%" a-class)
     (nest
      (map-ast-while-path ast-b)
@@ -727,7 +727,7 @@ out of one tree and turns it into another."))
          ;; Do not also search for wraps in the recursive call
          (*wrap* nil))
     (when (integerp first-ast-child)
-      (setf first-ast-child (elt (ast-children ast-b) first-ast-child)))
+      (setf first-ast-child (elt (children ast-b) first-ast-child)))
     #+ast-diff-unwrap-debug (format t "(ast-class ast-b) = ~S~%" b-class)
     (nest
      (map-ast-while-path ast-a)
@@ -785,7 +785,7 @@ out of one tree and turns it into another."))
                    ;; REVERSE? is used so we don't compute ast-diffs backwards
                    ;; when checking for UNWRAP
                    (< (nth-value 1 (if reverse? (ast-diff* c a) (ast-diff* a c))) cost-limit)))
-            (ast-children b))))
+            (children b))))
   (:method ((a t) (b t) &optional reverse?) (declare (ignore reverse?))
     (ast-equal-p a b)))
 
@@ -796,7 +796,7 @@ down from AST, as well as the classes of the nodes along the path."
   (let (left right classes)
     (iter (while path)
           (assert (typep ast 'ast))
-          (let ((c (ast-children ast))
+          (let ((c (children ast))
                 (i (pop path)))
             (assert (<= 0 i))
             (assert (< i (length c)))
@@ -1507,8 +1507,8 @@ source, build the edit tree corresponding to the script."))
   (if (and (typep source 'ast)
            (typep target 'ast))
       (change-segments-on-seqs
-       (ast-children source)
-       (ast-children target)
+       (children source)
+       (children target)
        script
        (lambda (source-segment-start source-segment-length
                 target-segment-start target-segment-length
@@ -1767,7 +1767,7 @@ object of type edit-tree-segment"))
 
 (defmethod describe-segment progn ((edit-tree-segment string-edit-segment))
   (let* ((start (edit-segment-start edit-tree-segment))
-         (str (elt (ast-children (edit-segment-node edit-tree-segment))
+         (str (elt (children (edit-segment-node edit-tree-segment))
                    start)))
     (format t "String = ~s~%" str))
   (format t "String-start = ~a~%"
@@ -1937,7 +1937,7 @@ be applied in that context."))
 (defun actual-ast-patch (ast script &rest keys
                         &key delete? (meld? (ast-meld-p ast)) &allow-other-keys)
   (declare (ignorable delete? meld?))
-  (let* ((children (ast-children ast))
+  (let* ((children (children ast))
          ;; For now, always meld
          ;; This may not give valid ASTs, but fix later
          (new-child-lists
@@ -2105,7 +2105,7 @@ process with the rest of the script."
       args
     (assert (= (length path) (length left-wrap) (length right-wrap)))
     (iter (while path)
-          (setf ast (nth (pop path) (ast-children ast))))
+          (setf ast (nth (pop path) (children ast))))
     (apply #'ast-patch* ast sub-action keys)))
 
 (defun ast-wrap (ast left-wrap right-wrap classes base-ast)
@@ -2144,7 +2144,7 @@ process with the rest of the script."
   (assert (= (length left-wrap) (length right-wrap) (length classes)))
   (setf left-wrap (reverse left-wrap))
   (setf right-wrap (reverse right-wrap))
-  (let ((asts (ast-children ast)))
+  (let ((asts (children ast)))
     (iter (while left-wrap)
           (let ((class (pop classes)))
             (assert class)
@@ -2164,18 +2164,18 @@ process with the rest of the script."
         args
       (assert (= (1+ (length path)) (length left-wrap) (length right-wrap)))
       (iter (while path)
-            (setf ast (nth (pop path) (ast-children ast)))
+            (setf ast (nth (pop path) (children ast)))
             (pop left-wrap)
             (pop right-wrap))
       (assert (= (length left-wrap) 1))
       (assert (= (length right-wrap) 1))
-      (let* ((c (ast-children ast))
+      (let* ((c (children ast))
              (total-len (length c))
              (left-len (length (car left-wrap)))
              (right-len (length (car right-wrap))))
         (assert (>= total-len (+ left-len right-len)))
         (let ((new-ast (copy ast :children (subseq c left-len (- total-len right-len)))))
-          (ast-children
+          (children
            (apply #'ast-patch* new-ast sub-action keys)))))))
 
 (defmethod ast-patch* ((original cons) (script list)

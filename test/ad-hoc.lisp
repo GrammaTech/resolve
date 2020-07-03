@@ -16,7 +16,7 @@
     (time (ast-diff t1 t2))))
 
 (defun remove-empty-strings-from-ast (ast)
-  (copy ast :children (iter (for child in (ast-children ast))
+  (copy ast :children (iter (for child in (children ast))
                             (cond ((typep child 'ast)
                                    (collect (remove-empty-strings-from-ast child)))
                                   ((not (emptyp child))
