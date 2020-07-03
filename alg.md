@@ -68,7 +68,7 @@ to be created by walking the diff.
 
 ## Merging Diffs
 
-The merge algorithm operates on three ASTs: a root AST ("original")`,
+The merge algorithm operates on three ASTs: a root AST ("original"),
 and two branch versions ("left" and "right").   It computes diffs
 from original to each of left and right, then walks these diffs to
 identify and attempt to resolve conflicts.
