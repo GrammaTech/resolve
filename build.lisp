@@ -11,4 +11,4 @@
  (list :source-registry :ignore-inherited-configuration
        (list :directory (merge-pathnames "src/" #+ccl (ccl::current-directory)))
        (list :tree (merge-pathnames "quicklisp/dists/" #+ccl (ccl::current-directory)))))
-(asdf:operate :deliver-asd-op :resolve)
+(asdf:operate :deliver-asd-op :resolve/ast-diff)
