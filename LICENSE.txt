@@ -52,7 +52,7 @@ expressly prohibited without specific prior written permission
 of an authorized representative of GrammaTech, Inc.  Redistribution
 includes combination in any form, including, but not limited to
 static and dynamic linking with any other software. Disclosure of the
-output or results of the software is also prohibited ithout specific
+output or results of the software is also prohibited without specific
 prior written permission of an authorized representative of GrammaTech, Inc.
 Any such redistribution or disclosure must reproduce the above copyright
 notice, this list of conditions and the following disclaimer in the
