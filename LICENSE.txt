@@ -6,7 +6,7 @@ All GrammaTech Proprietary Information is subject to following
 copyright and conditions:
 
 
-Copyright (c) 2019 GrammaTech, Inc. All rights reserved.
+Copyright (c) 2020 GrammaTech, Inc. All rights reserved.
 
 
 Any marks and brands contained herein are the property of GrammaTech, Inc.

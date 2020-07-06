@@ -72,7 +72,9 @@ job of manual conflict resolution.
 - Java via JavaParser ASTs
 - Common-Lisp via Eclector
 
-## License
+## Copyright and License
+Copyright (c) 2020 GrammaTech, Inc. All rights reserved.
+
 Resolve, and any accompanying documentation or other materials are
 GrammaTech, Inc. (GrammaTech) Proprietary Information.
 
