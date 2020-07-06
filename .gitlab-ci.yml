@@ -32,6 +32,17 @@ test-ccl:
     LISP: 'ccl'
   <<: *test
 
+binary-release:
+  stage: deploy
+  artifacts:
+    paths:
+      - resolve
+  script:
+    - rm -f /tmp/$(basename $LOCAL_IMAGE_NAME).cid
+    - docker run --cidfile=/tmp/$(basename $LOCAL_IMAGE_NAME).cid $LOCAL_IMAGE_NAME /bin/bash -c "sbcl --script build.lisp && ccl --load build.lisp"
+    - docker cp $(cat /tmp/$(basename $LOCAL_IMAGE_NAME).cid):/root/quicklisp/local-projects/resolve/build resolve
+    - rm -f /tmp/$(basename $LOCAL_IMAGE_NAME).cid
+
 dependents:
   stage: deploy
   script:
