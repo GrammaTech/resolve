@@ -19,6 +19,7 @@
         :resolve/software/project
         :resolve/software/auto-mergeable
         :resolve/software/parseable)
+  (:import-from :resolve/ast-diff :*unstable*)
   (:export :resolve
            :auto-merge-test
            :populate
@@ -132,6 +133,36 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
 
 
 ;;; Evolution of a merge resolution.
+
+(defun map-project-file-ast-nodes (fn project)
+  (flet ((map-files (files)
+           (mapcar (lambda (file)
+                     (cons (car file)
+                           (copy (cdr file)
+                                 :genome (mapcar fn (genome (cdr file))))))
+                   files)))
+    (copy project
+          :evolve-files (map-files (evolve-files project))
+          :other-files (map-files (other-files project)))))
+
+(defun merge-conflict-sides (a b)
+  (let ((*unstable* nil))
+    (values (merge-diffs2 a b)
+            *unstable*)))
+
+(defun try-reconcile-conflicts (project)
+  (map-project-file-ast-nodes
+   (lambda (node)
+     (if (typep node 'conflict-ast)
+         (match (conflict-ast-child-alist node)
+           ((alist (:my . my) (:your . your) (:old . old))
+            (multiple-value-bind (merge unstable?)
+                (converge my old your :conflict nil)
+              (if unstable? node merge)))
+           (otherwise node))
+         node))
+   project))
+
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target num-threads
                        strings base-cost wrap wrap-sequences max-wrap-diff &allow-other-keys)
@@ -157,7 +188,8 @@ Extra keys are passed through to EVOLVE.")
               ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
               ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*))
     (note 2 "Populate candidate merge resolutions.")
-    (let* ((converged (converge my old your :conflict t))
+    (let* ((initial (converge my old your :conflict t))
+           (converged (try-reconcile-conflicts initial))
            (*population* (populate converged))
            ;; Because each variant is tested against a test suite,
            ;; where the test script may be repeated over an index, the
@@ -172,6 +204,10 @@ Extra keys are passed through to EVOLVE.")
            (*fitness-evals* 0)
            (*fitness-predicate* #'<))
 
+      (note 2 "AST merging eliminated ~d conflict~:p"
+            (- (length (get-conflicts initial))
+               (length (get-conflicts converged))))
+
       ;; Special case - there are no conflicts to be resolved
       (unless (get-conflicts converged)
         (note 2 "No conflicts found.")
@@ -179,7 +215,7 @@ Extra keys are passed through to EVOLVE.")
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Number of conflicts found: ~d."
-              (length (get-conflicts converged)))
+            (length (get-conflicts converged)))
       (note 2 "Evaluate ~d population members."
               (length *population*))
       (task-map num-threads
