@@ -1,3 +1,5 @@
 *
 !.gitignore
 !resolve.asd
+!LICENSE.txt
+!README.md
