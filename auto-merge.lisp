@@ -19,7 +19,7 @@
         :resolve/software/project
         :resolve/software/auto-mergeable
         :resolve/software/parseable)
-  (:import-from :resolve/ast-diff :*unstable*)
+  (:import-from :resolve/ast-diff)
   (:export :resolve
            :auto-merge-test
            :populate
@@ -144,11 +144,6 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
     (copy project
           :evolve-files (map-files (evolve-files project))
           :other-files (map-files (other-files project)))))
-
-(defun merge-conflict-sides (a b)
-  (let ((*unstable* nil))
-    (values (merge-diffs2 a b)
-            *unstable*)))
 
 (defun try-reconcile-conflicts (project)
   (map-project-file-ast-nodes
