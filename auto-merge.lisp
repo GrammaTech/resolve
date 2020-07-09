@@ -20,11 +20,14 @@
         :resolve/software/auto-mergeable
         :resolve/software/parseable)
   (:import-from :resolve/ast-diff)
+  (:import-from :software-evolution-library/components/file
+                :file-w-attributes)
   (:export :resolve
            :auto-merge-test
            :populate
            :resolve-to
-           :resolve-conflict))
+           :resolve-conflict
+           :try-reconcile-conflicts))
 (in-package :resolve/auto-merge)
 (in-readtable :curry-compose-reader-macros)
 
@@ -134,27 +137,32 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
 
 ;;; Evolution of a merge resolution.
 
-(defun map-project-file-ast-nodes (fn project)
+(defun map-project-files (fn project)
   (flet ((map-files (files)
            (mapcar (lambda (file)
                      (cons (car file)
-                           (copy (cdr file)
-                                 :genome (mapcar fn (genome (cdr file))))))
+                           (mapcar fn (cdr file))))
                    files)))
     (copy project
           :evolve-files (map-files (evolve-files project))
           :other-files (map-files (other-files project)))))
 
-(defun try-reconcile-conflicts (project)
-  (map-project-file-ast-nodes
-   (lambda (node)
-     (if (typep node 'conflict-ast)
-         (match (conflict-ast-child-alist node)
-           ((alist (:my . my) (:your . your))
-            (if (equal? my your) my node))
-           (otherwise node))
-         node))
-   project))
+(defgeneric try-reconcile-conflicts (sw)
+  (:method ((node t)) node)
+  (:method ((node conflict-ast))
+    (match (conflict-ast-child-alist node)
+      ((alist (:my . my) (:your . your) (:old . old))
+       (cond ((equal? my your) my)
+             ((equal? old my) your)
+             ((equal? old your) my)
+             (t node)))
+      (otherwise node)))
+  (:method ((file file-w-attributes))
+    (copy file
+          :genome (mapcar #'try-reconcile-conflicts
+                          (genome file))))
+  (:method ((project project))
+    (map-project-files #'try-reconcile-conflicts project)))
 
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target num-threads
@@ -197,9 +205,10 @@ Extra keys are passed through to EVOLVE.")
            (*fitness-evals* 0)
            (*fitness-predicate* #'<))
 
-      (note 2 "AST merging eliminated ~d conflict~:p"
+      (note 2 "AST merging eliminated ~d/~d conflict~:p"
             (- (length (get-conflicts initial))
-               (length (get-conflicts converged))))
+               (length (get-conflicts converged)))
+            (length (get-conflicts initial)))
 
       ;; Special case - there are no conflicts to be resolved
       (unless (get-conflicts converged)

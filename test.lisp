@@ -1590,6 +1590,28 @@
               (create-auto-mergeable (create-software your))
               {auto-merge-test _ (create-test-suite "true" 1)}))))
 
+(defun count-conflicts (sw)
+  (count-if (of-type 'conflict-ast) (genome sw)))
+
+(defun try-merge (my old your)
+  (let* ((my (from-string (make 'sel/sw/javascript:javascript) my))
+         (old (from-string (make 'sel/sw/javascript:javascript) old))
+         (your (from-string (make 'sel/sw/javascript:javascript) your))
+         (converged (converge my old your :conflict t)))
+    (values (genome-string
+             (try-reconcile-conflicts converged))
+            (count-conflicts converged))))
+
+(deftest reconcile-after-converge ()
+  (is (equal '("[1, 4, 6]" 2)
+             (multiple-value-list
+              (try-merge "[1, 4, 3]" "[1, 2, 3]" "[1, 2, 6]"))))
+  (is (equal '("let x = 1; let y = 4; let z = 6" 2)
+             (multiple-value-list
+              (try-merge "let x = 1; let y = 4; let z = 3"
+                         "let x = 1; let y = 2; let z = 3"
+                         "let x = 1; let y = 2; let z = 6")))))
+
 
 ;;; Additional tests of internals
 (deftest ast-size-test ()
