@@ -1,6 +1,5 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  LOCAL_IMAGE_NAME: '$CI_PROJECT_PATH-$CI_COMMIT_REF_NAME-$CI_PIPELINE_ID'
 
 default:
   image: $DOCKER_REGISTRY/$CI_PROJECT_NAMESPACE/sel
@@ -39,10 +38,9 @@ binary-release:
     paths:
       - resolve
   script:
-    - rm -f /tmp/$(basename $LOCAL_IMAGE_NAME).cid
-    - docker run --cidfile=/tmp/$(basename $LOCAL_IMAGE_NAME).cid $LOCAL_IMAGE_NAME /bin/bash -c "sbcl --script build.lisp && ccl --load build.lisp"
-    - docker cp $(cat /tmp/$(basename $LOCAL_IMAGE_NAME).cid):/root/quicklisp/local-projects/resolve/build resolve
-    - rm -f /tmp/$(basename $LOCAL_IMAGE_NAME).cid
+    - sbcl --script build.lisp && ccl --load build.lisp
+  only:
+    - master
 
 dependents:
   stage: deploy
