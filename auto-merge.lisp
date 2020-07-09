@@ -183,7 +183,7 @@ Extra keys are passed through to EVOLVE.")
     (note 2 "Populate candidate merge resolutions.")
     (let* ((initial (converge my old your :conflict t))
            (converged (try-reconcile-conflicts initial))
-           (*population* (populate converged))
+           *population*
            ;; Because each variant is tested against a test suite,
            ;; where the test script may be repeated over an index, the
            ;; return value of `fitness' is not a number but a list of
@@ -205,6 +205,8 @@ Extra keys are passed through to EVOLVE.")
       (unless (get-conflicts converged)
         (note 2 "No conflicts found.")
         (return-from resolve converged))
+
+      (setf *population* (populate converged))
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Number of conflicts found: ~d."
