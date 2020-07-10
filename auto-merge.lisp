@@ -157,11 +157,11 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
              ((equal? old your) my)
              (t node)))
       (otherwise node)))
-  (:method ((file file-w-attributes))
+  (:method ((file auto-mergeable))
     (copy file
           :genome (mapcar #'try-reconcile-conflicts
                           (genome file))))
-  (:method ((project project))
+  (:method ((project auto-mergeable-project))
     (map-project-files #'try-reconcile-conflicts project)))
 
 (defgeneric resolve (my old your test &rest rest

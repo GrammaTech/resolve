@@ -1594,9 +1594,9 @@
   (count-if (of-type 'conflict-ast) (genome sw)))
 
 (defun try-merge (my old your)
-  (let* ((my (from-string (make 'sel/sw/javascript:javascript) my))
-         (old (from-string (make 'sel/sw/javascript:javascript) old))
-         (your (from-string (make 'sel/sw/javascript:javascript) your))
+  (let* ((my (create-auto-mergeable (from-string (make 'javascript) my)))
+         (old (create-auto-mergeable (from-string (make 'javascript) old)))
+         (your (create-auto-mergeable (from-string (make 'javascript) your)))
          (converged (converge my old your :conflict t)))
     (values (genome-string
              (try-reconcile-conflicts converged))
