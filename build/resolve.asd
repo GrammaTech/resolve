@@ -1,3 +1,6 @@
+(defsystem "resolve"
+    :class asdf/bundle:prebuilt-system)
+
 (defsystem "resolve/core"
   :class asdf/bundle:prebuilt-system
   :version "0.0.0"
