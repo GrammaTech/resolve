@@ -66,6 +66,10 @@ being inserted and removed, but also all the parts of the trees that
 remain the same.  This enables a printed representation of the diff
 to be created by walking the diff.
 
+Diffs can be decomposed into edit trees -- a tree of nested edits
+where each subedit is isolated relative to it parent.  In practice,
+edits tend to decompose naturally in this way.
+
 ## Merging Diffs
 
 The merge algorithm operates on three ASTs: a root AST ("original"),
@@ -101,7 +105,65 @@ Merged:  `x , a  b , z`
 
 which is not syntactically correct.
 
-The problem here is the default respresentation doesn't know that the
+The problem here is the default representation doesn't know that the
 comma has to be replicated.  The solution will be to enrich the AST
 representation so the separators are not explicitly represented in
 leaf strings, but instead are introduced during unparsing.
+
+## Motivation and History
+
+Resolve was developed to provide a diff/merge algorithm integrated into
+the Software Evolution Library.  While based on ideas from preexisting
+tooling, such as Gumtree, Resolve is not intended to supersede them.
+
+Resolve's development has been motivated by practical considerations.
+The algorithms should be fast, and should produce results that programmers
+find to be natural and useful.   This is contrast to some academic
+work where the goal is to find algorithms that are guaranteed to find
+optimal (in some specific sense) edits with running times that are
+often some higher degree polynomial in the size of the ASTs.
+
+We took a practical approach to developing the diff algorithm, using
+it on "real" code and seeing where it performed well and where it did
+not.  An example of this: for diffing long sequences of (for example)
+statement ASTs, we had at first implemented the usual O(mn) dynamic
+programming algorithm.  But we found that in practice this was
+overkill: in essentially all cases, the heuristic algorithm that first
+identifies long common subsequences would produce the same edit, but
+up to orders of magnitude faster.  This was known before (the old line
+oriented Unix diff algorithm did this, for example).
+
+Experience on real code showed that we needed to be able to move code
+up and down the AST (wrap and unwrap), as this is a common idiom in code
+differences (for example, wrapping an if statement around a code block).
+We took the same practical approach to this, using heuristics to limit
+search at the cost of sometimes not producing the very best edits.
+
+## Areas for Future Research
+
+### Heuristics for Fast Tree Comparison
+
+It's useful to be able to quickly determine if two subtrees are good candidates
+for recursive application of the differencing algorithm (that is, the cost of
+the edit from one to the other may be small).   Find good algorithms for doing
+this.  An example might be compute the bag distance of leaf values between the
+two trees.
+
+### Sliding L1 Window Problem
+
+This problem comes up in quickly evaluating whether sequence wrapping/unwrapping
+is worth investigating.  Given a vector x and a longer vector y of nonnegative integers,
+compute the L1 norm of the the difference between x and contiguous subsequences of
+y of the same length as x.   For the L2 norm, this could be done by convolution using
+FFTs.  Is there an algorithm better than the trivial quadratic one for the L1
+case?
+
+### Graceful Degradation
+
+Modify the algorithm to quickly find a "good" edit, then (as time allows) gradually improve
+is.  This would mean maintaining some sort of graph representing the overall edit problem,
+with promising parts being progressively explored (or pruned off).
+
+### General Move Edits
+
+Allow order-violating motions of subtrees.
