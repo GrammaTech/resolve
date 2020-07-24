@@ -39,6 +39,7 @@ binary-release:
       - resolve
   script:
     - sbcl --script build.lisp && ccl --load build.lisp
+    - mv build resolve
   only:
     - master
 
