@@ -239,8 +239,7 @@ AST stub root indicating they were deleted from the project."
 (defun fixup-json-ast (ast fixer)
   "Ensure that AST is a valid JSON AST by calling FIXER on the list of children of each AST node."
   (mapcar (lambda (node)
-            (if (and (typep node 'javascript-ast)
-                     (eql :objectexpression (ast-class node)))
+            (if (typep node 'js-object-expression)
                 (nest
                  (copy node :children)
                  (funcall fixer (children node)))
@@ -280,11 +279,6 @@ When a property node is removed, any subsequent children that are not JavaScript
 
 Only the last occurrence of each child is retained (per the behavior of Node.js)."
   (nest
-   (flet ((property-name (p)
-            (nest
-             (source-text)
-             (find-if (of-type 'javascript-ast))
-             (children p)))))
    (let ((runs
           (runs children
                 :test (lambda (x y)
@@ -294,10 +288,9 @@ Only the last occurrence of each child is retained (per the behavior of Node.js)
    (delete-duplicates runs :test)
    (lambda (x y)
      (multiple-value-match (values (first x) (first y))
-       (((and x (class javascript-ast (class :property)))
-         (and y (class javascript-ast (class :property))))
-        (equal (property-name x)
-               (property-name y)))))))
+       (((js-property :js-key name1)
+         (js-property :js-key name2))
+        (equal name1 name2))))))
 
 (defmethod phenome ((obj auto-mergeable-simple) &key bin)
   "Override phenome to write the simple text software object to disk
