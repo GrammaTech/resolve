@@ -1480,11 +1480,10 @@
     (with-fixture javascript-converge-conflict
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
-             (progn (replace-ast (copy *cnf*)
+             (progn (with (copy *cnf*)
                                  (first (conflict-nodes *cnf*))
                                  (aget :my (conflict-ast-child-alist
-                                            (first (conflict-nodes *cnf*))))
-                                 :literal t)
+                                            (first (conflict-nodes *cnf*)))))
                     (length (aget :my (conflict-ast-child-alist
                                        (car (conflict-nodes *cnf*)))))))))))
 
@@ -1506,15 +1505,14 @@
     (is (typep (@ *cnf* '(3)) 'conflict-ast)
         "Path (3) is a conflict ast in the original.")
     (let* ((old (@ *cnf* '(3)))
-           (new (replace-ast (copy *cnf*)
+           (new (with (copy *cnf*)
                              (ast-path *cnf* old)
-                             (aget :my (conflict-ast-child-alist old))
-                             :literal t)))
+                             (aget :my (conflict-ast-child-alist old)))))
       (is (typep (@ new '(3)) 'javascript-ast)
-          "Path (3) is a JavaScript ast in result of replace-ast.")
+          "Path (3) is a JavaScript ast in result of with.")
       (is (typep (@ *cnf* '(3)) 'conflict-ast)
           "Path (3) is STILL a conflict-ast in the original ~
-           after replace-ast."))))
+           after with."))))
 
 (deftest (resolve-to-selects-alternatives-of-conflicts
           :long-running) ()
@@ -1543,7 +1541,7 @@
       ;; NOTE: One could call `astyle' before calling `genome-string'
       ;;       to ensure more uniformity, but it doesn't matter yet.
       ;;
-      ;; NOTE: It may be that replace-ast is actually modifying the
+      ;; NOTE: It may be that with is actually modifying the
       ;;       original program's AST.  This is something to check.
       (is (string= (genome-string my)
                    (genome-string (aget :borders *variants*))))
