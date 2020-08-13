@@ -140,6 +140,9 @@ wrapping and unwrapping to be considered.")
 
 (defun clength (x) (iter (while (consp x)) (pop x) (summing 1)))
 
+(defmethod ast-class ((x ast))
+  (type-of x))
+
 (defmethod ccost ((x cons))
   (let ((conses nil))
     (let ((y x))
