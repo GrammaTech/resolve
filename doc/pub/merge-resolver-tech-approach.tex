@@ -1,0 +1,32 @@
+\mr works in two phases.  First it leverages GrammaTech's
+\gls{ast}-based software differencing (\autoref{ast-diff}) to find
+semantically meaningful differences between two versions of software
+against a shared base version, and to try to merge these differences
+resulting in a merged piece of software with possible areas of
+conflict.  Second \mr iterative steps through the identified chunks
+attempting to resolve them using standard resolution schemes
+identified in large-scale empirical reviews of software merging by
+real developers.  The final resolution is presented to users in the
+standard GitHub user interface (\autoref{github-api}).
+
+More detail on the \mr technique is available through the web-page for
+the GitHub application we built for
+\mr.\footnote{\url{https://mergeresolver.github.io/}}
+
+\begin{figure}
+  \begin{center}
+    \adjustbox{max width=\textwidth}{\includegraphics{figures/Screen_Shot_2020-06-11_at_10.png}}
+  \end{center}
+  \caption[AST-based software differencing]{\label{ast-diff}Results of
+    the application of \gls{ast}-based software differencing to a
+    real-world merge conflict form the popular JQuery JavaScript
+    repository.}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \adjustbox{max width=\textwidth}{\includegraphics{figures/screenshot-3.png}}
+  \end{center}
+  \caption[\mr GitHub API]{\label{github-api}\mr GitHub API in which developers can
+    accept a merge resolution.}  
+\end{figure}

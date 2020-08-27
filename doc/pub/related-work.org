@@ -1,0 +1,184 @@
+#+Title: Related Work.
+
+* Papers
+
+** An Empirical Examination of the Relationship Between Code Smells and Merge Conflicts
+
+** On the Nature of Merge Conflicts: a Study of 2,731 Open Source Java Projects Hosted by GitHub (TSE 2018)
+
+** Understanding semi-structured merge conflict characteristics in open-source Java projects （EMSE 2018）
+
+** Automatic Software Merging Using Automated Program Repair （IBF）
+
+** A state-of-the-art survey on software merging
+  :PROPERTIES:
+  :TITLE:    A state-of-the-art survey on software merging
+  :BTYPE:    article
+  :CUSTOM_ID: mens2002state
+  :AUTHOR:   Mens, Tom
+  :JOURNAL:  IEEE transactions on software engineering
+  :VOLUME:   28
+  :NUMBER:   5
+  :PAGES:    449--462
+  :YEAR:     2002
+  :PUBLISHER: IEEE
+  :END:
+
+A survey paper which should be read and cited.
+#+begin_quote
+5.6    Degree of Automation
+
+Merge tools can range from a manual--and often timeconsuming--process,
+over a semiautomated process that requires interaction with the user,
+to a fully automated approach. While differencing and conflict
+detection is usually fully automatic, conflict resolution is typically
+interactive. Only in very specific situations is it possible to fully
+automate the merge process. In the flexible merge framework of Munson
+and Dewan [43], one can make a fine-grained combination of interactive
+and automatic approaches.
+
+In order to resolve merge conflicts in an automated way, one can
+resort to automatic or default conflict resolution strategies [2],
+[42], [43]. For example, if all changes are tagged with a timestamp,
+we can decide to keep the entity with the most recent timestamp in
+case of a conflict.  Another strategy would be to keep a list of user
+priorities and the change by the user with the highest priority is
+included in the result.n
+
+Although using default resolution strategies is useful, it is not
+foolproof. Occasionally, the proposed solution needs to be revised
+manually after the merge has been performed because the merge tool
+took the wrong decision. Additionally, some conflicts are too complex
+to be resolved in an automatic way. For these conflicts, user
+interaction will always be required.
+#+end_quote
+
+Related to tree differencing.
+#+begin_quote
+If we want to perform syntactic merging, we first need to compare the
+delta between two syntax representations 0e.g., parse trees). Yang
+[66] describes a comparison tool for detecting syntactic differences
+between programs. An example of a syntactic delta algorithm
+specifically destined to find the difference between UML TM diagrams
+is the Rational Rose TM Visual Differencing tool.
+
+If we prefer semantic merging, we need to calculate semantic
+differences between two versions of a program.  This is achieved by
+Semantic Diff [31], which expresses its results in terms of the
+observable input-output behavior.
+#+end_quote
+
+** Merging models based on given correspondences
+  :PROPERTIES:
+  :TITLE:    Merging models based on given correspondences
+  :BTYPE:    inproceedings
+  :CUSTOM_ID: pottinger2003merging
+  :AUTHOR:   Pottinger, Rachel A and Bernstein, Philip A
+  :BOOKTITLE: Proceedings of the 29th international conference on Very large data bases-Volume 29
+  :PAGES:    862--873
+  :YEAR:     2003
+  :ORGANIZATION: VLDB Endowment
+  :END:
+Presents an algorithm for merging /models/ ("a formal description of a
+complex application artifact").  Doesn't appear to claim to fully
+automate conflict resolution, only to generalize pre-existing merge
+algorithms for more specific structures (e.g., only for XML).
+
+** Abstract Semantic Differencing via Speculative Correlation
+  :PROPERTIES:
+  :TITLE:    Abstract Semantic Differencing via Speculative Correlation
+  :BTYPE:    inproceedings
+  :CUSTOM_ID: Partush:2014:ASD:2660193.2660245
+  :AUTHOR:   Partush, Nimrod and Yahav, Eran
+  :BOOKTITLE: Proceedings of the 2014 ACM International Conference on Object Oriented Programming Systems Languages \& Applications
+  :SERIES:   OOPSLA '14
+  :YEAR:     2014
+  :ISBN:     978-1-4503-2585-1
+  :LOCATION: Portland, Oregon, USA
+  :PAGES:    811--828
+  :NUMPAGES: 18
+  :URL:      http://doi.acm.org/10.1145/2660193.2660245
+  :DOI:      10.1145/2660193.2660245
+  :ACMID:    2660245
+  :PUBLISHER: ACM
+  :ADDRESS:  New York, NY, USA
+  :KEYWORDS: abstract interpretation, differential analysis, equivalence checking, numerical domains, patches, semantic diff
+  :END:
+They use a correlating abstract domain that lets them calculate
+differences between any two interleavings of a program.
+
+They present a speculative search algorithm to find an interleaving
+with minimal abstract semantic difference.
+** Semantic Diff: A Tool for Summarizing the Effects of Modifications.
+  :PROPERTIES:
+  :TITLE:    Semantic Diff: A Tool for Summarizing the Effects of Modifications.
+  :BTYPE:    inproceedings
+  :CUSTOM_ID: jackson1994semantic
+  :AUTHOR:   Jackson, Daniel and Ladd, David A and others
+  :BOOKTITLE: ICSM
+  :VOLUME:   94
+  :PAGES:    243--252
+  :YEAR:     1994
+  :END:
+Expresses differences between two versions of a procedure by looking
+at the relations between their I/O behavior.
+
+Uses static analysis to determine dependence behavior between
+variables in the procedure, and then compares these dependency
+relations between the different versions of the procedure.
+
+** Identifying syntactic differences between two programs
+  :PROPERTIES:
+  :TITLE:    Identifying syntactic differences between two programs
+  :BTYPE:    article
+  :CUSTOM_ID: yang1991identifying
+  :AUTHOR:   Yang, Wuu
+  :JOURNAL:  Software: Practice and Experience
+  :VOLUME:   21
+  :NUMBER:   7
+  :PAGES:    739--755
+  :YEAR:     1991
+  :PUBLISHER: Wiley Online Library
+  :END:
+Present a tree-based differencing engine which prints the two programs
+"synchronously" with the differences highlighted.
+* Patents
+** Automatic synchronization conflict resolution 
+https://patents.google.com/patent/US20110218964A1/en
+
+Differences noticed between two computing devices.  Then "rule-based"
+conflict resolution is performed ("based at least in part on a type of
+the change" made at each computing device) to resolve the conflicts,
+and a notice of the resolution is sent to the second computing device.
+
+** Digital document change conflict resolution
+https://patents.google.com/patent/US20160034433A1/en
+
+Resolve conflicts by asking the user or by applying "conflict
+resolution rule(s)" to choose between the first and second changes.
+
+** Automatic conflict resolution 
+https://patents.google.com/patent/US20110004702A1/en
+
+A file of condition/action tuples is read and used to pre-process
+conflicting files before a merge is performed.
+
+** Collaborative model for software systems with synchronization submodel with merge feature, automatic conflict resolution and isolation of potential changes for reuse
+https://patents.google.com/patent/US6678882B1/en
+
+This looks related, but super-high level and vague.  Lots of talk of
+human actors collaborating by sharing objects.
+
+** Automated merging in a software development environment 
+https://patents.google.com/patent/US20090210852A1/en
+
+Talks a lot about "worklists" of elements which should and should not
+be merged.  Only talk about conflicts is manual.
+
+** Pre-merge conflict avoidance 
+https://patents.google.com/patent/US20130036400A1/en
+
+A system to notify a developer (presumably on commit) that there are
+potentially conflicting changes in other developers versions of the
+code.
+
