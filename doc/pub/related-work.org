@@ -1,6 +1,84 @@
 #+Title: Related Work.
 
 * Papers
+** Evaluating and improving semistructured merge
+https://spgroup.github.io/s3m/eis.html
+https://github.com/guilhermejccavalcanti/jFSTMerge
+
+** Fine-grained and accurate source code differencing
+ They provide a tool for accessing the "edit script" encapsulating the
+ evolution of a software project.  The tool goes beyond line-by-line
+ edits to capture abstract syntax tree edits, including *moves* of
+ code.
+
+ Tow problems in state of the art AST differencing.
+ 1. Handling move actions.
+ 2. Scaling to fine-grained ASTs with thousands of nodes.
+
+ Edit actions
+ - updateValue :: changes the value of a node
+ - add :: adds a node
+ - delete :: removes a node
+ - move :: moves a node
+
+ Heuristic edit script generation (in two phases).
+ 1. Establish a mapping between nodes.
+ 2. Based on the mapping deduce the edit script.
+
+*** Architecture
+ :  file1.c------+   +---->AST1----+
+ :               v   |             v
+ :               Parser          Mapping---->Actions
+ :               ^   |             ^            |
+ :  file2.c------+   +---->AST2----+            v
+ :                                          Edit Script
+
+ - Parser used is customizable.
+
+*** \sect 5.1 Research questions
+ - RQ1 :: Does GumTree do a good job.
+ - RQ2 :: Is GumTree better than =diff=.
+
+ Answered with review of 144 revisions by 3 independent reviewers.
+
+*** \sect 5.2 automatic evaluation
+ Compared against RTED and ChangeDistiller.
+
+*** \sect 5.3 Comparison of moves between GT and CD
+ Claiming GT moves are more precise.
+** Accurate and Efficient Refactoring Detection in Commit History
+** IntelliMerge: a refactoring-aware software merging technique
+They compare against what they claim is the leading semi-structured
+merge tool for Java, [[*Evaluating and improving semistructured merge][Evaluating and improving semistructured merge]].
+
+Their technique does "top down" and "bottom up" merging.  The "top
+down" bit uses /signatures/ to identify elements which are consistent
+between versions.  This is useful in that it allows them to detect
+moves and to reduce the merging problem.
+- They can find moves between files by looking for signature matches.
+- They throw away as much as possible as quickly as possible
+- For subsequent "bottom-up" matching they pool by program element
+  kind reducing the size/complexity.
+
+Their bottom-up merging doesn't actually replay specific refactorings,
+but they have two types 1-1 easy and m-n hard heuristics for matching,
+each of these classes of heuristics match big sets of types of
+refactorings.  I'm not clear how they merge the refactorings (didn't
+get that far).
+
+Relevant references to follow:
+- jFSTMerge [[*Evaluating and improving semistructured merge][Evaluating and improving semistructured merge]]
+- Gumtree [[*Fine-grained and accurate source code differencing][Fine-grained and accurate source code differencing]]
+- RefactoringMiner [[*Accurate and Efficient Refactoring Detection in Commit History][Accurate and Efficient Refactoring Detection in Commit History]]
+
+Notes:
+- We should treat top-level "moves" (which we should identify with
+  signatures) differently from promotions/demotions (which we can
+  handle by extending our existing tree differencing).
+- It might be interesting to try to explode a single big commit into
+  smaller edits, each of which are "between" either side of the big
+  change and which also parse or pass the test suite (or some other
+  quality metric).
 
 ** An Empirical Examination of the Relationship Between Code Smells and Merge Conflicts
 
@@ -126,7 +204,6 @@ at the relations between their I/O behavior.
 Uses static analysis to determine dependence behavior between
 variables in the procedure, and then compares these dependency
 relations between the different versions of the procedure.
-
 ** Identifying syntactic differences between two programs
   :PROPERTIES:
   :TITLE:    Identifying syntactic differences between two programs
@@ -142,6 +219,87 @@ relations between the different versions of the procedure.
   :END:
 Present a tree-based differencing engine which prints the two programs
 "synchronously" with the differences highlighted.
+** Verified three-way program merge
+** An Efficient Algorithm for Type-Safe Structural Diffing
+** Automatic Software Merging using Automated Program Repair
+- Repository -- https://github.com/stan6/mergeconflict
+** Software merge: semantics of combining changes to programs
+** Semistructured merge: rethinking merge in revision control systems
+** Extensible language-aware merging
+** Syntactic software merging
+** Balancing precision and performance in structured merge
+Why do no practical structured-merge tools exist for mainstream
+programming languages?
+1. tools must commit to a particular language, so have to use a
+   different tool for every language
+2. structured merge algorithms are typically cubic
+
+Their solution to speed issues is to "auto-tune" their merge algorithm
+and only do structured when a conflict is detected.
+
+Important to note that structured merge can help by understanding when
+movement can be semantics preserving.  E.g., order of definition of
+methods doesn't matter.
+
+Language-specific properties useful for structured merge
+- order does or does not matter for children of different elements
+- some elements have a fixed number of children
+
+Figure 1 has good examples of semantics mattering.
+- it can realize conflicts aren't real
+- it can find conflicts *not* found by line-based perge
+
+Notes data-flow can be useful.  Consider LLVM-assisted merge?
+
+Section 3.2.1 gives implementation details.  Could be useful if we
+decide to implement something similar.
+
+Results
+- 60% more conflicts detected than unstructured (because of ordering
+  things), with 21% fewer lines of conflict (smaller conflicts)
+- 5% of changed files can not be merged with normal merge, 2% with
+  structured merge
+
+** The life-cycle of merge conflicts: processes, barriers, and strategies
+Conducted semi-structured interviews with developers to discuss
+merges.
+- developers defer responding to conflicts based on their perception
+  of the complexity, this deferral affects the whole team
+- developers visually view code to evaluate their resolution
+- perceptions alter the impact of tools to aid in merge
+
+General notes and background
+- Report conflicts in 19% of all merges
+- Developers are more concerned with the complexity of the merged code
+  over the size of the conflicts to be resolved
+- discussion of other "operations-based merging" techniques which
+  record and replay series of edits to good effect (requires editor
+  integration)
+
+Interview results
+- in developer "evaluation phase" some just compile, some also test,
+  some manually review
+- some developers use tools like "pager duty" to get notices of
+  conflicts so they can quickly push fixes so they don't get "broken
+  code"
+- some monitor commits to avoid conflicts in VC because they don't
+  understand git
+- developers interested in merging quickly to avoid things getting
+  worse
+** A Study of Merge-Conflict Resolutions in Open-Source Software
+Chalmers university of technology Masters Thesis.
+
+See also [[*Comprehending How Merge Conflicts Developed in an Open Source Software Project][Comprehending How Merge Conflicts Developed in an Open Source Software Project]].
+
+** Comprehending How Merge Conflicts Developed in an Open Source Software Project
+** Integrating noninterfering versions of programs
+First Reps publication with his wife.
+
+Cite related to merging and automatic merge conflict resolution.
+
+** Identifying the semantic and textual differences between two versions of a program
+** Using semantic differencing to reduce the cost of regression testing
+
 * Patents
 ** Automatic synchronization conflict resolution 
 https://patents.google.com/patent/US20110218964A1/en
