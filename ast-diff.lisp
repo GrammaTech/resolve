@@ -28,6 +28,7 @@
    :gt/full
    :software-evolution-library
    :software-evolution-library/software/parseable
+   :software-evolution-library/software/non-homologous-parseable
    :software-evolution-library/software/clang
    :software-evolution-library/software/simple
    :software-evolution-library/software/source
@@ -36,6 +37,9 @@
    :cl-heap)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-RST+)
+  (:shadowing-import-from :functional-trees
+   :child-slots :slot-spec-slot
+   :children-alist :slot-specifier)
   (:export
    :ast-cost
    :ast-size
@@ -140,6 +144,9 @@ wrapping and unwrapping to be considered.")
 
 (defun clength (x) (iter (while (consp x)) (pop x) (summing 1)))
 
+(defgeneric ast-class (ast)
+  (:documentation "This was previously defined in sel/software/ast"))
+
 (defmethod ast-class ((x ast))
   (type-of x))
 
@@ -166,16 +173,23 @@ wrapping and unwrapping to be considered.")
   (:documentation "Return cost of AST."))
 
 (defmethod ast-cost ((ast ast))
-  (reduce #'+ (children ast) :key #'ast-cost :initial-value 1))
+  (cl:reduce #'+ (children ast) :key #'ast-cost :initial-value 1))
+
+(defmethod ast-cost ((ast non-homologous-ast))
+  (cl:reduce #'+ (standardized-children ast) :key #'ast-cost :initial-value 1))
+
+;; Slot-specifiers are introduced as markers in the standardized-children
+;; lists of non-homologous-ast nodes, and should not contribute the
+;; the cost.
+(defmethod ast-cost ((ss slot-specifier)) 0)
 
 (defmethod ast-cost ((ast t))
   1)
 
-(defmethod ast-cost ((ast string))
-  (let ((len (length ast)))
-    (if *ignore-whitespace*
-        (- len (count-if #'whitespacep ast))
-        len)))
+(defmethod ast-cost ((s string))
+  (if *ignore-whitespace*
+      (count-if-not #'whitespacep s)
+      (length s)))
 
 (defmethod ast-cost ((ast vector))
   (length ast))
@@ -613,7 +627,8 @@ differencing of specialized AST structures.; `equal?',
   (let (diff cost)
     (when (eql (ast-class ast-a) (ast-class ast-b))
       (setf (values diff cost)
-            (ast-diff*-lists (children ast-a) (children ast-b)
+            (ast-diff*-lists (standardized-children ast-a)
+                             (standardized-children ast-b)
                              ast-a ast-b)))
     (when *wrap*
       (multiple-value-bind (wrap-diff wrap-cost)
@@ -629,7 +644,6 @@ differencing of specialized AST structures.; `equal?',
     (if diff
         (values diff cost)
         (call-next-method))))
-
 
 (defun map-ast-while-path (ast fn &optional path)
   "Apply FN to the nodes of AST A, stopping
@@ -776,7 +790,7 @@ out of one tree and turns it into another."))
       (values best-candidate best-cost))))
 
 (defgeneric ast-child-check (a b &optional reverse?)
-  (:documentation 
+  (:documentation
    "Check that A is 'close enough' to some child of b")
   (:method ((a ast) (b ast) &optional reverse?)
     (let* ((a-cost (ast-cost a))
@@ -1937,6 +1951,8 @@ be applied in that context."))
 (defun actual-ast-patch (ast script &rest keys
                         &key delete? (meld? (ast-meld-p ast)) &allow-other-keys)
   (declare (ignorable delete? meld?))
+  (assert (typep ast 'ast))
+  (assert (not (typep ast 'non-homologous-ast)))
   (let* ((children (children ast))
          ;; For now, always meld
          ;; This may not give valid ASTs, but fix later
@@ -1947,10 +1963,33 @@ be applied in that context."))
            (iter (for new-children in new-child-lists)
                  (collect (copy ast :children new-children))))))
 
+(defun actual-non-homologous-ast-patch (ast script &rest keys
+                                        &key delete? (meld? (ast-meld-p ast))
+                                        &allow-other-keys)
+  ;; Outline of approach:
+  ;;  Build a "fake children" list which contains slot specifiers for the named children
+  ;;  slots, and also the non-empty interleaved text
+  ;;  Compute diff on these list
+  ;;  Convert these lists back to interleaved-text and child lists
+  (declare (ignorable delete? meld?))
+  (let* ((schildren (standardized-children ast))
+         (new-schild-lists
+           (multiple-value-list
+            (apply #'ast-patch* schildren script :meld? meld? keys))))
+    (apply #'values
+           (iter (for new-schildren in new-schild-lists)
+                 (collect (copy-with-standardized-children ast new-schildren))))))
+
 (defmethod ast-patch* ((ast ast) (script list) &rest keys
                        &key &allow-other-keys)
   (if (listp (car script))
       (apply #'actual-ast-patch ast script keys)
+      (call-next-method)))
+
+(defmethod ast-patch* ((ast non-homologous-ast) (script list) &rest keys
+                        &key &allow-other-keys)
+  (if (listp (car script))
+      (apply #'actual-non-homologous-ast-patch ast script keys)
       (call-next-method)))
 
 (defmethod ast-patch* ((original t) (script cons)
@@ -3029,3 +3068,67 @@ a tail of diff-a, and a tail of diff-b.")
                                          (>= s22 (+ s12 l1))))))
                 (push triple selected-triples)))
         (sort selected-triples #'< :key #'car)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Conversion functions for handling variants of ast nodes
+
+;;; The problem solved here is to put different kinds of
+;;; ast nodes into a form ameanable to the diff and patch
+;;; algorithms, so they may be handled together.
+
+(defgeneric standardized-children (ast)
+  (:documentation "Obtain a standardized CHILDREN list for ast."))
+
+(defgeneric copy-with-standardized-children (ast standardized-children &key &allow-other-keys)
+  (:documentation "Make a copy of AST, but use STANDARDIZED-CHILDREN
+and convert it back to whatever internal form this kind of AST uses."))
+
+(defmethod standardized-children ((ast ast))
+  "The default method uses the ordinary CHILDREN function"
+  (children ast))
+
+(defmethod standardized-children ((ast non-homologous-ast))
+  (let ((itext (interleaved-text ast))
+        (calist (children-alist ast)))
+    (assert (= ;; (1+ (length calist))
+             (reduce #'+ calist :key [#'1- #'length] :initial-value 1)
+             (length itext))
+            ()
+            "Length mismatch in child alist, interleaved text lists:~%~a~%~s~%"
+            calist itext)
+    (cons (car itext)
+          (iter (for (child-spec . vals) in (children-alist ast))
+                (appending (cons child-spec
+                                 (iter (for v in vals)
+                                       (collecting v)
+                                       (collecting (pop itext)))))))))
+
+(defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
+  "The default method uses ordinary copy, treating the children list
+as the ordinary children list."
+  (apply #'copy ast :children children args))
+
+(defmethod copy-with-standardized-children ((ast non-homologous-ast) (children list) &rest args)
+  (assert (or (null children)
+              (typep (car children) 'slot-specifier)))
+  ;; Must extract the interleaved-text strings
+  (let* ((itext (if (stringp (car children))
+                    (list (pop children))
+                    (list "")))
+         (child-alist
+           (iter (while children)
+                 (collecting
+                   (cons (car children)
+                         (iter (pop children)
+                               (while children)
+                               (while (not (typep (car children) 'slot-specifier)))
+                               (if (stringp (car children))
+                                   (push (pop children) itext)
+                                   (collecting (pop children)))))))))
+    (setf itext (nreverse itext))
+    (let ((calen (length child-alist)))
+      (assert (eql calen (length (child-slots ast))))
+      (assert (eql calen (1- (length itext)))))
+    (apply #'copy-with-children-alist ast child-alist :interleaved-text itext args)))
