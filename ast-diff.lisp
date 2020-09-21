@@ -1972,6 +1972,7 @@ be applied in that context."))
   ;;  Compute diff on these list
   ;;  Convert these lists back to interleaved-text and child lists
   (declare (ignorable delete? meld?))
+  (check-child-lists ast)
   (let* ((schildren (standardized-children ast))
          (new-schild-lists
            (multiple-value-list
@@ -3090,16 +3091,18 @@ and convert it back to whatever internal form this kind of AST uses."))
   (children ast))
 
 (defmethod standardized-children ((ast non-homologous-ast))
+  (check-child-lists ast)
   (let ((itext (interleaved-text ast))
-        (calist (children-alist ast)))
+        (calist (children-slot-specifier-alist ast)))
     (assert (= ;; (1+ (length calist))
-             (reduce #'+ calist :key [#'1- #'length] :initial-value 1)
+             (reduce #'+ calist :key (lambda (p) (length (cdr p)))
+                                :initial-value 1)
              (length itext))
             ()
             "Length mismatch in child alist, interleaved text lists:~%~a~%~s~%"
             calist itext)
-    (cons (car itext)
-          (iter (for (child-spec . vals) in (children-alist ast))
+    (cons (pop itext)
+          (iter (for (child-spec . vals) in calist)
                 (appending (cons child-spec
                                  (iter (for v in vals)
                                        (collecting v)
@@ -3108,27 +3111,145 @@ and convert it back to whatever internal form this kind of AST uses."))
 (defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
   "The default method uses ordinary copy, treating the children list
 as the ordinary children list."
-  (apply #'copy ast :children children args))
+  (let ((new (apply #'copy ast :children children :stored-hash nil args)))
+    (check-child-lists new)
+    new))
+
+(defun is-slot-specifier (obj)
+  (typep obj 'slot-specifier))
+
+(defun is-conflict-node-with-slot-specifier (node)
+  (and (typep node 'conflict-ast)
+       (some [{some #'is-slot-specifier} #'cdr]
+             (conflict-ast-child-alist node))))
 
 (defmethod copy-with-standardized-children ((ast non-homologous-ast) (children list) &rest args)
-  (assert (or (null children)
-              (typep (car children) 'slot-specifier)))
-  ;; Must extract the interleaved-text strings
-  (let* ((itext (if (stringp (car children))
-                    (list (pop children))
-                    (list "")))
-         (child-alist
-           (iter (while children)
-                 (collecting
-                   (cons (car children)
-                         (iter (pop children)
-                               (while children)
-                               (while (not (typep (car children) 'slot-specifier)))
-                               (if (stringp (car children))
-                                   (push (pop children) itext)
-                                   (collecting (pop children)))))))))
-    (setf itext (nreverse itext))
-    (let ((calen (length child-alist)))
-      (assert (eql calen (length (child-slots ast))))
-      (assert (eql calen (1- (length itext)))))
-    (apply #'copy-with-children-alist ast child-alist :interleaved-text itext args)))
+  (declaim (special *a* *c*))
+  ;; Remember state; used for debugging on failure
+  (setf *a* ast)
+  (setf *c* children)
+  (if (some #'is-conflict-node-with-slot-specifier children)
+      ;; Conflict that prevents creation of a node here
+      ;; Instead, combine any conflict nodes and move up to
+      ;; the parent
+      (sel/sw/parseable::combine-all-conflict-asts ast children)
+      ;; Must extract the interleaved-text strings
+      (multiple-value-bind (child-alist itext)
+          (unstandardize-children children)
+        (if (and (equal? itext (interleaved-text ast))
+                 (equal? child-alist (children-alist ast))
+                 (null args))
+            ast
+            (let ((calen (length child-alist)))
+              (setf child-alist
+                    (iter (for ss in (child-slot-specifiers ast))
+                          (let ((p (assoc ss child-alist)))
+                            (collecting (or p (list ss))))))
+              ;; These checks are problematic
+              ;; Conditionalize them out for now
+              #+nil
+              (assert (eql calen (length (child-slots ast)))
+                      ()
+                      "CHILD-ALIST and (CHILD-SLOTS AST) have different lengths.~%~a~%~a~%~a~%~a" child-alist (child-slots ast) ast children)
+              #+nil
+              (assert (eql (length itext) (cl:reduce #'+ child-alist :key [#'length #'cdr] :initial-value 1))
+                ()
+                "Lengths mismatch:  itext = ~s, child-alist = ~a" itext child-alist)
+              (let ((new (apply #'copy-with-children-alist ast child-alist
+                                :stored-hash nil
+                                :interleaved-text itext args)))
+                (check-child-lists new)
+                new))))))
+
+
+(defmethod combine-all-conflict-asts ((parent non-homologous-ast) (child-list list))
+  (multiple-value-bind (alist def)
+      (combine-conflict-asts-in-list child-list)
+    (make-instance
+     'conflict-ast
+     :child-alist (iter (for (k . children) in alist)
+                        (collecting (list k (copy-with-standardized-children parent children))))
+     :default-children (list (copy-with-standardized-children parent def)))))
+
+(defun unstandardize-children (children)
+  "Extract interleaved-text from a standardized list of children,
+introducing empty strings or merging strings as needed."
+  ;; Note that this fails if there's a non-string child that occurs
+  ;; before any slot-specifier.  This may happen, for example,
+  ;; if a conflict node is generated that "swallows" slot-specifiers.
+  ;; For that reason, conflict nodes need to be moved up to the parent
+  ;; level when that happens.
+  (let ((s nil)
+        (itext nil)
+        (child-alist nil)
+        (ss nil))
+    (loop
+      (unless children (return))
+      (let ((c (pop children)))
+        (typecase c
+          (string (setf s (concatenate 'string s c)))
+          (slot-specifier
+           (push (list c) child-alist))
+          (otherwise
+           (unless child-alist
+             (error "Child ~a occurs before any slot-specifier" c))
+           (push (or s "") itext)
+           (setf s nil)
+           (push c (cdar child-alist))))))
+    (push (or s "") itext)
+    (dolist (p child-alist)
+      (setf (cdr p) (nreverse (cdr p))))
+    (values (nreverse child-alist) (nreverse itext))))
+
+(defgeneric check-child-lists (ast)
+  (:documentation "Checks if the child slots of AST have appropriate
+contents."))
+
+(defmethod check-child-lists (ast) ast) ;; default
+(defmethod check-child-lists ((ast node))
+  (let ((child-slots (child-slots ast)))
+    (iter (for (name . arity) in child-slots)
+          (let ((v (slot-value ast name)))
+            (if (eql arity 1)
+                (assert (not (consp v))
+                        ()
+                        "Arity 1 slot has a nonempty list: ~a, ~a"
+                        name v)
+                (assert (and (listp v)
+                             (not (some #'listp v)))
+                        ()
+                        "General child slot has improper contents: ~a, ~a"
+                        name v)))))
+  ast)
+
+#|
+(defgeneric check-children (node)
+  (:documentation "Check that the child slots of NODE are appropriate"))
+
+(defmethod check-children ((node t)) t)
+(defmethod check-children ((node non-homologous-ast))
+  (let ((sslist (child-slot-specifiers node)))
+    (iter (for ss in sslist)
+          (let ((v (slot-value node (slot-specifier-slot ss))))
+            (
+|#
+
+(defun dump-ast (ast)
+  (dump-ast* ast 0))
+
+(defgeneric dump-ast* (ast indent)
+  (:method ((ast t) (indent integer)) (format t "~v@{ ~}~s~%" indent ast))
+  (:method ((ast functional-tree-ast) (indent integer))
+    (format t "~v@{ ~}~a~%" indent (ast-class ast))
+    (let ((n2 (+ indent 2)))
+      (mapc {dump-ast* _ n2} (children ast))))
+  (:method ((ast non-homologous-ast) (indent integer))
+    (format t "~v@{ ~}~a~%" indent (ast-class ast))
+    (format t "~v@{ ~}~s~%" indent (interleaved-text ast))
+    (dolist (ss (child-slot-specifiers ast))
+      (let ((s (ft::slot-specifier-slot ss))
+            (n2 (+ indent 2)))
+        (format t "~v@{ ~}~a:~%" indent s)
+        (if (eql (ft::slot-specifier-arity ss) 1)
+            (dump-ast* (slot-value ast s) n2)
+            (mapc {dump-ast* _ n2} (slot-value ast s)))))))
