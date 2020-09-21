@@ -57,7 +57,7 @@
    :merge3
    :converge
    :show-chunks
-   :merge-diffs-on-syms
+v   :merge-diffs-on-syms
    ;; Functions needed by alist.lisp
    :record-unstable
    :merge-diffs2
@@ -1200,7 +1200,7 @@ Prefix and postfix returned as additional values."
                 (while (or (not w) (not uw)))
                 (when (consp d)
                   (case (car d)
-                    (:same (incf i) (incf j))
+                    ((:same :replace) (incf i) (incf j))
                     (:delete (incf i))
                     (:insert (incf j))
                     (:recurse
@@ -1262,6 +1262,7 @@ Prefix and postfix returned as additional values."
        (:bad most-positive-fixnum)
        (:insert (+ base-cost (ast-cost (cdr diff))))
        (:delete (+ base-cost (if (cdr diff) (ast-cost (cdr diff)) 1)))
+       (:replace (+ base-cost (ast-cost (cadr diff)) (ast-cost (caddr diff))))
        ((:recurse-tail :recurse) (diff-cost (cdr diff)))
        ((:insert-sequence :delete-sequence)
         (+ base-cost
@@ -1606,6 +1607,11 @@ Returns a list of edit tree nodes for these nodes."
                (push action collected-actions)
                (incf changes)
                (incf source-position))
+              (:replace
+               (push action collected-actions)
+               (incf changes)
+               (incf target-position)
+               (incf source-position))
               (:insert-sequence
                (push action collected-actions)
                (let ((n (length (cdr action))))
@@ -1891,6 +1897,11 @@ is shorter, replicate the last value (or NIL if none)."
 (defmacro delete-eop-old (e) `(cdr ,e))
 (defun copy-delete-eop (e) (cons :delete (delete-eop-old e)))
 
+(deftype replace-eop () '(cons (eql :replace) (cons t (cons t null))))
+(defun replace-eop-p (e) (typep e 'replace-eop))
+(defmacro replace-eop-old (e) `(cadr ,e))
+(defmacro replace-eop-new (e) `(caddr ,e))
+
 (deftype recurse-eop () '(cons (eql :recurse) t))
 (defun recurse-eop-p (e) (typep e 'recurse-eop))
 (defmacro recurse-eop-ops (e) `(cdr ,e))
@@ -1926,6 +1937,7 @@ is shorter, replicate the last value (or NIL if none)."
 A diff is a sequence of actions as returned by `ast-diff' including:
 :same A  : keep the current AST
 :insert B  : insert B at the current position
+:replace A B : remove the current AST A, replacing it with B
 :delete A  : remove the current AST
 :recurse S : recursively apply script S to the current AST
 :wrap S <path> <left-wrap> <right-wrap> <classes> <new> : Apply S to current AST,
@@ -2079,6 +2091,9 @@ process with the rest of the script."
                    (ecase (car action)
                      ((nil) nil)
                      (:insert (list (cdr action)))
+                     (:replace
+                      (setf consume t)
+                      (list (caddr action)))
                      (:delete
                       (setf consume t)
                       nil)
@@ -2242,6 +2257,12 @@ process with the rest of the script."
              (cons (combine-conflict-asts conflict-node (car rest))
                    (cdr rest))
              (cons conflict-node rest)))
+       (record-conflict (asts script)
+         (multiple-value-bind (conflict-node asts-rest)
+             (ast-patch-conflict-action
+              asts (list (list (car script))))
+           (let ((rest (edit asts-rest (cdr script))))
+             (merge-conflict-ast conflict-node rest))))
        (edit (asts script)
          ;; Returns multiple values, depending on the value of MELD
          ;; When MELD is false, return a single value if there are no
@@ -2327,11 +2348,7 @@ process with the rest of the script."
                       (edit (cdr asts) (cdr script)))))
                   (conflict
                    ;; Record this, since it conflicts with :old
-                   (multiple-value-bind (conflict-node asts-rest)
-                       (ast-patch-conflict-action
-                        asts (list (list (car script))))
-                     (let ((rest (edit asts-rest (cdr script))))
-                       (merge-conflict-ast conflict-node rest))))
+                   (record-conflict asts script))
                   ;; The key DELETE?, if NIL (default T) will
                   ;; cause :DELETE edits to be ignored.  The
                   ;; use case for this is to do a kind of binary
@@ -2342,6 +2359,30 @@ process with the rest of the script."
                   (t
                    (cons-values meld?
                                 (car asts) (edit (cdr asts) (cdr script))))))
+
+               (:replace
+                (assert (equal? (car asts) (car args)) ()
+                        "AST-PATCH* (CONS): ~
+                         :REPLACE not same as in script: ~a, ~a"
+                        (car asts) (car args))
+                (cond
+                  (tag
+                   ;; implicit :SAME on other tags
+                   (let ((alist (iter (for i in '(:old :my :your))
+                                      (if (eql i tag)
+                                          (collecting (list i (cadr args)))
+                                          (collecting (list i (car asts)))))))
+                     (merge-conflict-asts
+                      (make-instance 'conflict-ast :child-alist alist)
+                      (edit (cdr asts) (cdr script)))))
+                  (conflict
+                   ;; Record this, since it conflicts with :old
+                   (record-conflict asts script))
+                  (delete?
+                   (cons-values meld? (cadr args) (edit (cdr asts) (cdr script))))
+                  (t
+                   (cons-values meld? (cadr args) (edit asts (cdr script))))))
+                   
                (:insert
                 (if tag
                     (let ((alist `((,tag ,args))))
@@ -2394,6 +2435,7 @@ and replicating the others."
                 (flet ((%check (s1 s2)
                          (assert (equal? s1 s2) () "MELD-SCRIPTS ~a: ~
                                  should have been the same: ~a, ~a" val s1 s2)))
+                  
                   (switch (val :test #'equal)
                     ('(:same :same)
                       (%check (cdar script1) (cdar script2))
@@ -2425,6 +2467,31 @@ and replicating the others."
                       (collect (pop script2)))
                     ('(:recurse :recurse)
                       ;; should not happen?
+                      (pop script2)
+                      (collect (pop script1)))
+                    ('(:replace :same)
+                      (%check (cadar script1) (cdar script2))
+                      (collect (pop script1))
+                      (pop script2))
+                    ('(:replace :delete)
+                      (%check (cadar script1) (cdar script2))
+                      (collect (pop script1)))
+                    ('(:replace :replace)
+                      (%check (cadar script1) (cadar script2))
+                      (pop script2)
+                      (collect (pop script1)))
+                    ('(:replace :recurse)
+                      (pop script2)
+                      (collect (pop script1)))
+                    ('(:same :replace)
+                      (%check (cdar script1) (cadar script2))
+                      (pop script1)
+                      (collect (pop script2)))
+                    ('(:delete :replace)
+                      (%check (cdar script1) (cadar script2))
+                      (pop script1)
+                      (collect (pop script2)))
+                    ('(:recurse :replace)
                       (pop script2)
                       (collect (pop script1)))
                     (t (error "Do not recognize actions in meld-scripts: ~A, ~A"
@@ -2491,6 +2558,12 @@ and replicating the others."
             (assert (< i len))
             (assert (equalp args (elt original i)))
             (incf i))
+           (:replace
+            (assert (typep (cadr args) etype))
+            (assert (< i len))
+            (assert (equalp (car args) (elt original i)))
+            (incf i)
+            (vector-push-extend (cadr args) result))
            (:recurse
             (assert (< i len))
             (let ((vals (multiple-value-list
@@ -2641,6 +2714,13 @@ Numerous options are provided to control presentation."
                                        (:same (pr content))
                                        (:delete (push-delete content))
                                        (:insert (push-insert content))
+                                       ;; The :replace case is used only when
+                                       ;; sort-insert-delete is NIL.  Otherwise,
+                                       ;; these have been broken up into :insert
+                                       ;; and :delete already                                     
+                                       (:replace
+                                        (push-insert (cadr content))
+                                        (push-delete (car content)))
                                        (:recurse (%print-diff content))
                                        (:same-sequence (map nil #'pr content))
                                        (:insert-sequence
@@ -2664,13 +2744,16 @@ Numerous options are provided to control presentation."
 
 (defun put-inserts-before-deletes (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the
-   inserts preceed the deletes."
+   inserts preceed the deletes.  Also, split :replace into
+   :insert and :delete"
   (let ((saved-deletes nil))
     (nconc
      (iter (for d in diff)
            (case (car d)
              (:insert (collecting d))
              (:delete (push d saved-deletes))
+             (:replace (collecting `(:insert . ,(caddr d)))
+              (push `(:delete ,(cadr d)) saved-deletes))
              (t (appending (nreverse saved-deletes))
                 (setf saved-deletes nil)
                 (collecting d))))
@@ -2763,6 +2846,8 @@ a tail of diff-a, and a tail of diff-b.")
   ;; (values (list (car o-b)) o-a (cdr o-b))
   (:method ((sym-a (eql :same)) (sym-b (eql :delete)) o-a o-b)
     (handle-conflict o-a o-b :unstable nil :use-b t))
+  (:method ((sym-a (eql :same)) (sym-b (eql :replace)) o-a o-b)
+    (handle-conflict o-a o-b :unstable nil :use-b t))
   (:method ((sym-a (eql :same)) (sym-b (eql :recurse)) o-a o-b)
     (handle-conflict o-a o-b :use-b t :unstable nil))
 
@@ -2779,6 +2864,10 @@ a tail of diff-a, and a tail of diff-b.")
   ;; sym-a is :insert
   (:method ((sym-a (eql :insert)) (sym-b (eql :insert)) o-a o-b)
     (handle-conflict o-a o-b))
+  (:method ((sym-a (eql :insert)) (sym-b (eql :replace)) o-a o-b)
+    (if (equal? (cdar o-a) (caddar o-b))
+        (handle-conflict o-a o-b :unstable nil :use-b t)
+        (call-next-method)))
   ;; default cases for :insert
   (:method ((sym-a (eql :insert)) (sym-b t) o-a o-b)
     (handle-conflict o-a o-b :unstable nil :leave-b t))
@@ -2793,6 +2882,10 @@ a tail of diff-a, and a tail of diff-b.")
     (record-unstable o-a o-b)
     ;; Do insert first, keep the delete around
     (handle-conflict o-a o-b :unstable nil :leave-a t))
+  (:method ((sym-a (eql :delete)) (sym-b (eql :replace)) o-a o-b)
+    (if (equal? (cdar o-a) (cadar o-b))
+        (handle-conflict o-a o-b :unstable nil :use-b t)
+        (handle-conflict o-a o-b :unstable t)))
   (:method ((sym-a (eql :delete)) (sym-b null) o-a o-b)
     (handle-conflict o-a o-b :leave-b t))
   (:method ((sym-a (eql :delete)) (sym-b (eql :same)) o-a o-b)
@@ -2810,6 +2903,8 @@ a tail of diff-a, and a tail of diff-b.")
 
   ;; sym-a is :recurse
   (:method ((sym-a (eql :recurse)) (sym-b (eql :delete)) o-a o-b)
+    (handle-conflict o-a o-b :unstable t))
+  (:method ((sym-a (eql :recurse)) (sym-b (eql :replace)) o-a o-b)
     (handle-conflict o-a o-b :unstable t))
   (:method ((sym-a (eql :recurse)) (sym-b null) o-a o-b)
     (handle-conflict o-a o-b :unstable t :leave-b t))
@@ -2834,6 +2929,19 @@ a tail of diff-a, and a tail of diff-b.")
 
   (:method ((sym-a null) (sym-b t) o-a o-b)
     (handle-conflict o-a o-b :leave-a t))
+
+  (:method ((sym-a (eql :replace)) (sym-b (eql :same)) o-a o-b)
+    (handle-conflict o-a o-b :unstable nil))
+  (:method ((sym-a (eql :replace)) (sym-b (eql :insert)) o-a o-b)
+    (if (equal? (caddar o-a) (cdar o-b))
+        (handle-conflict o-a o-b :unstable nil)
+        (handle-conflict o-a o-b :unstable t)))
+  (:method ((sym-a (eql :replace)) (sym-b (eql :delete)) o-a o-b)
+    (if (equal? (cadar o-a) (cdar o-b))
+        (handle-conflict o-a o-b :unstable nil)
+        (handle-conflict o-a o-b :unstable t)))
+  (:method ((sym-a (eql :replace)) (sym-b (eql :recurse)) o-a o-b)
+    (handle-conflict o-a o-b :unstable t))
 
   ;; do not handle these for now
   (:method ((sym-a (eql :same-tail)) (sym-b (eql :same)) o-a o-b)

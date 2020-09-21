@@ -329,6 +329,10 @@
   (is (equalp (ast-patch '1 '((:insert . 2) (:delete . 1))) 2)
       "Insert followed by delete in patch"))
 
+(deftest sexp-replace ()
+  (is (equalp (ast-patch '(1) '((:replace 1 2) (:same . :nil))) '(2))
+      "Replace leaf value by another value"))
+
 (deftest sexp-two-differences ()
   (is (equalp (ast-patch '(1 2 3 4 5) (ast-diff '(1 2 3 4 5) '(1 6 3 7 5)))
 	      '(1 6 3 7 5))
