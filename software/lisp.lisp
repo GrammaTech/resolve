@@ -3,7 +3,8 @@
         :resolve/ast-diff
         :software-evolution-library
         :software-evolution-library/software/parseable
-        :software-evolution-library/software/lisp))
+        :software-evolution-library/software/lisp)
+  (:import-from :resolve/ast-diff :ast-class))
 (in-package :resolve/software/lisp)
 (in-readtable :curry-compose-reader-macros)
 
