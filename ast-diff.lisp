@@ -1179,13 +1179,15 @@ Prefix and postfix returned as additional values."
                      ;; of ast-diff*
                      ;; HACK -- if this is a full replacement, just splice it in
                      (let ((diff (ast-diff* a b)))
-                       (if (and (eql (length diff) 2)
-                                (or (null (set-exclusive-or diff `((:delete . ,a) (:insert . ,b))
-                                                            :test #'equal))
-                                    (equal diff `((:replace ,a ,b)))))
-                           ;; diff
-                           `((:replace .a ,b))
-                           (list (cons :recurse (ast-diff* a b))))))))
+                       (cond
+                         ((equal diff `((:replace ,a ,b)))
+                          diff)
+                         ((and (eql (length diff) 2)
+                               (null (set-exclusive-or diff `((:delete . ,a) (:insert . ,b))
+                                                       :test #'equal)))
+                          `((:replace ,a ,b)))
+                         (t
+                          (list (cons :recurse (ast-diff* a b)))))))))
              (:wrap-sequence
               (assert (> dest-a 1))
               (assert (> dest-b 0))
