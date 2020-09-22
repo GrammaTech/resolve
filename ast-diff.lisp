@@ -220,6 +220,9 @@ can be recursed on if STRINGS is true (defaults to true)"))
     (write-string "." stream)
     (source-text ast stream)))
 
+(defmethod source-text ((ast slot-specifier) &optional stream)
+  (write-sequence "" stream))
+
 (defgeneric ast-to-list-form (ast)
   (:documentation "Convert ast into a more readable list form")
   (:method ((ast ast))
