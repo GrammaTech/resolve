@@ -569,6 +569,25 @@ differencing of specialized AST structures.; `equal?',
             (t
              (multiple-value-bind (diff cost)
                  (call-next-method)
+               ;; Check for insert, delete pairs
+               ;; When we find one, replace with a :REPLACE edit
+               (let* ((changed nil)
+                      (e diff)
+                      (new-diff
+                        (iter (while e)
+                              (cond
+                                ((and (consp (car e))
+                                      (consp (cadr e))
+                                      (eql (caar e) :insert)
+                                      (eql (caadr e) :delete))
+                                 (setf changed t)
+                                 (collecting
+                                   `(:replace ,(cdr (cadr e)) ,(cdr (car e))))
+                                 (pop e) (pop e))
+                                (t (collecting (pop e)))))))
+                 (when changed
+                   (setf diff new-diff
+                         cost (diff-cost new-diff))))
                (when (>= ast-diff-counter hash-upper-limit)
                  (setf ast-diff-counter
                        (thin-ast-diff-table ast-diff-cache ast-diff-counter)))
@@ -1029,8 +1048,8 @@ Prefix and postfix returned as additional values."
                              :src (aref nodes (1- a) b)
                              :dest node :kind :delete)
                           (rd-node-in-arcs node))
-                    (when (and (> b 0) (ast-can-recurse (aref vec-a (1- a))
-                                                        (aref vec-b (1- b))))
+                    (when (> b 0 ) ;; (and (> b 0) (ast-can-recurse (aref vec-a (1- a))
+                                   ;;                     (aref vec-b (1- b))))
                       (push (make-rd-link
                              ;; :a (1- a) :b (1- b)
                              :src (aref nodes (1- a) (1- b))
@@ -1151,17 +1170,22 @@ Prefix and postfix returned as additional values."
              (:same-or-recurse
               (assert a)
               (assert b)
-              (if (equal? a b)
-                  (list (cons :same a))
-                  ;; Recursive -- we exploit the caching :around method
-                  ;; of ast-diff*
-                  ;; HACK -- if this is a full replacement, just splice it in
-                  (let ((diff (ast-diff* a b)))
-                    (if (and (eql (length diff) 2)
-                             (null (set-exclusive-or diff `((:delete . ,a) (:insert . ,b))
-                                                     :test #'equal)))
-                        diff
-                        (list (cons :recurse (ast-diff* a b)))))))
+              (cond ((equal? a b)
+                     (list (cons :same a)))
+                    ((not (ast-can-recurse a b))
+                     (list (list :replace a b)))
+                    (t
+                     ;; Recursive -- we exploit the caching :around method
+                     ;; of ast-diff*
+                     ;; HACK -- if this is a full replacement, just splice it in
+                     (let ((diff (ast-diff* a b)))
+                       (if (and (eql (length diff) 2)
+                                (or (null (set-exclusive-or diff `((:delete . ,a) (:insert . ,b))
+                                                            :test #'equal))
+                                    (equal diff `((:replace ,a ,b)))))
+                           ;; diff
+                           `((:replace .a ,b))
+                           (list (cons :recurse (ast-diff* a b))))))))
              (:wrap-sequence
               (assert (> dest-a 1))
               (assert (> dest-b 0))
@@ -1354,7 +1378,7 @@ value that is used instead."
   #+debug (format t "ast-diff[T] ~S~%" (mapcar #'class-of (list ast-a ast-b)))
   (if (equal ast-a ast-b)
       (values `((:same . ,ast-a)) 0)
-      (values `((:insert . ,ast-b) (:delete . ,ast-a))
+      (values `((:replace ,ast-a ,ast-b)) ; `((:insert . ,ast-b) (:delete . ,ast-a))
               (+ *base-cost* (ast-cost ast-a) (ast-cost ast-b)))))
 
 (defmethod ast-diff* ((ast-a list) (ast-b list))
@@ -2060,6 +2084,12 @@ be applied in that context."))
                       keys
                       original (cdar script))
               (cdadr script))
+             ((equal keys '(:replace))
+              (assert (equal? original (cadar script))
+                      ()
+                      "AST-PATCH*: ~a not the same as in script: ~a, ~a"
+                      keys original (cadar script))
+              (caddar script))
              ((member :conflict keys)
               (values-list (iter (for s in (cdr script))
                                  (collect (ast-patch* original s)))))
@@ -2372,7 +2402,7 @@ process with the rest of the script."
                                       (if (eql i tag)
                                           (collecting (list i (cadr args)))
                                           (collecting (list i (car asts)))))))
-                     (merge-conflict-asts
+                     (merge-conflict-ast
                       (make-instance 'conflict-ast :child-alist alist)
                       (edit (cdr asts) (cdr script)))))
                   (conflict
@@ -2940,6 +2970,8 @@ a tail of diff-a, and a tail of diff-b.")
     (if (equal? (cadar o-a) (cdar o-b))
         (handle-conflict o-a o-b :unstable nil)
         (handle-conflict o-a o-b :unstable t)))
+  (:method ((sym-a (eql :replace)) (sym-b (eql :replace)) o-a o-b)
+    (handle-conflict o-a o-b :unstable t))
   (:method ((sym-a (eql :replace)) (sym-b (eql :recurse)) o-a o-b)
     (handle-conflict o-a o-b :unstable t))
 
