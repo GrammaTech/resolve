@@ -25,7 +25,9 @@
         :resolve/software/lisp)
   (:import-from :uiop/stream :read-file-forms)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
-                :put-inserts-before-deletes)
+                :put-inserts-before-deletes
+                :has-conflict-node-before-slot-specifiers
+                :slot-specifier)
   (:import-from :software-evolution-library/command-line
                 :create-software
                 :create-test-suite)
@@ -577,6 +579,15 @@
   (with-fixture resolve-asd-file-forms
     (is (zerop (nth-value 1 (ast-diff *forms* *forms*)))
         "Handles forms from a lisp source file.")))
+
+(deftest has-conflict-node-before-slot-specifiers.test ()
+  (let ((c (make-instance 'sel/sw/parseable:conflict-ast))
+        (s (make-instance 'slot-specifier)))
+    (is (has-conflict-node-before-slot-specifiers (list c)))
+    (is (not (has-conflict-node-before-slot-specifiers ())))
+    (is (not (has-conflict-node-before-slot-specifiers (list 'a))))
+    (is (has-conflict-node-before-slot-specifiers (list 'a c s 'b)))
+    (is (not (has-conflict-node-before-slot-specifiers (list s c))))))
 
 
 ;;;; Clang AST Diff tests

@@ -3268,12 +3268,19 @@ as the ordinary children list."
        (some [{some #'is-slot-specifier} #'cdr]
              (conflict-ast-child-alist node))))
 
+(defun has-conflict-node-before-slot-specifiers (children)
+  (iter (for c in children)
+        (typecase c
+          (slot-specifier (return nil))
+          (conflict-ast (return t)))))
+
 (defmethod copy-with-standardized-children ((ast non-homologous-ast) (children list) &rest args)
   (declaim (special *a* *c*))
   ;; Remember state; used for debugging on failure
   (setf *a* ast)
   (setf *c* children)
-  (if (some #'is-conflict-node-with-slot-specifier children)
+  (if (or (some #'is-conflict-node-with-slot-specifier children)
+          (has-conflict-node-before-slot-specifiers children))
       ;; Conflict that prevents creation of a node here
       ;; Instead, combine any conflict nodes and move up to
       ;; the parent
