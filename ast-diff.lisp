@@ -3289,7 +3289,11 @@ as the ordinary children list."
       (multiple-value-bind (child-alist itext)
           (unstandardize-children children)
         (if (and (equal? itext (interleaved-text ast))
-                 (equal? child-alist (children-alist ast))
+                 (equal? (mapcar (lambda (p)
+                                   (cons (ft::slot-specifier-slot (car p))
+                                         (cdr p)))
+                                 child-alist)
+                         (children-alist ast))
                  (null args))
             ast
             (let ((calen (length child-alist)))
@@ -3355,7 +3359,7 @@ introducing empty strings or merging strings as needed."
 
 (defgeneric check-child-lists (ast)
   (:documentation "Checks if the child slots of AST have appropriate
-contents."))
+contents.  Uses ASSERT to cause failure if they do not."))
 
 (defmethod check-child-lists (ast) ast) ;; default
 (defmethod check-child-lists ((ast node))
@@ -3374,17 +3378,7 @@ contents."))
                         name v)))))
   ast)
 
-#|
-(defgeneric check-children (node)
-  (:documentation "Check that the child slots of NODE are appropriate"))
-
-(defmethod check-children ((node t)) t)
-(defmethod check-children ((node non-homologous-ast))
-  (let ((sslist (child-slot-specifiers node)))
-    (iter (for ss in sslist)
-          (let ((v (slot-value node (slot-specifier-slot ss))))
-            (
-|#
+;;; Informational printing of AST structure, used for debugging
 
 (defun dump-ast (ast)
   (dump-ast* ast 0))
