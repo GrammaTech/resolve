@@ -27,6 +27,9 @@
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
                 :put-inserts-before-deletes
                 :has-conflict-node-before-slot-specifiers
+                :standardized-children
+                :unstandardize-children
+                :copy-with-standardized-children
                 :slot-specifier)
   (:import-from :software-evolution-library/command-line
                 :create-software
@@ -301,6 +304,15 @@
   (is (equal (multiple-value-list
               (ast-diff " abc " "  abc  " :strings nil :ignore-whitespace t))
              '(((:insert-sequence . "  abc  ") (:delete-sequence . " abc ")) 4))))
+
+(deftest sexp-diff-string.17 ()
+  (let ((s1 "abc")
+        (s2 (make-array '(3) :element-type 'character
+                             :initial-contents '(#\a #\b #\c)
+                             :adjustable t)))
+    (is (string= s1 s2))
+    (is (equal (multiple-value-list (ast-diff s1 s2 :strings t))
+               '(((:same-sequence . "abc")) 0)))))
 
 (deftest sexp-diff-vector.1 ()
   (is (equalp (multiple-value-list
@@ -588,6 +600,12 @@
     (is (not (has-conflict-node-before-slot-specifiers (list 'a))))
     (is (has-conflict-node-before-slot-specifiers (list 'a c s 'b)))
     (is (not (has-conflict-node-before-slot-specifiers (list s c))))))
+
+(deftest standarized-children.test ()
+  (let* ((g (genome (from-string (make 'javascript) "[1,2,3]")))
+         (g2 (copy-with-standardized-children
+              g (standardized-children g))))
+    (is (equal? g g2))))
 
 
 ;;;; Clang AST Diff tests
@@ -1595,10 +1613,13 @@
        (write-string-into-file good (path-join dir "problem.js")))
      (write-string-into-file bad (path-join my "problem.js")))
    (finishes
-     (resolve (create-auto-mergeable (create-software my))
-              (create-auto-mergeable (create-software orig))
-              (create-auto-mergeable (create-software your))
-              {auto-merge-test _ (create-test-suite "true" 1)}))))
+     (let ((my-sw (create-software my))
+           (orig-sw (create-software orig))
+           (your-sw (create-software your)))
+       (resolve (create-auto-mergeable my-sw)
+                (create-auto-mergeable orig-sw)
+                (create-auto-mergeable your-sw)
+                {auto-merge-test _ (create-test-suite "true" 1)})))))
 
 (defun count-conflicts (sw)
   (count-if (of-type 'conflict-ast) (genome sw)))
