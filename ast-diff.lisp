@@ -57,7 +57,7 @@
    :merge3
    :converge
    :show-chunks
-v   :merge-diffs-on-syms
+   :merge-diffs-on-syms
    ;; Functions needed by alist.lisp
    :record-unstable
    :merge-diffs2
