@@ -1599,6 +1599,7 @@
                   *population*))
        "Population has no conflict ASTs remaining.")))
 
+#+nil
 (deftest can-merge-when-one-side-is-invalid ()
   (nest
    (with-temporary-directory (:pathname orig))
