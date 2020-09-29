@@ -39,6 +39,11 @@
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
+  (:import-from :functional-trees :slot-specifier :slot-specifier-slot
+   :slot-specifier-arity :slot-specifier-for-slot)
+  (:import-from :software-evolution-library/software/non-homologous-parseable
+                :interleaved-text)
+
   (:import-from :software-evolution-library/utility/task :task-map)
   (:export ;; auto-mergeable data structures
            :auto-mergeable
@@ -382,11 +387,66 @@ conflict AST resolution with an alternative option."
          (new-resolution (resolve-conflict-ast conflict-ast
                                                :strategy strategy))
          (conflict-path (ast-path software (car prior-resolution)))
+         lccp
          (parent (@ software (butlast conflict-path))))
+    #+auto-mergeable-debug
+    (progn
+      (format t "conflict-ast = ~a~%" conflict-ast)
+      (format t "strategy = ~a~%" strategy)
+      (format t "prior-resolution = ~a~%" prior-resolution)
+      (format t "new-resolution = ~a~%" new-resolution)
+      (format t "conflict-path = ~a~%" conflict-path)
+      (format t "parent = ~a~%" parent))
     ;; Replace the prior resolution children with the new resolution
-    (if (null conflict-path)
-        `((:set (:stmt1 . ,conflict-path)
-                (:literal1 . ,(car new-resolution))))
+    (cond
+      ((null conflict-path)
+       `((:set (:stmt1 . ,conflict-path)
+               (:literal1 . ,(car new-resolution)))))
+      ((typep (setf lccp (lastcar conflict-path))
+              '(cons (or slot-specifier symbol) integer))
+       (destructuring-bind (ss . index)
+           lccp
+         (when (symbolp ss)
+           (setf ss (slot-specifier-for-slot parent ss)))
+         (let ((arity (slot-specifier-arity ss))
+               (slot (slot-specifier-slot ss)))
+           #+auto-mergeable-debug
+           (progn
+             (format t "slot = ~a~%" slot)
+             (format t "arity = ~a~%" arity)
+             (format t "slot-value = ~a~%" (slot-value parent slot)))
+           (if (eql arity 1)
+           `((:set (:stmt1 . ,parent)
+                   (:literal1 .
+                              ,(copy parent
+                                     slot
+                                     (car new-resolution)))))
+           (let ((pos (position (@ parent lccp) (remove-if #'stringp (children parent))))
+                 (prior-len (length prior-resolution))
+                 (new-len (length new-resolution)))
+             (assert pos)
+             (let* ((itext (interleaved-text parent))
+                    (new-interleaved-text
+                      (if (< new-len prior-len)
+                          (append (subseq itext 0 (1+ pos))
+                                  (subseq itext (+ pos (- prior-len new-len))))
+                          (if (> new-len prior-len)
+                              (append (subseq itext 0 (1+ pos))
+                                      (make-list (- new-len prior-len) :initial-element "")
+                                      (subseq itext (1+ pos)))
+                              itext))))
+               `((:set (:stmt1 . ,parent)
+                       (:literal1 .
+                                  ,(copy parent
+                                         :interleaved-text new-interleaved-text
+                                         slot
+                                         (let ((prior-children (slot-value parent slot)))
+                                           (append (subseq prior-children 0 index)
+                                                   new-resolution
+                                                   (subseq prior-children
+                                                           (+ index
+                                                              prior-len))))))))))))))
+      (t
         `((:set (:stmt1 . ,parent)
                 (:literal1 .
                            ,(copy parent :children
@@ -396,7 +456,7 @@ conflict AST resolution with an alternative option."
                                           new-resolution
                                           (subseq (children parent)
                                                   (+ (lastcar conflict-path)
-                                                     (length prior-resolution)))))))))))
+                                                     (length prior-resolution))))))))))))
 
 (defmethod apply-mutation ((software auto-mergeable-simple)
                            (mutation new-conflict-resolution))
