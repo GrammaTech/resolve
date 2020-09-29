@@ -3275,7 +3275,7 @@ as the ordinary children list."
           (conflict-ast (return t)))))
 
 (defmethod copy-with-standardized-children ((ast non-homologous-ast) (children list) &rest args)
-  (declaim (special *a* *c*))
+  (declare (special *a* *c*))
   ;; Remember state; used for debugging on failure
   (setf *a* ast)
   (setf *c* children)
@@ -3316,7 +3316,6 @@ as the ordinary children list."
                                 :interleaved-text itext args)))
                 (check-child-lists new)
                 new))))))
-
 
 (defmethod combine-all-conflict-asts ((parent non-homologous-ast) (child-list list))
   (multiple-value-bind (alist def)
