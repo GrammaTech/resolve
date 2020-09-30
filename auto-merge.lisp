@@ -163,7 +163,7 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
       (otherwise node)))
   (:method ((file auto-mergeable))
     (copy file
-          :genome (try-reconcile-conflicts (genome file))))
+          :genome (mapcar #'try-reconcile-conflicts (genome file))))
   (:method ((project auto-mergeable-project))
     (map-project-files #'try-reconcile-conflicts project)))
 
