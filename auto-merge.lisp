@@ -151,8 +151,11 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
 (defgeneric try-reconcile-conflicts (sw)
   (:method ((node t)) node)
   (:method ((node conflict-ast))
+    ;; Note that the child-alist slot of conflict-asts is no longer
+    ;; really an alist: it used to be that the cdr was a list of
+    ;; children, but now the cdr is always a list of a single element.
     (match (conflict-ast-child-alist node)
-      ((alist (:my . my) (:your . your) (:old . old))
+      ((alist (:my . (list my)) (:your . (list your)) (:old . (list old)))
        (cond ((equal? my your) my)
              ((equal? old my) your)
              ((equal? old your) my)
@@ -160,8 +163,7 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
       (otherwise node)))
   (:method ((file auto-mergeable))
     (copy file
-          :genome (mapcar #'try-reconcile-conflicts
-                          (genome file))))
+          :genome (try-reconcile-conflicts (genome file))))
   (:method ((project auto-mergeable-project))
     (map-project-files #'try-reconcile-conflicts project)))
 
