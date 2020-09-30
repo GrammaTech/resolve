@@ -3297,6 +3297,7 @@ as the ordinary children list."
                  (null args))
             ast
             (let ((calen (length child-alist)))
+              (declare (ignorable calen))
               (setf child-alist
                     (iter (for ss in (child-slot-specifiers ast))
                           (let ((p (assoc ss child-alist)))
@@ -3336,8 +3337,7 @@ introducing empty strings or merging strings as needed."
   ;; level when that happens.
   (let ((s nil)
         (itext nil)
-        (child-alist nil)
-        (ss nil))
+        (child-alist nil))
     (loop
       (unless children (return))
       (let ((c (pop children)))
