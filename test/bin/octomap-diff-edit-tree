@@ -1,6 +1,6 @@
 #!/bin/bash
 NUM_DIFFS="$(test/bin/octomap-diff --edit-tree|grep -c "Coherence")"
-if [ "$NUM_DIFFS" == "22" ];then
+if [ "$NUM_DIFFS" == "24" ];then
     echo PASS
     exit 0
 else

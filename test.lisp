@@ -25,7 +25,7 @@
         :resolve/software/lisp)
   (:import-from :uiop/stream :read-file-forms)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
-                :put-inserts-before-deletes
+                :simplify-diff-for-printing
                 :has-conflict-node-before-slot-specifiers
                 :standardized-children
                 :unstandardize-children
@@ -1674,13 +1674,13 @@
   (is (equal (unastify (copy (astify '(x y)))) '(x y)))
   (is (equal (unastify (copy (astify '(x . y)))) '(x . y))))
 
-(deftest put-inserts-before-deletes-test ()
-  (is (equal (put-inserts-before-deletes
+(deftest simplify-diff-for-printing-test ()
+  (is (equal (simplify-diff-for-printing
               '((:insert x) (:delete y) (:delete w)))
              '((:insert x) (:delete y) (:delete w))))
-  (is (equal (put-inserts-before-deletes '((:delete y) (:insert x)))
+  (is (equal (simplify-diff-for-printing '((:delete y) (:insert x)))
              '((:insert x) (:delete y))))
-  (is (equal (put-inserts-before-deletes
+  (is (equal (simplify-diff-for-printing
               '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))
              '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))))
 

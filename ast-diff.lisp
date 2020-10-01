@@ -2743,7 +2743,7 @@ Numerous options are provided to control presentation."
                  (t
                   (assert (every #'consp diff))
                   (when sort-insert-delete
-                    (setf diff (put-inserts-before-deletes diff)))
+                    (setf diff (simplify-diff-for-printing diff)))
                   (mapc (lambda-bind ((type . content))
                                      (ecase type
                                        (:same (pr content))
@@ -2777,21 +2777,29 @@ Numerous options are provided to control presentation."
       (purge)
       (values))))
 
-(defun put-inserts-before-deletes (diff)
+(defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the
-   inserts preceed the deletes.  Also, split :replace into
-   :insert and :delete"
+   inserts preceed the deletes.  Also, flatten :RECURSE and
+   remove :SAME of empty strings."
   (let ((saved-deletes nil))
     (nconc
-     (iter (for d in diff)
-           (case (car d)
-             (:insert (collecting d))
-             (:delete (push d saved-deletes))
-             (:replace (collecting `(:insert . ,(caddr d)))
-              (push `(:delete ,(cadr d)) saved-deletes))
-             (t (appending (nreverse saved-deletes))
-                (setf saved-deletes nil)
-                (collecting d))))
+     (iter (while diff)
+           (let ((d (pop diff)))
+             (flet ((%pop ()
+                      (appending (nreverse saved-deletes))
+                      (setf saved-deletes nil)
+                      (collecting d)))
+               (case (car d)
+                 (:insert (collecting d))
+                 (:delete (push d saved-deletes))
+                 (:recurse (if (listp (cadr d))
+                               (setf diff (append (cdr d) diff))
+                               (%pop)))
+                 (:replace (collecting `(:insert . ,(caddr d)))
+                  (push `(:delete ,(cadr d)) saved-deletes))
+                 (t
+                  (unless (equal d '(:same . ""))
+                    (%pop)))))))
      (nreverse saved-deletes))))
 
 
