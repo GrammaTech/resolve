@@ -427,14 +427,17 @@ conflict AST resolution with an alternative option."
              (assert pos)
              (let* ((itext (interleaved-text parent))
                     (new-interleaved-text
-                      (if (< new-len prior-len)
-                          (append (subseq itext 0 (1+ pos))
-                                  (subseq itext (+ pos (- prior-len new-len))))
-                          (if (> new-len prior-len)
-                              (append (subseq itext 0 (1+ pos))
-                                      (make-list (- new-len prior-len) :initial-element "")
-                                      (subseq itext (1+ pos)))
-                              itext))))
+                     ;; This "works" in the sense of making the tests pass, but
+                     ;; it's not clean.  The best solution will be to change to
+                     ;; ast nodes without interleaved-text.
+                     (if (< new-len prior-len)
+                         (append (subseq itext 0 (1+ pos))
+                                 (subseq itext (+ pos (- prior-len new-len))))
+                         (if (> new-len prior-len)
+                             (append (subseq itext 0 (1+ pos))
+                                     (make-list (- new-len prior-len) :initial-element "")
+                                     (subseq itext (1+ pos)))
+                             itext))))
                `((:set (:stmt1 . ,parent)
                        (:literal1 .
                                   ,(copy parent
