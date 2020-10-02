@@ -2779,7 +2779,7 @@ Numerous options are provided to control presentation."
 
 (defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the
-   inserts preceed the deletes.  Also, flatten :RECURSE and
+   inserts precede the deletes.  Also, flatten :RECURSE and
    remove :SAME of empty strings."
   (let ((saved-deletes nil))
     (nconc
