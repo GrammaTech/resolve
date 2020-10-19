@@ -4,7 +4,7 @@
         #+gt :testbot
         :software-evolution-library
         :software-evolution-library/utility/debug
-        :software-evolution-library/stefil-plus
+        :stefil+
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
         :software-evolution-library/software/clang
@@ -68,7 +68,7 @@
 
 (defun run-batch (&rest a)
   (declare (ignorable a))
-  (setf sel/stefil+:*long-tests* t)
+  (setf stefil+:*long-tests* t)
   (batch-test #'test "RESOLVE" +resolve-branch+))
 
 (define-constant +etc-dir+
