@@ -23,6 +23,7 @@
         :resolve/software/auto-mergeable
         :resolve/software/parseable
         :resolve/software/lisp)
+  #+gt (:shadowing-import-from :testbot :batch-test)
   (:import-from :uiop/stream :read-file-forms)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
                 :simplify-diff-for-printing
