@@ -575,22 +575,28 @@ command-line options processed by the returned function."
           num-tests (resolve-num-tests-from-num-tests num-tests)
           tests (create-test-suite test-script num-tests))
     (note 2 "Create software objects.")
-    (to-file (apply #'resolve
-                    (create-auto-mergeable
-                     (expand-options-for-which-files language "MY"
-                      :ignore-paths ignore-paths
-                      :ignore-other-paths ignore-paths
-                      :threads num-threads))
-                    (create-auto-mergeable
-                     (expand-options-for-which-files language "OLD"
-                      :ignore-paths ignore-paths
-                      :ignore-other-paths ignore-paths
-                      :threads num-threads))
-                    (create-auto-mergeable
-                     (expand-options-for-which-files language "YOUR"
-                      :ignore-paths ignore-paths
-                      :ignore-other-paths ignore-paths
-                      :threads num-threads))
+    (let ((my (create-auto-mergeable
+               (expand-options-for-which-files
+                language "MY"
+                :ignore-paths ignore-paths
+                :ignore-other-paths ignore-paths
+                :threads num-threads)))
+          (old (create-auto-mergeable
+                (expand-options-for-which-files
+                 language "OLD"
+                 :ignore-paths ignore-paths
+                 :ignore-other-paths ignore-paths
+                 :threads num-threads)))
+          (your (create-auto-mergeable
+                 (expand-options-for-which-files
+                  language "YOUR"
+                  :ignore-paths ignore-paths
+                  :ignore-other-paths ignore-paths
+                  :threads num-threads))))
+      (note 2 "Resolve differences")
+      (let ((result
+             (apply #'resolve
+                    my old your
                     {auto-merge-test _ tests}
                     :num-threads num-threads
                     :strings strings
@@ -600,9 +606,11 @@ command-line options processed by the returned function."
                     :max-wrap-diff max-wrap
                     (append (when evolve (list :evolve? evolve))
                             (when max-evals (list :max-evals max-evals))
-                            (when max-time (list :max-time max-time))))
-             (if (directory-pathname-p my-file)
-                 (make-pathname :directory (append out-dir '("auto-merged")))
-                 (make-pathname :directory out-dir
-                                :name "auto-merged"
-                                :type (pathname-type my-file))))))
+                            (when max-time (list :max-time max-time))))))
+        (note 2 "Emit result")
+        (to-file result
+                 (if (directory-pathname-p my-file)
+                     (make-pathname :directory (append out-dir '("auto-merged")))
+                     (make-pathname :directory out-dir
+                                    :name "auto-merged"
+                                    :type (pathname-type my-file))))))))
