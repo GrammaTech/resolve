@@ -579,20 +579,20 @@ command-line options processed by the returned function."
                (expand-options-for-which-files
                 language "MY"
                 :ignore-paths ignore-paths
-                :ignore-other-paths ignore-paths
-                :threads num-threads)))
+                :ignore-other-paths ignore-paths)
+               :threads num-threads))
           (old (create-auto-mergeable
                 (expand-options-for-which-files
                  language "OLD"
                  :ignore-paths ignore-paths
-                 :ignore-other-paths ignore-paths
-                 :threads num-threads)))
+                 :ignore-other-paths ignore-paths)
+                :threads num-threads))
           (your (create-auto-mergeable
                  (expand-options-for-which-files
                   language "YOUR"
                   :ignore-paths ignore-paths
-                  :ignore-other-paths ignore-paths
-                  :threads num-threads))))
+                  :ignore-other-paths ignore-paths)
+                 :threads num-threads)))
       (note 2 "Resolve differences")
       (let ((result
              (apply #'resolve
