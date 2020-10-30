@@ -548,7 +548,8 @@ See `ast-patch' for more details on edit scripts.
 The following generic functions may be specialized to configure
 differencing of specialized AST structures.; `equal?',
 `ast-cost' and `ast-can-recurse'."))
-(let ((ast-diff-cache (make-hash-table))
+
+(let ((ast-diff-cache (make-hash-table :size 1021))
       (ast-diff-counter 0)
       (hash-upper-limit 100000000))
   (declare (type (integer 0 2000000000) ast-diff-counter))
