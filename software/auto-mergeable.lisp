@@ -104,7 +104,7 @@
     (change-class (copy obj) 'auto-mergeable-json))
   (:method ((obj lisp) &key)
     (change-class (copy obj) 'auto-mergeable-lisp))
-  (:method ((obj project) &key (threads 1))
+  (:method ((obj project) &key (threads 1) already-merged)
     (labels ((task-filter (fn objects)
                (nest
                 (map 'list #'cdr)
@@ -116,10 +116,14 @@
                           objects)))
              (parseable-file-p (file-obj-pair)
                "Filter files which can be parsed into ASTs."
-               (when (typep (cdr file-obj-pair) 'parseable)
-                 (handler-case
-                     (genome (cdr file-obj-pair))
-                   (mutate (c) (declare (ignorable c)) nil))))
+               (nest
+                (when (typep (cdr file-obj-pair) 'parseable))
+                (unless (member (car file-obj-pair)
+                                already-merged
+                                :test #'equal))
+                (handler-case
+                    (genome (cdr file-obj-pair))
+                  (mutate (c) (declare (ignorable c)) nil))))
              (evolve-files ()
                "Return a list of `auto-mergeable-parseable` software objects
                representing source files which have been parsed into ASTs."

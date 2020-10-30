@@ -532,6 +532,26 @@ command-line options processed by the returned function."
     (wait-on-manual manual)
     (exit-command ast-merge (if unstable 1 0) new-merged)))
 
+(defun common-files-by (getter soft1 soft2)
+  (fbind (getter)
+    (filter (lambda (relative-file)
+              (ignore-some-conditions (file-error)
+                (file= (path-join (project-dir soft1) relative-file)
+                       (path-join (project-dir soft2) relative-file))))
+            (intersection (mapcar #'car (getter soft1))
+                          (mapcar #'car (getter soft2))
+                          :test #'equal))))
+
+(defgeneric common-evolve-files (soft1 soft2)
+  (:method ((soft1 t) (soft2 t)) nil)
+  (:method ((soft1 project) (soft2 project))
+    (common-files-by #'evolve-files soft1 soft2)))
+
+(defgeneric common-other-files (soft1 soft2)
+  (:method ((soft1 t) (soft2 t)) nil)
+  (:method ((soft1 project) (soft2 project))
+    (common-files-by #'other-files soft1 soft2)))
+
 (define-command-rest auto-merge
     (my-file old-file your-file test-script
              &spec +auto-merge-command-line-options+
@@ -575,24 +595,41 @@ command-line options processed by the returned function."
           num-tests (resolve-num-tests-from-num-tests num-tests)
           tests (create-test-suite test-script num-tests))
     (note 2 "Create software objects.")
-    (let ((my (create-auto-mergeable
-               (expand-options-for-which-files
-                language "MY"
-                :ignore-paths ignore-paths
-                :ignore-other-paths ignore-paths)
-               :threads num-threads))
-          (old (create-auto-mergeable
-                (expand-options-for-which-files
-                 language "OLD"
-                 :ignore-paths ignore-paths
-                 :ignore-other-paths ignore-paths)
-                :threads num-threads))
-          (your (create-auto-mergeable
-                 (expand-options-for-which-files
-                  language "YOUR"
-                  :ignore-paths ignore-paths
-                  :ignore-other-paths ignore-paths)
-                 :threads num-threads)))
+    (let* ((my-soft
+            (expand-options-for-which-files
+             language "MY"
+             :ignore-paths ignore-paths
+             :ignore-other-paths ignore-paths))
+           (old-soft
+            (expand-options-for-which-files
+             language "OLD"
+             :ignore-paths ignore-paths
+             :ignore-other-paths ignore-paths))
+           (your-soft
+            (expand-options-for-which-files
+             language "YOUR"
+             :ignore-paths ignore-paths
+             :ignore-other-paths ignore-paths))
+           (already-merged
+            (union (intersection (common-evolve-files my-soft old-soft)
+                                 (common-evolve-files old-soft your-soft)
+                                 :test #'equal)
+                   (intersection (common-other-files my-soft old-soft)
+                                 (common-other-files old-soft your-soft)
+                                 :test #'equal)
+                   :test #'equal))
+           (my
+            (create-auto-mergeable my-soft
+                                   :threads num-threads
+                                   :already-merged already-merged))
+           (old
+            (create-auto-mergeable old-soft
+                                   :threads num-threads
+                                   :already-merged already-merged))
+           (your
+            (create-auto-mergeable your-soft
+                                   :threads num-threads
+                                   :already-merged already-merged)))
       (note 2 "Resolve differences")
       (let ((result
              (apply #'resolve
