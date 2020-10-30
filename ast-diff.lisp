@@ -2286,6 +2286,11 @@ process with the rest of the script."
   (declare (ignorable delete?))
   (when (member (car script) '(:wrap :unwrap))
     (return-from ast-patch* (call-next-method)))
+  ;; Avoid the problem that, since each `:same' results in non-tail
+  ;; recursion, comparing two large, identical files can overflow the
+  ;; stack.
+  (when (every {starts-with :same} script)
+    (return-from ast-patch* original))
   (labels
       ((merge-conflict-ast (conflict-node rest)
          (if (and (typep (car rest) 'conflict-ast)

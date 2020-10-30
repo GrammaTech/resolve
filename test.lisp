@@ -923,6 +923,13 @@
       (is (equalp (genome obj3) '(((:code . "ayb"))))
           "Patch correctly applies to a simple object, with :replace"))))
 
+(deftest simple.ast-diff.large ()
+  "Test that you can diff large simple objects without stack overflow."
+  (let* ((lines (make-list 100000 :initial-element "x"))
+         (script (mapcar {cons :same} lines)))
+    (finishes (ast-patch* lines script))
+    (values)))
+
 
 ;;;; AST edit tree tests
 (deftest edit-tree.1 ()
