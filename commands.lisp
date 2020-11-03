@@ -538,9 +538,8 @@ command-line options processed by the returned function."
               (ignore-some-conditions (file-error)
                 (file= (path-join (project-dir soft1) relative-file)
                        (path-join (project-dir soft2) relative-file))))
-            (intersection (mapcar #'car (getter soft1))
-                          (mapcar #'car (getter soft2))
-                          :test #'equal))))
+            (intersection (convert 'set (mapcar #'car (getter soft1)))
+                          (convert 'set (mapcar #'car (getter soft2)))))))
 
 (defgeneric common-evolve-files (soft1 soft2)
   (:method ((soft1 t) (soft2 t)) nil)
@@ -611,13 +610,11 @@ command-line options processed by the returned function."
              :ignore-paths ignore-paths
              :ignore-other-paths ignore-paths))
            (already-merged
-            (union (intersection (common-evolve-files my-soft old-soft)
-                                 (common-evolve-files old-soft your-soft)
-                                 :test #'equal)
-                   (intersection (common-other-files my-soft old-soft)
-                                 (common-other-files old-soft your-soft)
-                                 :test #'equal)
-                   :test #'equal))
+            (union
+             (intersection (common-evolve-files my-soft old-soft)
+                           (common-evolve-files old-soft your-soft))
+             (intersection (common-other-files my-soft old-soft)
+                           (common-other-files old-soft your-soft))))
            (my
             (create-auto-mergeable my-soft
                                    :threads num-threads

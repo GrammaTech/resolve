@@ -104,7 +104,7 @@
     (change-class (copy obj) 'auto-mergeable-json))
   (:method ((obj lisp) &key)
     (change-class (copy obj) 'auto-mergeable-lisp))
-  (:method ((obj project) &key (threads 1) already-merged)
+  (:method ((obj project) &key (threads 1) (already-merged (empty-set)))
     (labels ((task-filter (fn objects)
                (nest
                 (map 'list #'cdr)
@@ -114,13 +114,13 @@
                           (lambda (obj)
                             (cons (fn obj) obj))
                           objects)))
+             (already-merged? (file-obj-pair)
+               (contains? already-merged (car file-obj-pair)))
              (parseable-file-p (file-obj-pair)
                "Filter files which can be parsed into ASTs."
                (nest
                 (when (typep (cdr file-obj-pair) 'parseable))
-                (unless (member (car file-obj-pair)
-                                already-merged
-                                :test #'equal))
+                (unless (already-merged? file-obj-pair))
                 (handler-case
                     (genome (cdr file-obj-pair))
                   (mutate (c) (declare (ignorable c)) nil))))
@@ -129,7 +129,9 @@
                representing source files which have been parsed into ASTs."
                (mapcar (lambda-bind ((file . obj))
                          (cons file (create-auto-mergeable obj)))
-                       (task-filter #'parseable-file-p (all-files obj))))
+                       (task-filter #'parseable-file-p
+                                    (remove-if #'already-merged?
+                                               (all-files obj)))))
              (other-files ()
                "Return a list of `auto-mergeable-simple` software objects
                representing flat text files."
@@ -138,7 +140,9 @@
                          (cons file
                                (from-file (make-instance 'auto-mergeable-simple)
                                           (original-path obj))))
-                       (remove-if #'parseable-file-p (all-files obj)))))
+                       (remove-if #'parseable-file-p
+                                  (remove-if #'already-merged?
+                                             (all-files obj))))))
       (change-class (copy obj :evolve-files (evolve-files)
                               :other-files (other-files))
                     (symbol-cat 'auto-mergeable (type-of obj))))))
