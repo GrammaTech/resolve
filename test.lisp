@@ -1623,6 +1623,11 @@
                          "let x = 1; let y = 2; let z = 3"
                          "let x = 1; let y = 2; let z = 6")))))
 
+(defun test-ordered-children-merge ()
+  (try-merge "`hello {$x} world`"
+             "`${y} hello ${x} world`"
+             "`hello ${x} world ${z}`"))
+
 
 ;;; Additional tests of internals
 (deftest ast-size-test ()

@@ -3300,7 +3300,7 @@ as the ordinary children list."
       ;; the parent
       (sel/sw/parseable::combine-all-conflict-asts ast children)
       ;; Must extract the interleaved-text strings
-      (multiple-value-bind (child-alist itext)
+      (multiple-value-bind (child-alist itext new-child-order)
           (unstandardize-children children)
         (if (and (equal? itext (interleaved-text ast))
                  (equal? (mapcar (lambda (p)
@@ -3326,9 +3326,14 @@ as the ordinary children list."
               (assert (eql (length itext) (cl:reduce #'+ child-alist :key [#'length #'cdr] :initial-value 1))
                 ()
                 "Lengths mismatch:  itext = ~s, child-alist = ~a" itext child-alist)
-              (let ((new (apply #'copy-with-children-alist ast child-alist
-                                :stored-hash nil
-                                :interleaved-text itext args)))
+              (let ((new (multiple-value-call #'copy-with-children-alist
+                           ast child-alist
+                           :stored-hash nil
+                           :interleaved-text itext
+                           (if (ast-annotation ast :child-order)
+                               new-child-order
+                               (values))
+                           (values-list args))))
                 (check-child-lists new)
                 new))))))
 
@@ -3351,7 +3356,8 @@ introducing empty strings or merging strings as needed."
   ;; level when that happens.
   (let ((s nil)
         (itext nil)
-        (child-alist nil))
+        (child-alist nil)
+        (order nil))
     (loop
       (unless children (return))
       (let ((c (pop children)))
@@ -3364,11 +3370,16 @@ introducing empty strings or merging strings as needed."
              (error "Child ~a occurs before any slot-specifier" c))
            (push (or s "") itext)
            (setf s nil)
-           (push c (cdar child-alist))))))
+           (push c (cdar child-alist))
+           (push (list (cons (caar child-alist)
+                             (length (cdar child-alist))))
+                 order)))))
     (push (or s "") itext)
     (dolist (p child-alist)
       (setf (cdr p) (nreverse (cdr p))))
-    (values (nreverse child-alist) (nreverse itext))))
+    (values (nreverse child-alist)
+            (nreverse itext)
+            (nreverse order))))
 
 (defgeneric check-child-lists (ast)
   (:documentation "Checks if the child slots of AST have appropriate
