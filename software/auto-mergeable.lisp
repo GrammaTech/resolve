@@ -41,7 +41,7 @@
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :functional-trees :slot-specifier :slot-specifier-slot
    :slot-specifier-arity :slot-specifier-for-slot)
-  (:import-from :software-evolution-library/software/non-homologous-parseable
+  (:import-from :software-evolution-library/software/parseable
                 :interleaved-text)
 
   (:import-from :software-evolution-library/utility/task :task-map)
