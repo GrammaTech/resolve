@@ -3351,7 +3351,17 @@ as the ordinary children list."
 
 (defun unstandardize-children (children)
   "Extract interleaved-text from a standardized list of children,
-introducing empty strings or merging strings as needed."
+introducing empty strings or merging strings as needed.
+
+Return three values.
+
+The first value is the new values of the child slots, grouped as an
+alist of (slot . children)
+
+The second value is the interleaved text.
+
+The third value is a list suitable for use as the :child-order
+annotation."
   ;; Note that this fails if there's a non-string child that occurs
   ;; before any slot-specifier.  This may happen, for example,
   ;; if a conflict node is generated that "swallows" slot-specifiers.
