@@ -3334,7 +3334,11 @@ as the ordinary children list."
                            :stored-hash nil
                            :interleaved-text itext
                            (if (ast-annotation ast :child-order)
-                               new-child-order
+                               (values :annotations
+                                       (acons :child-order
+                                              new-child-order
+                                              (adrop '(:child-order)
+                                                     (ast-annotations ast))))
                                (values))
                            (values-list args))))
                 (check-child-lists new)
@@ -3384,15 +3388,16 @@ annotation."
            (push (or s "") itext)
            (setf s nil)
            (push c (cdar child-alist))
-           (push (list (cons (caar child-alist)
-                             (length (cdar child-alist))))
-                 order)))))
+           (let ((slot (ft::slot-specifier-slot (caar child-alist))))
+             (push (cons slot
+                         (1+ (or (aget slot order) -1)))
+                   order))))))
     (push (or s "") itext)
     (dolist (p child-alist)
       (setf (cdr p) (nreverse (cdr p))))
     (values (nreverse child-alist)
             (nreverse itext)
-            (nreverse order))))
+            (nreverse (mapcar #'list order)))))
 
 (defgeneric check-child-lists (ast)
   (:documentation "Checks if the child slots of AST have appropriate
