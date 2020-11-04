@@ -2363,10 +2363,13 @@ process with the rest of the script."
                     (append-values meld?
                                    (apply #'ast-patch-unwrap-sequence (car asts) args keys)
                                    (edit (cdr asts) (cdr script)))))
-
-               (:same (cons-values meld?
-                                   (car asts)
-                                   (edit (cdr asts) (cdr script))))
+               (:same
+                (let* ((script script)
+                       (asts asts)
+                       (prefix (iter (while (eql (caar script) :same))
+                                     (collecting (pop asts))
+                                     (pop script))))
+                  (append-values meld? prefix (edit asts script))))
                (:same-tail
                 (assert (null (cdr script))) ;; :same-tail always occurs last
                 (assert (equal? asts args) () "AST-PATCH* (CONS): ~
