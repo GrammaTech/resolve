@@ -3303,7 +3303,7 @@ as the ordinary children list."
       ;; the parent
       (sel/sw/parseable::combine-all-conflict-asts ast children)
       ;; Must extract the interleaved-text strings
-      (multiple-value-bind (child-alist itext new-child-order)
+      (multiple-value-bind (child-alist itext)
           (unstandardize-children children)
         (if (and (equal? itext (interleaved-text ast))
                  (equal? (mapcar (lambda (p)
@@ -3329,18 +3329,9 @@ as the ordinary children list."
               (assert (eql (length itext) (cl:reduce #'+ child-alist :key [#'length #'cdr] :initial-value 1))
                 ()
                 "Lengths mismatch:  itext = ~s, child-alist = ~a" itext child-alist)
-              (let ((new (multiple-value-call #'copy-with-children-alist
-                           ast child-alist
-                           :stored-hash nil
-                           :interleaved-text itext
-                           (if (ast-annotation ast :child-order)
-                               (values :annotations
-                                       (acons :child-order
-                                              new-child-order
-                                              (adrop '(:child-order)
-                                                     (ast-annotations ast))))
-                               (values))
-                           (values-list args))))
+              (let ((new (apply #'copy-with-children-alist ast child-alist
+                                :stored-hash nil
+                                :interleaved-text itext args)))
                 (check-child-lists new)
                 new))))))
 
@@ -3355,17 +3346,7 @@ as the ordinary children list."
 
 (defun unstandardize-children (children)
   "Extract interleaved-text from a standardized list of children,
-introducing empty strings or merging strings as needed.
-
-Return three values.
-
-The first value is the new values of the child slots, grouped as an
-alist of (slot . children)
-
-The second value is the interleaved text.
-
-The third value is a list suitable for use as the :child-order
-annotation."
+introducing empty strings or merging strings as needed."
   ;; Note that this fails if there's a non-string child that occurs
   ;; before any slot-specifier.  This may happen, for example,
   ;; if a conflict node is generated that "swallows" slot-specifiers.
@@ -3373,8 +3354,7 @@ annotation."
   ;; level when that happens.
   (let ((s nil)
         (itext nil)
-        (child-alist nil)
-        (order nil))
+        (child-alist nil))
     (loop
       (unless children (return))
       (let ((c (pop children)))
@@ -3387,17 +3367,11 @@ annotation."
              (error "Child ~a occurs before any slot-specifier" c))
            (push (or s "") itext)
            (setf s nil)
-           (push c (cdar child-alist))
-           (let ((slot (ft::slot-specifier-slot (caar child-alist))))
-             (push (cons slot
-                         (1+ (or (aget slot order) -1)))
-                   order))))))
+           (push c (cdar child-alist))))))
     (push (or s "") itext)
     (dolist (p child-alist)
       (setf (cdr p) (nreverse (cdr p))))
-    (values (nreverse child-alist)
-            (nreverse itext)
-            (nreverse (mapcar #'list order)))))
+    (values (nreverse child-alist) (nreverse itext))))
 
 (defgeneric check-child-lists (ast)
   (:documentation "Checks if the child slots of AST have appropriate
