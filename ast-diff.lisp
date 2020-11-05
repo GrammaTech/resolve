@@ -3324,9 +3324,9 @@ as the ordinary children list."
       ;; Conflict that prevents creation of a node here
       ;; Instead, combine any conflict nodes and move up to
       ;; the parent
-      (sel/sw/parseable::combine-all-conflict-asts ast children)
+      (combine-all-conflict-asts ast children)
       ;; Must extract the interleaved-text strings
-      (multiple-value-bind (child-alist itext)
+      (multiple-value-bind (child-alist itext new-child-order)
           (unstandardize-children children)
         (if (and (equal? itext (interleaved-text ast))
                  (equal? (mapcar (lambda (p)
@@ -3352,10 +3352,20 @@ as the ordinary children list."
               (assert (eql (length itext) (cl:reduce #'+ child-alist :key [#'length #'cdr] :initial-value 1))
                 ()
                 "Lengths mismatch:  itext = ~s, child-alist = ~a" itext child-alist)
-              (let ((new (apply #'copy-with-children-alist ast child-alist
-                                :stored-hash nil
-                                :interleaved-text itext args)))
+              (let ((new (multiple-value-call #'copy-with-children-alist
+                           ast child-alist
+                           :stored-hash nil
+                           :interleaved-text itext
+                           (if (ast-annotation ast :child-order)
+                               (values :annotations
+                                       (acons :child-order
+                                              new-child-order
+                                              (adrop '(:child-order)
+                                                     (ast-annotations ast))))
+                               (values))
+                           (values-list args))))
                 (check-child-lists new)
+                (check-interleaved-text new)
                 new))))))
 
 (defmethod combine-all-conflict-asts ((parent non-homologous-ast) (child-list list))

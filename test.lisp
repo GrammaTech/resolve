@@ -1620,8 +1620,9 @@
          (old (create-auto-mergeable (from-string (make 'javascript) old)))
          (your (create-auto-mergeable (from-string (make 'javascript) your)))
          (converged (converge my old your :conflict t)))
-    (values (genome-string
-             (try-reconcile-conflicts converged))
+    (values (source-text
+             (genome
+              (try-reconcile-conflicts converged)))
             (count-conflicts converged))))
 
 (deftest reconcile-after-converge ()
@@ -1633,6 +1634,11 @@
               (try-merge "let x = 1; let y = 4; let z = 3"
                          "let x = 1; let y = 2; let z = 3"
                          "let x = 1; let y = 2; let z = 6")))))
+
+(defun test-ordered-children-merge ()
+  (try-merge "`${y} hello ${x} world`"
+             "`hello ${x} world`"
+             "`hello ${x} world ${z}`"))
 
 
 ;;; Additional tests of internals
