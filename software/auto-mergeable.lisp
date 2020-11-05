@@ -406,68 +406,72 @@ conflict AST resolution with an alternative option."
       (format t "conflict-path = ~a~%" conflict-path)
       (format t "parent = ~a~%" parent))
     ;; Replace the prior resolution children with the new resolution
-    (cond
-      ((null conflict-path)
-       `((:set (:stmt1 . ,conflict-path)
-               (:literal1 . ,(car new-resolution)))))
-      ((typep (setf lccp (lastcar conflict-path))
-              '(cons (or slot-specifier symbol) integer))
-       (destructuring-bind (ss . index)
-           lccp
-         (when (symbolp ss)
-           (setf ss (slot-specifier-for-slot parent ss)))
-         (let ((arity (slot-specifier-arity ss))
-               (slot (slot-specifier-slot ss)))
-           #+auto-mergeable-debug
-           (progn
-             (format t "slot = ~a~%" slot)
-             (format t "arity = ~a~%" arity)
-             (format t "slot-value = ~a~%" (slot-value parent slot)))
-           (if (eql arity 1)
-               `((:set (:stmt1 . ,parent)
-                       (:literal1 .
-                                  ,(copy parent
-                                         slot
-                                         (car new-resolution)))))
-               (let ((pos (position (@ parent lccp) (remove-if #'stringp (children parent))))
-                     (prior-len (length prior-resolution))
-                     (new-len (length new-resolution)))
-                 (assert pos)
-                 (let* ((itext (interleaved-text parent))
-                        (new-interleaved-text
-                         ;; This "works" in the sense of making the tests pass, but
-                         ;; it's not clean.  The best solution will be to change to
-                         ;; ast nodes without interleaved-text.
-                         (if (< new-len prior-len)
-                             (append (subseq itext 0 (1+ pos))
-                                     (subseq itext (+ pos (- prior-len new-len))))
-                             (if (> new-len prior-len)
-                                 (append (subseq itext 0 (1+ pos))
-                                         (make-list (- new-len prior-len) :initial-element "")
-                                         (subseq itext (1+ pos)))
-                                 itext))))
-                   `((:set (:stmt1 . ,parent)
-                           (:literal1 .
-                                      ,(copy parent
-                                             :interleaved-text new-interleaved-text
-                                             slot
-                                             (let ((prior-children (slot-value parent slot)))
-                                               (append (subseq prior-children 0 index)
-                                                       new-resolution
-                                                       (subseq prior-children
-                                                               (+ index
-                                                                  prior-len))))))))))))))
-      (t
-       `((:set (:stmt1 . ,parent)
-               (:literal1 .
-                          ,(copy parent :children
-                                 (append (subseq (children parent)
-                                                 0
-                                                 (lastcar conflict-path))
-                                         new-resolution
-                                         (subseq (children parent)
-                                                 (+ (lastcar conflict-path)
-                                                    (length prior-resolution))))))))))))
+    (setf lccp (lastcar conflict-path))
+    (nlet retry ()
+      (cond
+        ((null conflict-path)
+         `((:set (:stmt1 . ,conflict-path)
+                 (:literal1 . ,(car new-resolution)))))
+        ((symbolp lccp)
+         (setf lccp (cons lccp 0))
+         (retry))
+        ((typep lccp '(cons (or slot-specifier symbol) integer))
+         (destructuring-bind (ss . index)
+             lccp
+           (when (symbolp ss)
+             (setf ss (slot-specifier-for-slot parent ss)))
+           (let ((arity (slot-specifier-arity ss))
+                 (slot (slot-specifier-slot ss)))
+             #+auto-mergeable-debug
+             (progn
+               (format t "slot = ~a~%" slot)
+               (format t "arity = ~a~%" arity)
+               (format t "slot-value = ~a~%" (slot-value parent slot)))
+             (if (eql arity 1)
+                 `((:set (:stmt1 . ,parent)
+                         (:literal1 .
+                                    ,(copy parent
+                                           slot
+                                           (car new-resolution)))))
+                 (let ((pos (position (@ parent lccp) (remove-if #'stringp (children parent))))
+                       (prior-len (length prior-resolution))
+                       (new-len (length new-resolution)))
+                   (assert pos)
+                   (let* ((itext (interleaved-text parent))
+                          (new-interleaved-text
+                           ;; This "works" in the sense of making the tests pass, but
+                           ;; it's not clean.  The best solution will be to change to
+                           ;; ast nodes without interleaved-text.
+                           (if (< new-len prior-len)
+                               (append (subseq itext 0 (1+ pos))
+                                       (subseq itext (+ pos (- prior-len new-len))))
+                               (if (> new-len prior-len)
+                                   (append (subseq itext 0 (1+ pos))
+                                           (make-list (- new-len prior-len) :initial-element "")
+                                           (subseq itext (1+ pos)))
+                                   itext))))
+                     `((:set (:stmt1 . ,parent)
+                             (:literal1 .
+                                        ,(copy parent
+                                               :interleaved-text new-interleaved-text
+                                               slot
+                                               (let ((prior-children (slot-value parent slot)))
+                                                 (append (subseq prior-children 0 index)
+                                                         new-resolution
+                                                         (subseq prior-children
+                                                                 (+ index
+                                                                    prior-len))))))))))))))
+        (t
+         `((:set (:stmt1 . ,parent)
+                 (:literal1 .
+                            ,(copy parent :children
+                                   (append (subseq (children parent)
+                                                   0
+                                                   (lastcar conflict-path))
+                                           new-resolution
+                                           (subseq (children parent)
+                                                   (+ (lastcar conflict-path)
+                                                      (length prior-resolution)))))))))))))
 
 (defmethod apply-mutation ((software auto-mergeable-simple)
                            (mutation new-conflict-resolution))
