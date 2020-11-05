@@ -3242,7 +3242,13 @@ a tail of diff-a, and a tail of diff-b.")
 ;;; algorithms, so they may be handled together.
 
 (defgeneric standardized-children (ast)
-  (:documentation "Obtain a standardized CHILDREN list for ast."))
+  (:documentation "Obtain a standardized CHILDREN list for ast.
+
+A standardized child list contains interleaved text, child nodes, and
+special slot-specifier nodes such that the nodes between
+slot-specifier n and slot-specifier n+1 belong to the slot n.
+
+A slot specifier may occur more than once."))
 
 (defgeneric copy-with-standardized-children (ast standardized-children &key &allow-other-keys)
   (:documentation "Make a copy of AST, but use STANDARDIZED-CHILDREN
@@ -3254,21 +3260,38 @@ and convert it back to whatever internal form this kind of AST uses."))
 
 (defmethod standardized-children ((ast non-homologous-ast))
   (check-child-lists ast)
-  (let ((itext (interleaved-text ast))
-        (calist (children-slot-specifier-alist ast)))
-    (assert (= ;; (1+ (length calist))
-             (reduce #'+ calist :key (lambda (p) (length (cdr p)))
-                                :initial-value 1)
-             (length itext))
-            ()
-            "Length mismatch in child alist, interleaved text lists:~%~a~%~s~%"
-            calist itext)
-    (cons (pop itext)
-          (iter (for (child-spec . vals) in calist)
-                (appending (cons child-spec
-                                 (iter (for v in vals)
-                                       (collecting v)
-                                       (collecting (pop itext)))))))))
+  (nest
+   (let ((itext (interleaved-text ast))
+         (calist (children-slot-specifier-alist ast)))
+     (assert (= ;; (1+ (length calist))
+              (reduce #'+ calist :key (lambda (p) (length (cdr p)))
+                                 :initial-value 1)
+              (length itext))
+             ()
+             "Length mismatch in child alist, interleaved text lists:~%~a~%~s~%"
+             calist itext))
+   (flet ((child-slot-spec (child)
+            (car (find child calist
+                       :key #'cdr
+                       :test #'member)))
+          (interleave-text-with-alist (alist)
+            (cons (pop itext)
+                  (iter (for (child-spec . vals) in alist)
+                        (appending
+                         (cons child-spec
+                               (iter (for v in vals)
+                                     (collecting v)
+                                     (collecting (pop itext))))))))))
+   (if (not (ast-annotation ast :child-order))
+       (interleave-text-with-alist calist))
+   (let* ((sorted-children (sorted-children ast))
+          (specifier-runs (runs sorted-children :key #'child-slot-spec))
+          (ordered-calist
+           (mapcar (lambda (run)
+                     (cons (child-slot-spec (car run))
+                           run))
+                   specifier-runs)))
+     (interleave-text-with-alist ordered-calist))))
 
 (defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
   "The default method uses ordinary copy, treating the children list
@@ -3346,7 +3369,17 @@ as the ordinary children list."
 
 (defun unstandardize-children (children)
   "Extract interleaved-text from a standardized list of children,
-introducing empty strings or merging strings as needed."
+introducing empty strings or merging strings as needed.
+
+Return three values.
+
+The first value is the new values of the child slots, grouped as an
+alist of (slot . children)
+
+The second value is the interleaved text.
+
+The third value is a list suitable for use as the :child-order
+annotation."
   ;; Note that this fails if there's a non-string child that occurs
   ;; before any slot-specifier.  This may happen, for example,
   ;; if a conflict node is generated that "swallows" slot-specifiers.
@@ -3354,24 +3387,36 @@ introducing empty strings or merging strings as needed."
   ;; level when that happens.
   (let ((s nil)
         (itext nil)
-        (child-alist nil))
+        (child-alist nil)
+        (current-slot nil)
+        (ordering (ordering (filter (of-type 'slot-specifier) children)))
+        (order nil))
     (loop
       (unless children (return))
       (let ((c (pop children)))
         (typecase c
           (string (setf s (concatenate 'string s c)))
           (slot-specifier
-           (push (list c) child-alist))
+           (setf current-slot c)
+           (unless (assoc c child-alist)
+             (push (list c) child-alist)))
           (otherwise
-           (unless child-alist
+           (unless current-slot
              (error "Child ~a occurs before any slot-specifier" c))
            (push (or s "") itext)
            (setf s nil)
-           (push c (cdar child-alist))))))
+           (let ((slot-pair (assoc current-slot child-alist)))
+             (push c (cdr slot-pair))
+             ;; Mimic the format of `ft:position'.
+             (let ((slot (ft::slot-specifier-slot current-slot)))
+               (push (list (cons slot (1- (length (cdr slot-pair)))))
+                     order)))))))
     (push (or s "") itext)
     (dolist (p child-alist)
       (setf (cdr p) (nreverse (cdr p))))
-    (values (nreverse child-alist) (nreverse itext))))
+    (values (sort child-alist ordering :key #'car)
+            (nreverse itext)
+            (nreverse order))))
 
 (defgeneric check-child-lists (ast)
   (:documentation "Checks if the child slots of AST have appropriate
