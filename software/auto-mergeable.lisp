@@ -518,7 +518,8 @@ using STRATEGY.")
                    (mapcar (lambda (child)
                              (if (typep child 'ast)
                                  (copy child :annotations
-                                             `((:conflict-ast . ,conflict)))
+                                       (append `((:conflict-ast . ,conflict))
+                                               (ast-annotations child)))
                                  (make-instance 'ast-stub
                                   :children (list child)
                                   :annotations `((:conflict-ast . ,conflict)))))
