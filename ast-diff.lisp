@@ -3395,7 +3395,7 @@ annotation."
   ;; if a conflict node is generated that "swallows" slot-specifiers.
   ;; For that reason, conflict nodes need to be moved up to the parent
   ;; level when that happens.
-  (let ((s nil)
+  (let ((s (make-string-output-stream))
         (itext nil)
         (child-alist nil)
         (current-slot nil)
@@ -3405,7 +3405,7 @@ annotation."
       (unless children (return))
       (let ((c (pop children)))
         (typecase c
-          (string (setf s (concatenate 'string s c)))
+          (string (write-string c s))
           (slot-specifier
            (setf current-slot c)
            (unless (assoc c child-alist)
@@ -3413,15 +3413,14 @@ annotation."
           (otherwise
            (unless current-slot
              (error "Child ~a occurs before any slot-specifier" c))
-           (push (or s "") itext)
-           (setf s nil)
+           (push (get-output-stream-string s) itext)
            (let ((slot-pair (assoc current-slot child-alist)))
              (push c (cdr slot-pair))
              ;; Mimic the format of `ft:position'.
              (let ((slot (ft::slot-specifier-slot current-slot)))
                (push (list (cons slot (1- (length (cdr slot-pair)))))
                      order)))))))
-    (push (or s "") itext)
+    (push (get-output-stream-string s) itext)
     (dolist (p child-alist)
       (setf (cdr p) (nreverse (cdr p))))
     (values (sort child-alist ordering :key #'car)
