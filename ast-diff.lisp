@@ -3244,11 +3244,16 @@ a tail of diff-a, and a tail of diff-b.")
 (defgeneric standardized-children (ast)
   (:documentation "Obtain a standardized CHILDREN list for ast.
 
-A standardized child list contains interleaved text, child nodes, and
-special slot-specifier nodes such that the nodes between
-slot-specifier n and slot-specifier n+1 belong to the slot n.
+Return the children as a flat list, in textual order, of
+text nodes, slot markers, and children. The same slot marker may occur
+more than once.
 
-A slot specifier may occur more than once."))
+A standardized child list is a flat list, in textual order, of (1)
+text nodes, (3) child nodes, and (2) special slot-specifier nodes such
+that the child nodes between slot-specifier n and slot-specifier n+1
+belong to the slot n.
+
+The same slot specifier may occur more than once."))
 
 (defgeneric copy-with-standardized-children (ast standardized-children &key &allow-other-keys)
   (:documentation "Make a copy of AST, but use STANDARDIZED-CHILDREN
@@ -3271,10 +3276,13 @@ and convert it back to whatever internal form this kind of AST uses."))
              "Length mismatch in child alist, interleaved text lists:~%~a~%~s~%"
              calist itext))
    (flet ((child-slot-spec (child)
+            "Return the spec for the slot that includes CHILD."
             (car (find child calist
                        :key #'cdr
                        :test #'member)))
           (interleave-text-with-alist (alist)
+            "Given an alist of (child-spec . children), return a list
+interleaving text nodes, slot specs, and children."
             (cons (pop itext)
                   (iter (for (child-spec . vals) in alist)
                         (appending
@@ -3285,7 +3293,10 @@ and convert it back to whatever internal form this kind of AST uses."))
    (if (not (ast-annotation ast :child-order))
        (interleave-text-with-alist calist))
    (let* ((sorted-children (sorted-children ast))
+          ;; Gather runs of children having the same slot specifier.
           (specifier-runs (runs sorted-children :key #'child-slot-spec))
+          ;; Return an "alist" of (slot-spec . children) where the same
+          ;; slot-spec may occur more than once.
           (ordered-calist
            (mapcar (lambda (run)
                      (cons (child-slot-spec (car run))
@@ -3384,7 +3395,8 @@ introducing empty strings or merging strings as needed.
 Return three values.
 
 The first value is the new values of the child slots, grouped as an
-alist of (slot . children)
+alist of (slot . children), ordered by the first textual appearance of
+each slot.
 
 The second value is the interleaved text.
 
@@ -3399,6 +3411,8 @@ annotation."
         (itext nil)
         (child-alist nil)
         (current-slot nil)
+        ;; Capture the current order of the first occurrence of each
+        ;; of the slot specifiers.
         (ordering (ordering (filter (of-type 'slot-specifier) children)))
         (order nil))
     (loop
@@ -3416,7 +3430,8 @@ annotation."
            (push (get-output-stream-string s) itext)
            (let ((slot-pair (assoc current-slot child-alist)))
              (push c (cdr slot-pair))
-             ;; Mimic the format of `ft:position'.
+             ;; The extra layer here (a cons in a list) is to mimic
+             ;; the format of `ft:position'.
              (let ((slot (ft::slot-specifier-slot current-slot)))
                (push (list (cons slot (1- (length (cdr slot-pair)))))
                      order)))))))

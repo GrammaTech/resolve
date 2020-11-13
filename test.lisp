@@ -1635,10 +1635,15 @@
                          "let x = 1; let y = 2; let z = 3"
                          "let x = 1; let y = 2; let z = 6")))))
 
-(defun test-ordered-children-merge ()
-  (try-merge "`${y} hello ${x} world`"
-             "`hello ${x} world`"
-             "`hello ${x} world ${z}`"))
+(deftest test-ordered-children-merge ()
+  (is (equal "`${x}`"
+             (try-merge "`${x}`" "``" "`${x}`")))
+  (is (equal "`${x} hello`"
+             (try-merge "`${x} hello`" "`hello`" "`${x} hello`")))
+  (is (equal "`${x} hello`"
+             (try-merge "`${x} hello`" "`hello`" "`hello`")))
+  (is (equal "`${x} hello`"
+             (try-merge "`hello`" "`hello`" "`${x} hello`"))))
 
 
 ;;; Additional tests of internals

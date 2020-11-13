@@ -395,7 +395,6 @@ conflict AST resolution with an alternative option."
          (new-resolution (resolve-conflict-ast conflict-ast
                                                :strategy strategy))
          (conflict-path (ast-path software (car prior-resolution)))
-         lccp
          (parent (@ software (butlast conflict-path))))
     #+auto-mergeable-debug
     (progn
@@ -406,15 +405,14 @@ conflict AST resolution with an alternative option."
       (format t "conflict-path = ~a~%" conflict-path)
       (format t "parent = ~a~%" parent))
     ;; Replace the prior resolution children with the new resolution
-    (setf lccp (lastcar conflict-path))
-    (nlet retry ()
+    (nlet retry ((lccp (lastcar conflict-path)))
       (cond
         ((null conflict-path)
          `((:set (:stmt1 . ,conflict-path)
                  (:literal1 . ,(car new-resolution)))))
         ((symbolp lccp)
-         (setf lccp (cons lccp 0))
-         (retry))
+         ;; Retry after normalizing lccp.
+         (retry (cons lccp 0)))
         ((typep lccp '(cons (or slot-specifier symbol) integer))
          (destructuring-bind (ss . index)
              lccp
