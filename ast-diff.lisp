@@ -3371,8 +3371,7 @@ as the ordinary children list."
                                (values :annotations
                                        (acons :child-order
                                               new-child-order
-                                              (adrop '(:child-order)
-                                                     (ast-annotations ast))))
+                                              (ast-annotations ast)))
                                (values))
                            (values-list args))))
                 (check-child-lists new)
