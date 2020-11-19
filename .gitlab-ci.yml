@@ -58,7 +58,7 @@ binary-release-deploy:
     - tar czf $CI_PROJECT_NAME.tar.gz $CI_PROJECT_NAME/*
     - tar --list -f $CI_PROJECT_NAME.tar.gz
     - sshpass -p $MNEMO_ARTIFACTS_PASSWORD scp -p $CI_PROJECT_NAME.tar.gz mnemosyne@download-updater.grammatech.com:.
-    - 'curl https://download-updater.grammatech.com/mnemosyne/sync-request/ | grep "RESPONSE: ACCEPTED"'
+    - 'curl https://download-updater.grammatech.com/mnemosyne/sync-request/ | grep -E "RESPONSE: ACCEPTED|BUSY"'
   only:
     - master
 
