@@ -148,27 +148,60 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
           :evolve-files (map-files (evolve-files project))
           :other-files (map-files (other-files project)))))
 
-(defgeneric try-reconcile-conflicts (sw)
-  (:method ((node t)) node)
-  (:method ((node conflict-ast))
-    ;; Note that the child-alist slot of conflict-asts is no longer
-    ;; really an alist: it used to be that the cdr was a list of
-    ;; children, but now the cdr is always a list of a single element.
-    (match (conflict-ast-child-alist node)
-      ((alist (:my . (list my)) (:your . (list your)) (:old . (list old)))
-       (cond ((equal? my your) my)
-             ((equal? old my) your)
-             ((equal? old your) my)
-             (t node)))
-      ((alist (:my . (list my)) (:your . (list your)))
-       (cond ((equal? my your) my)
-             (t node)))
-      (otherwise node)))
-  (:method ((file auto-mergeable))
-    (copy file
-          :genome (mapcar #'try-reconcile-conflicts (genome file))))
-  (:method ((project auto-mergeable-project))
-    (map-project-files #'try-reconcile-conflicts project)))
+(defun try-reconcile-conflicts (sw &aux reconciliations)
+  "Attempt to reconcile conflict nodes in SW assuming they represent conflicting branches of a Git repository."
+  (labels ((get-reconciliations-by-intent (node)
+             (typecase node
+               (auto-mergeable-project
+                (map-project-files #'get-reconciliations-by-intent node))
+               (auto-mergeable
+                (copy node
+                      :genome
+                      (mapcar #'get-reconciliations-by-intent
+                              (genome node))))
+               (conflict-ast
+                ;; Note that the child-alist slot of conflict-asts is
+                ;; no longer really an alist: it used to be that the
+                ;; cdr was a list of children, but now the cdr is
+                ;; always a list of a single element.
+                (match (conflict-ast-child-alist node)
+                  ((alist (:my . (list my))
+                          (:your . (list your))
+                          (:old . (list old)))
+                   (cond ((equal? my your)
+                          ;; If both branches make the same change, we
+                          ;; should keep it.
+                          (push (cons node :v1) reconciliations))
+                         ;; If one branch has changed and the other
+                         ;; has not, we should keep the change.
+                         ((equal? old my)
+                          (push (cons node :v2) reconciliations))
+                         ((equal? old your)
+                          (push (cons node :v1) reconciliations))
+                         (t node)))
+                  ((alist (:my . (list my))
+                          (:your . (list your)))
+                   ;; If both branches have made the same addition we
+                   ;; should keep it.
+                   (cond ((equal? my your)
+                          (push (cons node :v1) reconciliations))
+                         (t node)))
+                  (otherwise node)))
+               (otherwise node))))
+    (etypecase sw
+      (auto-mergeable-project
+       (copy sw
+             :evolve-files
+             (iter (for (file . obj) in (evolve-files sw))
+                   (collect (cons file (try-reconcile-conflicts obj))))))
+      (auto-mergeable
+       (get-reconciliations-by-intent sw)
+       (reduce (lambda (variant node.strategy)
+                 (resolve-conflict (copy variant)
+                                   (car node.strategy)
+                                   :strategy (cdr node.strategy)))
+               reconciliations
+               :initial-value sw)))))
 
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target num-threads
