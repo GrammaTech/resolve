@@ -214,13 +214,13 @@ can be recursed on if STRINGS is true (defaults to true)"))
 (defmethod ast-can-recurse ((ast-a ast) (ast-b ast))
   t)
 
-(defmethod source-text ((ast cons) &optional stream)
-  (iter (while (consp ast)) (source-text (pop ast) stream))
+(defmethod source-text ((ast cons) &rest args &key stream)
+  (iter (while (consp ast)) (apply #'source-text (pop ast) args))
   (when ast
     (write-string "." stream)
-    (source-text ast stream)))
+    (apply #'source-text ast args)))
 
-(defmethod source-text ((ast slot-specifier) &optional stream)
+(defmethod source-text ((ast slot-specifier) &key stream)
   (write-sequence "" stream))
 
 (defgeneric ast-to-list-form (ast)
@@ -264,7 +264,7 @@ can be recursed on if STRINGS is true (defaults to true)"))
                    :accessor unastify-cache)))
 
 (defmethod ast-class ((ast simple-lisp-ast)) :list)
-(defmethod source-text ((ast simple-lisp-ast) &optional stream)
+(defmethod source-text ((ast simple-lisp-ast) &key stream)
   (let ((v (unastify ast)))
     (if v
         (format stream "~a" (unastify v))
@@ -290,8 +290,8 @@ can be recursed on if STRINGS is true (defaults to true)"))
   (:documentation "Convert a SIMPLE-LISP-AST to a Lisp data structure"))
 
 (let ((end-marker :nil))
-  (defmethod source-text ((x (eql end-marker)) &optional stream)
-    (source-text "" stream))
+  (defmethod source-text ((x (eql end-marker)) &rest args &key)
+    (apply #'source-text "" args))
   (defmethod astify ((x list))
     (if (proper-list-p x)
         ;; Add an end marker to represent the NIL
@@ -400,14 +400,15 @@ special representation as edit-segments, recording both the position
 of the leaf in the children of its parent in the tree, and the position
 of the substring inside the string."))
 
-(defmethod source-text ((segment edit-segment) &optional stream)
+(defmethod source-text ((segment edit-segment) &rest args &key)
   (let ((start (edit-segment-start segment))
         (len (edit-segment-length segment))
         (ast-node (edit-segment-node segment)))
-    (mapc {source-text _ stream}
+    (mapc (lambda (ast)
+            (apply #'source-text ast args))
           (subseq (children ast-node) start (+ start len)))))
 
-(defmethod source-text ((segment string-edit-segment) &optional stream)
+(defmethod source-text ((segment string-edit-segment) &key stream)
   (with-slots (node start string-start string-length)
       segment
     (assert node)
