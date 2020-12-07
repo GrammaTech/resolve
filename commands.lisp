@@ -50,6 +50,8 @@
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/json
         :software-evolution-library/software/lisp)
+  (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
+  (:shadow :css :guess-language)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
   (:import-from :spinneret :with-html)
@@ -250,6 +252,13 @@ command-line options processed by the returned function."
                          '(genome from-file mutate print-object create-edit-tree
                            map-edit-tree ast-patch merge-diffs-on-syms))))
   (drop-dead-method-all))
+
+(defun guess-language (&rest sources)
+  (case-let (lang (apply #'sel/command-line:guess-language sources))
+    (ts:python 'python)
+    (ts:javascript 'javascript)
+    (ts:json 'json)
+    (t lang)))
 
 (define-command-rest ast-diff
     (old-file new-file &spec +ast-diff-command-line-options+
