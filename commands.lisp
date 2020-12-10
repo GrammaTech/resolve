@@ -51,7 +51,7 @@
         :software-evolution-library/software/json
         :software-evolution-library/software/lisp)
   (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
-  (:shadow :css :guess-language)
+  (:shadow :css)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
   (:import-from :spinneret :with-html)
@@ -253,8 +253,10 @@ command-line options processed by the returned function."
                            map-edit-tree ast-patch merge-diffs-on-syms))))
   (drop-dead-method-all))
 
-(defun guess-language (&rest sources)
-  (case-let (lang (apply #'sel/command-line:guess-language sources))
+(defun preferred-language (lang)
+  "Given LANG, a guess or resolved language, return a preferred language.
+At the moment that means /not/ using tree-sitter."
+  (case lang
     (ts:python 'python)
     (ts:javascript 'javascript)
     (ts:json 'json)
@@ -290,7 +292,8 @@ command-line options processed by the returned function."
                (unless language
                  (error "Must specify language when differencing strings."))
                (setf language
-                     (resolve-language-from-language-and-source language))
+                     (preferred-language
+                      (resolve-language-from-language-and-source language)))
                (let ((type (case language
                              (javascript "js")
                              (json "json")
@@ -308,7 +311,10 @@ command-line options processed by the returned function."
                (unless (every #'resolve-file (list old-file new-file))
                  (exit-command ast-diff 2 (error "Missing source.")))
                (unless language
-                 (setf language (guess-language old-file new-file)))))
+                 (setf language
+                       (preferred-language
+                        (guess-language old-file new-file))))
+               ()))
          (with-prof profile
          ;; Create the diff.
          (let* ((old-sw (expand-options-for-which-files language "OLD"))
@@ -426,9 +432,14 @@ command-line options processed by the returned function."
       (alist-plist (decode-json-from-string (payload-as-string)))
     (flet ((process (&rest rest)
              (let ((*lisp-interaction* t))
-               (handler-case (apply #'ast-diff old-file new-file :language language
-                                    rest)
-                 (error (e) (http-condition 500 "Error: ~a" e))))))
+               (handler-bind
+                   ((error (lambda (e)
+                             (describe e uiop:*stderr*)
+                             (uiop:print-backtrace :condition e
+                                                   :stream uiop:*stderr*)
+                             (http-condition 500 "Error: ~a" e))))
+                 (apply #'ast-diff old-file new-file :language language
+                        rest)))))
       (if link
           (let* ((json (with-output-to-string (*standard-output*)
                          (process :json t)))
@@ -504,7 +515,8 @@ command-line options processed by the returned function."
   (setf old-file (namestring (truename old-file))
         my-file (namestring (truename my-file))
         your-file (namestring (truename your-file))
-        language (or language (guess-language old-file my-file your-file)))
+        language (preferred-language
+                  (or language (guess-language old-file my-file your-file))))
   ;; Force OUT-DIR when running as a command line utility and merging
   ;; whole directories.  We can't write multiple files to STDOUT.
   (when (and (directory-p old-file) (not out-dir))
@@ -599,7 +611,8 @@ command-line options processed by the returned function."
           old-file (namestring (truename old-file))
           my-file (namestring (truename my-file))
           your-file (namestring (truename your-file))
-          language (or language (guess-language old-file my-file your-file))
+          language (preferred-language
+                    (or language (guess-language old-file my-file your-file)))
           num-tests (resolve-num-tests-from-num-tests num-tests)
           tests (create-test-suite test-script num-tests))
     (note 2 "Create software objects.")
