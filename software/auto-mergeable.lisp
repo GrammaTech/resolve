@@ -30,14 +30,13 @@
         :software-evolution-library/software/simple
         :software-evolution-library/software/parseable
         :software-evolution-library/software/clang
-        :software-evolution-library/software/javascript
-        :software-evolution-library/software/json
         :software-evolution-library/software/lisp
         :software-evolution-library/software/project
         :software-evolution-library/software/parseable-project
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/javascript-project
-        :software-evolution-library/software/lisp-project)
+        :software-evolution-library/software/lisp-project
+        :software-evolution-library/software/tree-sitter)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :functional-trees :slot-specifier :slot-specifier-slot
    :slot-specifier-arity :slot-specifier-for-slot)
@@ -252,7 +251,7 @@ AST stub root indicating they were deleted from the project."
 (defun fixup-json-ast (ast fixer)
   "Ensure that AST is a valid JSON AST by calling FIXER on the list of children of each AST node."
   (mapcar (lambda (node)
-            (if (typep node 'js-object-expression)
+            (if (typep node 'json-ast)
                 (nest
                  (copy node :children)
                  (funcall fixer (children node)))
@@ -301,8 +300,8 @@ Only the last occurrence of each child is retained (per the behavior of Node.js)
    (delete-duplicates runs :test)
    (lambda (x y)
      (multiple-value-match (values (first x) (first y))
-       (((js-property :js-key name1)
-         (js-property :js-key name2))
+       (((javascript-pair :javascript-key name1)
+         (javascript-pair :javascript-key name2))
         (equal name1 name2))))))
 
 (defmethod phenome ((obj auto-mergeable-simple) &key bin)

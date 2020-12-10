@@ -9,10 +9,9 @@
         :software-evolution-library/software/project
         :software-evolution-library/software/clang
         :software-evolution-library/software/clang-project
-        :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
-        :software-evolution-library/software/json
         :software-evolution-library/software/simple
+        :software-evolution-library/software/tree-sitter
         :software-evolution-library/components/formatting
         :software-evolution-library/components/test-suite
         :resolve/core
