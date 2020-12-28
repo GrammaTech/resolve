@@ -21,7 +21,7 @@
                software-evolution-library/software/parseable
                software-evolution-library/software/clang
                software-evolution-library/software/simple
-               software-evolution-library/software/source
+               software-evolution-library/software/ir
                software-evolution-library/view
                resolve/string
                metabang-bind

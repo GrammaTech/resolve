@@ -31,7 +31,7 @@
    :software-evolution-library/software/non-homologous-parseable
    :software-evolution-library/software/clang
    :software-evolution-library/software/simple
-   :software-evolution-library/software/source
+   :software-evolution-library/software/ir
    :resolve/string
    :metabang-bind
    :cl-heap)
