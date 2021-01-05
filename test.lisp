@@ -1522,15 +1522,15 @@
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested-simple
           :long-running) ()
   (with-fixture javascript-converge-conflict
-    (is (typep (@ *cnf* '(1)) 'conflict-ast)
+    (is (typep (@ *cnf* '(2)) 'conflict-ast)
         "Path (3) is a conflict ast in the original.")
-    (let* ((old (@ *cnf* '(1)))
+    (let* ((old (@ *cnf* '(2)))
            (new (with (copy *cnf*)
                       (ast-path *cnf* old)
                       (car (aget :my (conflict-ast-child-alist old))))))
-      (is (typep (@ new '(1)) 'javascript-ast)
+      (is (typep (@ new '(2)) 'javascript-ast)
           "Path (1) is a JavaScript ast in result of with.")
-      (is (typep (@ *cnf* '(1)) 'conflict-ast)
+      (is (typep (@ *cnf* '(2)) 'conflict-ast)
           "Path (1) is STILL a conflict-ast in the original ~
            after with."))))
 

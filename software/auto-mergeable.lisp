@@ -78,7 +78,7 @@
 (define-software auto-mergeable-parseable (auto-mergeable parseable) ())
 (define-software auto-mergeable-clang (auto-mergeable-parseable clang) ())
 (define-software auto-mergeable-javascript (auto-mergeable-parseable javascript) ())
-(define-software auto-mergeable-json (auto-mergeable-javascript json) ())
+(define-software auto-mergeable-json (auto-mergeable-parseable json) ())
 (define-software auto-mergeable-lisp (auto-mergeable-parseable lisp) ())
 
 (define-software auto-mergeable-project (auto-mergeable parseable-project) ())
