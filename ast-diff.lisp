@@ -28,7 +28,6 @@
    :gt/full
    :software-evolution-library
    :software-evolution-library/software/parseable
-   :software-evolution-library/software/non-homologous-parseable
    :software-evolution-library/software/clang
    :software-evolution-library/software/simple
    :software-evolution-library/software/ir
@@ -39,6 +38,9 @@
   (:shadowing-import-from :functional-trees
    :child-slots :slot-spec-slot
    :children-alist :slot-specifier)
+  (:import-from :software-evolution-library/software/tree-sitter
+                :tree-sitter-ast
+                :check-interleaved-text)
   (:export
    :ast-cost
    :ast-size
@@ -174,11 +176,11 @@ wrapping and unwrapping to be considered.")
 (defmethod ast-cost ((ast ast))
   (cl:reduce #'+ (children ast) :key #'ast-cost :initial-value 1))
 
-(defmethod ast-cost ((ast non-homologous-ast))
+(defmethod ast-cost ((ast tree-sitter-ast))
   (cl:reduce #'+ (standardized-children ast) :key #'ast-cost :initial-value 1))
 
 ;; Slot-specifiers are introduced as markers in the standardized-children
-;; lists of non-homologous-ast nodes, and should not contribute the
+;; lists of tree-sitter-ast nodes, and should not contribute the
 ;; the cost.
 (defmethod ast-cost ((ss slot-specifier)) 0)
 
@@ -1994,7 +1996,7 @@ be applied in that context."))
                         &key delete? (meld? (ast-meld-p ast)) &allow-other-keys)
   (declare (ignorable delete? meld?))
   (assert (typep ast 'ast))
-  (assert (not (typep ast 'non-homologous-ast)))
+  (assert (not (typep ast 'tree-sitter-ast)))
   (let* ((children (children ast))
          ;; For now, always meld
          ;; This may not give valid ASTs, but fix later
@@ -2005,7 +2007,7 @@ be applied in that context."))
            (iter (for new-children in new-child-lists)
                  (collect (copy ast :children new-children))))))
 
-(defun actual-non-homologous-ast-patch (ast script &rest keys
+(defun actual-tree-sitter-ast-patch (ast script &rest keys
                                         &key delete? (meld? (ast-meld-p ast))
                                         &allow-other-keys)
   ;; Outline of approach:
@@ -2029,10 +2031,10 @@ be applied in that context."))
       (apply #'actual-ast-patch ast script keys)
       (call-next-method)))
 
-(defmethod ast-patch* ((ast non-homologous-ast) (script list) &rest keys
+(defmethod ast-patch* ((ast tree-sitter-ast) (script list) &rest keys
                         &key &allow-other-keys)
   (if (listp (car script))
-      (apply #'actual-non-homologous-ast-patch ast script keys)
+      (apply #'actual-tree-sitter-ast-patch ast script keys)
       (call-next-method)))
 
 (defmethod ast-patch* ((original t) (script cons)
@@ -3263,7 +3265,7 @@ and convert it back to whatever internal form this kind of AST uses."))
   "The default method uses the ordinary CHILDREN function"
   (children ast))
 
-(defmethod standardized-children ((ast non-homologous-ast))
+(defmethod standardized-children ((ast tree-sitter-ast))
   (check-child-lists ast)
   (nest
    (let ((itext (interleaved-text ast))
@@ -3325,7 +3327,7 @@ as the ordinary children list."
           (slot-specifier (return nil))
           (conflict-ast (return t)))))
 
-(defmethod copy-with-standardized-children ((ast non-homologous-ast) (children list) &rest args)
+(defmethod copy-with-standardized-children ((ast tree-sitter-ast) (children list) &rest args)
   (declare (special *a* *c*))
   ;; Remember state; used for debugging on failure
   (setf *a* ast)
@@ -3378,7 +3380,7 @@ as the ordinary children list."
                 (check-interleaved-text new)
                 new))))))
 
-(defmethod combine-all-conflict-asts ((parent non-homologous-ast) (child-list list))
+(defmethod combine-all-conflict-asts ((parent tree-sitter-ast) (child-list list))
   (multiple-value-bind (alist def)
       (combine-conflict-asts-in-list child-list)
     (make-instance
@@ -3473,7 +3475,7 @@ contents.  Uses ASSERT to cause failure if they do not."))
     (format t "~v@{ ~}~a~%" indent (ast-class ast))
     (let ((n2 (+ indent 2)))
       (mapc {dump-ast* _ n2} (children ast))))
-  (:method ((ast non-homologous-ast) (indent integer))
+  (:method ((ast tree-sitter-ast) (indent integer))
     (format t "~v@{ ~}~a~%" indent (ast-class ast))
     (format t "~v@{ ~}~s~%" indent (interleaved-text ast))
     (dolist (ss (child-slot-specifiers ast))

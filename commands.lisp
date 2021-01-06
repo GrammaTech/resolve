@@ -46,9 +46,8 @@
         :software-evolution-library/software/project
         :software-evolution-library/software/clang
         :software-evolution-library/software/clang-project
-        :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
-        :software-evolution-library/software/json
+        :software-evolution-library/software/lisp
         :software-evolution-library/software/lisp)
   (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
   (:shadow :css)

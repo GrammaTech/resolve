@@ -60,13 +60,11 @@
                software-evolution-library/software/simple
                software-evolution-library/software/parseable
                software-evolution-library/software/clang
-               software-evolution-library/software/javascript
-               software-evolution-library/software/json
+               software-evolution-library/software/tree-sitter
                software-evolution-library/software/lisp
                software-evolution-library/software/project
                software-evolution-library/software/parseable-project
                software-evolution-library/software/clang-project
-               software-evolution-library/software/javascript-project
                software-evolution-library/software/lisp-project)
   :components ((:compiled-file "software/auto-mergeable")))
 
@@ -122,9 +120,8 @@
                software-evolution-library/software/project
                software-evolution-library/software/clang
                software-evolution-library/software/clang-project
-               software-evolution-library/software/javascript
+               software-evolution-library/software/tree-sitter
                software-evolution-library/software/javascript-project
-               software-evolution-library/software/json
                software-evolution-library/software/lisp)
   :components ((:compiled-file "commands")))
 
