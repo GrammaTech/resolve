@@ -2020,7 +2020,7 @@ be applied in that context."))
   (let* ((schildren (standardized-children ast))
          (new-schild-lists
            (multiple-value-list
-            (apply #'ast-patch* schildren script :meld? meld? keys))))
+            (apply #'ast-patch* schildren script keys))))
     (apply #'values
            (iter (for new-schildren in new-schild-lists)
                  (collect (copy-with-standardized-children ast new-schildren))))))
