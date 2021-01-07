@@ -3,7 +3,6 @@
 		:diff
 		:cl-strftime
 		:jsown
-		:cl-heap
 		:cl-interpol
                 :software-evolution-library
                 :resolve))

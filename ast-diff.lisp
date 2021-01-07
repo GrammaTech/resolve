@@ -33,8 +33,7 @@
    :software-evolution-library/software/simple
    :software-evolution-library/software/ir
    :resolve/string
-   :metabang-bind
-   :cl-heap)
+   :metabang-bind)
   (:shadowing-import-from :software-evolution-library/view
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :functional-trees
