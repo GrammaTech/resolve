@@ -43,7 +43,8 @@ binary-release:
     - git clone https://github.com/grammatech/sel.git /root/quicklisp/local-projects/sel
     - cd /root/quicklisp/local-projects/$CI_PROJECT_NAME
   script:
-    - sbcl --script build.lisp && ccl --load build.lisp --eval '(quit)'
+    - sbcl --script build.lisp
+    - ccl --load build.lisp --eval '(quit)'
     - mv build $CI_PROJECT_DIR/$CI_PROJECT_NAME
   only:
     - master
