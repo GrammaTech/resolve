@@ -4,6 +4,8 @@
 		:cl-strftime
 		:jsown
 		:cl-interpol
+                :cl-json
+                :babel
                 :software-evolution-library
                 :resolve))
 
