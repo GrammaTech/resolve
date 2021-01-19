@@ -58,8 +58,10 @@ BIN_TESTS =						\
 ifneq (,$(findstring sbcl, $(LISP)))
 BIN_TESTS +=					\
 	rest-ast-diff-returns-json		\
-	rest-ast-diff-takes-full-strings	\
 	rest-ast-diff-can-return-and-serve-link
+    # FIXME
+	# rest-ast-diff-takes-full-strings	\
+
 endif
 
 include .cl-make/cl.mk
