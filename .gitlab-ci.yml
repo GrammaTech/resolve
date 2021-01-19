@@ -19,6 +19,7 @@ build-manual:
 
 .test-template: &test
   stage: test
+  allow_failure: true
   script:
     - LISP=$LISP GT=yes make long-unit-check bin-check
 
