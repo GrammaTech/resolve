@@ -6,6 +6,8 @@ default:
   tags: ["kubernetes", "cluster"]
   before_script:
     - cp -r $(pwd)/ /root/quicklisp/local-projects/
+    - cd /root/quicklisp/local-projects/$CI_PROJECT_NAME
+    - make dependencies
 
 check-format:
   stage: .pre
@@ -38,11 +40,6 @@ binary-release:
   artifacts:
     paths:
       - $CI_PROJECT_NAME
-  before_script:
-    - cp -r $(pwd)/ /root/quicklisp/local-projects/
-    - git clone https://github.com/grammatech/functional-trees.git /root/quicklisp/local-projects/functional-trees
-    - git clone https://github.com/grammatech/sel.git /root/quicklisp/local-projects/sel
-    - cd /root/quicklisp/local-projects/$CI_PROJECT_NAME
   script:
     - sbcl --script build.lisp
     - ccl --load build.lisp --eval '(quit)'
