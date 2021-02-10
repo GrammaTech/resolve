@@ -310,7 +310,7 @@ at BIN."
   (to-file obj bin)
   (values bin 0 "" ""))
 
-(defmethod lines ((obj auto-mergeable-simple))
+(defmethod lines ((obj auto-mergeable-simple) &key)
   "Override lines to allow for conflict and stub ASTs to appear in the
 genome."
   (nest (remove nil)
