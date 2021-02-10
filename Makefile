@@ -26,27 +26,31 @@ BIN_TESTS =						\
 	clang-diff-on-gcd				\
 	lisp-diff-on-gcd				\
 	lisp-diff-on-gcd-raw				\
-	clang-diff-on-gcd-edit-tree			\
-	clang-diff-on-gcd-edit-tree-coherence		\
-	octomap-diff					\
-	octomap-diff-count				\
-	octomap-diff-edit-tree				\
-	can-auto-merge-gcd-single-file			\
-	can-auto-merge-gcd-single-file-evolve		\
-	can-auto-merge-gcd-project			\
-	can-auto-merge-gcd-project-evolve		\
-	can-auto-merge-gcd-project-insert-file-evolve	\
-	can-auto-merge-gcd-project-delete-file-evolve	\
-	can-auto-merge-text-single-file			\
-	can-auto-merge-text-single-file-evolve		\
-	can-auto-merge-text-project			\
-	can-auto-merge-text-project-evolve		\
-	can-auto-merge-text-project-insert-file-evolve	\
-	can-auto-merge-text-project-delete-file-evolve  \
-    # FIXME
-	# ast-diff-on-json-has-lines			\
-	# javascript-diff-on-gcd \
-	# ast-merge-json-has-conflict \
+# FIXME:
+#
+# Convert to tree-sitter:
+# clang-diff-on-gcd-edit-tree
+# clang-diff-on-gcd-edit-tree-coherence
+# octomap-diff
+# octomap-diff-count
+# octomap-diff-edit-tree
+# can-auto-merge-gcd-single-file
+# can-auto-merge-gcd-single-file-evolve
+# can-auto-merge-gcd-project
+# can-auto-merge-gcd-project-evolve
+# can-auto-merge-gcd-project-insert-file-evolve
+# can-auto-merge-gcd-project-delete-file-evolve
+# can-auto-merge-text-single-file
+# can-auto-merge-text-single-file-evolve
+# can-auto-merge-text-project
+# can-auto-merge-text-project-evolve
+# can-auto-merge-text-project-insert-file-evolve
+# can-auto-merge-text-project-delete-file-evolve
+#
+# Old failures:
+# ast-diff-on-json-has-lines
+# javascript-diff-on-gcd
+# ast-merge-json-has-conflict
 
 # REST tests are only executed for SBCL builds.
 # CCL reports an error on rest server startup related to the use of
