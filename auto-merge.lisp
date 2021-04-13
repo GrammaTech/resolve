@@ -20,6 +20,7 @@
         :resolve/software/auto-mergeable
         :resolve/software/parseable)
   (:import-from :resolve/ast-diff)
+  (:shadow :function-body)
   (:import-from :software-evolution-library/components/file
                 :file-w-attributes)
   (:export :resolve

@@ -51,7 +51,7 @@
         :software-evolution-library/software/lisp)
   (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
   (:shadow :css)
-  (:shadowing-import-from :software-evolution-library/view
+  (:shadowing-import-from :software-evolution-library/terminal
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
   (:import-from :spinneret :with-html)
   (:import-from :uiop/stream :println :writeln)

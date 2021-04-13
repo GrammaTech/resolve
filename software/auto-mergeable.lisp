@@ -37,6 +37,7 @@
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project
         :software-evolution-library/software/tree-sitter)
+  (:shadow :function-body)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :functional-trees :slot-specifier :slot-specifier-slot
    :slot-specifier-arity :slot-specifier-for-slot)
@@ -310,7 +311,7 @@ at BIN."
   (to-file obj bin)
   (values bin 0 "" ""))
 
-(defmethod lines ((obj auto-mergeable-simple) &key)
+(defmethod lines ((obj auto-mergeable-simple) &key &allow-other-keys)
   "Override lines to allow for conflict and stub ASTs to appear in the
 genome."
   (nest (remove nil)

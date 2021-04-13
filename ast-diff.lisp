@@ -33,7 +33,7 @@
    :software-evolution-library/software/ir
    :resolve/string
    :metabang-bind)
-  (:shadowing-import-from :software-evolution-library/view
+  (:shadowing-import-from :software-evolution-library/terminal
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :functional-trees
    :child-slots :slot-spec-slot
