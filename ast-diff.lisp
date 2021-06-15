@@ -39,8 +39,7 @@
    :child-slots :slot-spec-slot
    :children-alist :slot-specifier)
   (:import-from :software-evolution-library/software/tree-sitter
-                :tree-sitter-ast
-                :check-interleaved-text)
+                :tree-sitter-ast)
   (:export
    :ast-cost
    :ast-size
@@ -3377,7 +3376,6 @@ as the ordinary children list."
                                (values))
                            (values-list args))))
                 (check-child-lists new)
-                (check-interleaved-text new)
                 new))))))
 
 (defmethod combine-all-conflict-asts ((parent tree-sitter-ast) (child-list list))
