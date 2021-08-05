@@ -3310,52 +3310,49 @@ as the ordinary children list."
   ;; Remember state; used for debugging on failure
   (setf *a* ast)
   (setf *c* children)
-  (if (or (some #'is-conflict-node-with-slot-specifier children)
-          (has-conflict-node-before-slot-specifiers children))
-      ;; Conflict that prevents creation of a node here
-      ;; Instead, combine any conflict nodes and move up to
-      ;; the parent
-      (combine-all-conflict-asts ast children)
-      ;; Must extract the interleaved-text strings
-      (multiple-value-bind (child-alist itext new-child-order)
-          (unstandardize-children children)
-        (if (and (equal? itext (interleaved-text ast))
-                 (equal? (mapcar (lambda (p)
-                                   (cons (ft::slot-specifier-slot (car p))
-                                         (cdr p)))
-                                 child-alist)
-                         (children-alist ast))
-                 (null args))
-            ast
-            (let ((calen (length child-alist)))
-              (declare (ignorable calen))
-              (setf child-alist
-                    (iter (for ss in (child-slot-specifiers ast))
-                          (let ((p (assoc ss child-alist)))
-                            (collecting (or p (list ss))))))
-              ;; These checks are problematic
-              ;; Conditionalize them out for now
-              #+nil
-              (assert (eql calen (length (child-slots ast)))
-                      ()
-                      "CHILD-ALIST and (CHILD-SLOTS AST) have different lengths.~%~a~%~a~%~a~%~a" child-alist (child-slots ast) ast children)
-              #+nil
-              (assert (eql (length itext) (cl:reduce #'+ child-alist :key [#'length #'cdr] :initial-value 1))
-                ()
-                "Lengths mismatch:  itext = ~s, child-alist = ~a" itext child-alist)
-              (let ((new (multiple-value-call #'copy-with-children-alist
-                           ast child-alist
+  (labels ((add-every-slot (child-alist)
+             "Return a child alist which contains every slot even
+              if the slot doesn't have any children."
+             (iter
+               (for slot-specifier in (child-slot-specifiers ast))
+               (collecting
+                 (or (assoc slot-specifier child-alist)
+                     ;; empty slot.
+                     (list slot-specifier))
+                 into full-child-alist)
+               (finally
+                (assert (eql (length full-child-alist) (length (child-slots ast)))
+                  ()
+                  "CHILD-ALIST and (CHILD-SLOTS AST) have different lengths.~%~a~%~a~%~a~%~a"
+                  full-child-alist (child-slots ast) ast children)
+                (return full-child-alist))))
+           (copy-ast (child-alist)
+             "Create a copy of ast with values based on CHILD-ALIST."
+             (lret ((new (multiple-value-call #'copy-with-children-alist
+                           ast
+                           child-alist
                            :stored-hash nil
-                           :interleaved-text itext
-                           (if (ast-annotation ast :child-order)
-                               (values :annotations
-                                       (acons :child-order
-                                              new-child-order
-                                              (ast-annotations ast)))
-                               (values))
                            (values-list args))))
-                (check-child-lists new)
-                new))))))
+               (check-child-lists new)))
+           ;; TODO: find a better name for this function.
+           (maybe-get-copy (child-alist)
+             "Create a copy of AST if it would differ from the values
+              already in AST. Otherwise, return AST."
+             (if (and (equal? (mapcar (lambda (p)
+                                        (cons (ft::slot-specifier-slot (car p))
+                                              (cdr p)))
+                                      child-alist)
+                              (children-alist ast))
+                      (null args))
+                 ast
+                 (copy-ast (add-every-slot child-alist)))))
+    (if (or (some #'is-conflict-node-with-slot-specifier children)
+            (has-conflict-node-before-slot-specifiers children))
+        ;; Conflict that prevents creation of a node here
+        ;; Instead, combine any conflict nodes and move up to
+        ;; the parent
+        (combine-all-conflict-asts ast children)
+        (maybe-get-copy (unstandardize-children children)))))
 
 (defmethod combine-all-conflict-asts ((parent tree-sitter-ast) (child-list list))
   (multiple-value-bind (alist def)
