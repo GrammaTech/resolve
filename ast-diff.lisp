@@ -3266,44 +3266,23 @@ and convert it back to whatever internal form this kind of AST uses."))
 
 (defmethod standardized-children ((ast tree-sitter-ast))
   (check-child-lists ast)
-  (nest
-   (let ((itext (interleaved-text ast))
-         (calist (children-slot-specifier-alist ast)))
-     (assert (= ;; (1+ (length calist))
-              (reduce #'+ calist :key (lambda (p) (length (cdr p)))
-                                 :initial-value 1)
-              (length itext))
-             ()
-             "Length mismatch in child alist, interleaved text lists:~%~a~%~s~%"
-             calist itext))
-   (flet ((child-slot-spec (child)
-            "Return the spec for the slot that includes CHILD."
-            (car (find child calist
-                       :key #'cdr
-                       :test #'member)))
-          (interleave-text-with-alist (alist)
-            "Given an alist of (child-spec . children), return a list
-interleaving text nodes, slot specs, and children."
-            (cons (pop itext)
-                  (iter (for (child-spec . vals) in alist)
-                        (appending
-                         (cons child-spec
-                               (iter (for v in vals)
-                                     (collecting v)
-                                     (collecting (pop itext))))))))))
-   (if (not (ast-annotation ast :child-order))
-       (interleave-text-with-alist calist))
-   (let* ((sorted-children (sorted-children ast))
-          ;; Gather runs of children having the same slot specifier.
-          (specifier-runs (runs sorted-children :key #'child-slot-spec))
-          ;; Return an "alist" of (slot-spec . children) where the same
-          ;; slot-spec may occur more than once.
-          (ordered-calist
-           (mapcar (lambda (run)
-                     (cons (child-slot-spec (car run))
-                           run))
-                   specifier-runs)))
-     (interleave-text-with-alist ordered-calist))))
+  (labels ((child-slot-spec (child calist)
+             "Return the spec for the slot that includes CHILD."
+             (car (find child calist
+                        :key #'cdr
+                        :test #'member)))
+           (consolidate-runs (calist)
+             "Gather runs of children having the same slot specifier."
+             (runs (children ast) :key {child-slot-spec _ calist}))
+           (ordered-calist ()
+             "Return an `alist' of (slot-spec . children) where the same
+            slot-spec may occur more than once."
+             (let ((calist (children-slot-specifier-alist ast)))
+               (mapcar (lambda (run)
+                         (cons (child-slot-spec (car run) calist)
+                               run))
+                       (consolidate-runs calist)))))
+    (flatten (ordered-calist))))
 
 (defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
   "The default method uses ordinary copy, treating the children list
