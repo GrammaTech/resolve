@@ -44,9 +44,6 @@
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :functional-trees :slot-specifier :slot-specifier-slot
    :slot-specifier-arity :slot-specifier-for-slot)
-  (:import-from :software-evolution-library/software/parseable
-                :interleaved-text)
-
   (:import-from :software-evolution-library/utility/task :task-map)
   (:export ;; auto-mergeable data structures
            :auto-mergeable
@@ -392,92 +389,82 @@ option."))
                      (software auto-mergeable-parseable))
   "Return a list of parseable mutation operations to replace an existing
 conflict AST resolution with an alternative option."
-  (let* ((conflict-ast (targets mutation))
-         (strategy (or (strategy mutation)
-                       (random-elt (get-conflict-strategies conflict-ast))))
-         (prior-resolution (or (remove-if-not [{eq conflict-ast}
-                                               {aget :conflict-ast}
-                                               #'ast-annotations]
-                                              (get-resolved-conflicts software))
-                               (list conflict-ast)))
-         (new-resolution (resolve-conflict-ast conflict-ast
-                                               :strategy strategy))
-         (conflict-path (ast-path software (car prior-resolution)))
-         (parent (@ software (butlast conflict-path))))
-    #+auto-mergeable-debug
-    (progn
-      (format t "conflict-ast = ~a~%" conflict-ast)
-      (format t "strategy = ~a~%" strategy)
-      (format t "prior-resolution = ~a~%" prior-resolution)
-      (format t "new-resolution = ~a~%" new-resolution)
-      (format t "conflict-path = ~a~%" conflict-path)
-      (format t "parent = ~a~%" parent))
-    ;; Replace the prior resolution children with the new resolution
-    (nlet retry ((lccp (lastcar conflict-path)))
-      (cond
-        ((null conflict-path)
-         `((:set (:stmt1 . ,conflict-path)
-                 (:literal1 . ,(car new-resolution)))))
-        ((symbolp lccp)
-         ;; Retry after normalizing lccp.
-         (retry (cons lccp 0)))
-        ((typep lccp '(cons (or slot-specifier symbol) integer))
-         (destructuring-bind (ss . index)
-             lccp
-           (when (symbolp ss)
-             (setf ss (slot-specifier-for-slot parent ss)))
-           (let ((arity (slot-specifier-arity ss))
-                 (slot (slot-specifier-slot ss)))
+  (labels ((replace-at (sequence index item drop)
+             "Create a copy of SEQUENCE which drops DROP values at INDEX
+              and replaces them with ITEM."
+             (append
+              (subseq sequence 0 index)
+              item
+              (subseq sequence (+ index drop))))
+           (insert-into-parent-slot-ops
+               (parent slot arity index new-resolution prior-resolution)
+             "Return ops to insert NEW-RESOLUTION at INDEX of SLOT in PARENT."
+             (let* ((parent-slot-children (slot-value parent slot))
+                    (new-slot-value
+                      (if (eql arity 1)
+                          (car new-resolution)
+                          (replace-at
+                           parent-slot-children index
+                           new-resolution
+                           (length prior-resolution)))))
+               #+nil
+               (let ((pos (position (@ parent lccp) (children parent))))
+                 ;; TODO: does this assertion still make sense to have?
+                 (assert pos))
+               `((:set
+                  (:stmt1 . ,parent)
+                  (:literal1 . ,(copy parent (make-keyword slot) new-slot-value)))))))
+    (let* ((conflict-ast (targets mutation))
+           (strategy (or (strategy mutation)
+                         (random-elt (get-conflict-strategies conflict-ast))))
+           (prior-resolution (or (remove-if-not [{eq conflict-ast}
+                                                 {aget :conflict-ast}
+                                                 #'ast-annotations]
+                                                (get-resolved-conflicts software))
+                                 (list conflict-ast)))
+           (new-resolution (resolve-conflict-ast conflict-ast
+                                                 :strategy strategy))
+           (conflict-path (ast-path software (car prior-resolution)))
+           (parent (@ software (butlast conflict-path))))
+      #+auto-mergeable-debug
+      (progn
+        (format t "conflict-ast = ~a~%" conflict-ast)
+        (format t "strategy = ~a~%" strategy)
+        (format t "prior-resolution = ~a~%" prior-resolution)
+        (format t "new-resolution = ~a~%" new-resolution)
+        (format t "conflict-path = ~a~%" conflict-path)
+        (format t "parent = ~a~%" parent))
+      ;; TODO: remove this before merge. This is to ensure interleaved-text
+      ;;       isn't still present.
+      (assert (every (of-type 'ast) (append prior-resolution new-resolution)))
+      ;; Replace the prior resolution children with the new resolution
+      (nlet retry ((lccp (lastcar conflict-path)))
+        (cond
+          ((null conflict-path)
+           `((:set (:stmt1 . ,conflict-path)
+                   (:literal1 . ,(car new-resolution)))))
+          ((symbolp lccp)
+           ;; Retry after normalizing lccp.
+           (retry (cons lccp 0)))
+          ((typep lccp '(cons symbol integer))
+           (retry (cons (slot-specifier-for-slot parent (car lccp))
+                        (cdr lccp))))
+          ((typep lccp '(cons (or slot-specifier symbol) integer))
+           (let* ((slot-specifier (car lccp))
+                  (index (cdr lccp))
+                  (arity (slot-specifier-arity slot-specifier))
+                  (slot (slot-specifier-slot slot-specifier)))
              #+auto-mergeable-debug
              (progn
                (format t "slot = ~a~%" slot)
                (format t "arity = ~a~%" arity)
                (format t "slot-value = ~a~%" (slot-value parent slot)))
-             (if (eql arity 1)
-                 `((:set (:stmt1 . ,parent)
-                         (:literal1 .
-                                    ,(copy parent
-                                           slot
-                                           (car new-resolution)))))
-                 (let ((pos (position (@ parent lccp) (remove-if #'stringp (children parent))))
-                       (prior-len (length prior-resolution))
-                       (new-len (length new-resolution)))
-                   (assert pos)
-                   (let* ((itext (interleaved-text parent))
-                          (new-interleaved-text
-                           ;; This "works" in the sense of making the tests pass, but
-                           ;; it's not clean.  The best solution will be to change to
-                           ;; ast nodes without interleaved-text.
-                           (if (< new-len prior-len)
-                               (append (subseq itext 0 (1+ pos))
-                                       (subseq itext (+ pos (- prior-len new-len))))
-                               (if (> new-len prior-len)
-                                   (append (subseq itext 0 (1+ pos))
-                                           (make-list (- new-len prior-len) :initial-element "")
-                                           (subseq itext (1+ pos)))
-                                   itext))))
-                     `((:set (:stmt1 . ,parent)
-                             (:literal1 .
-                                        ,(copy parent
-                                               :interleaved-text new-interleaved-text
-                                               slot
-                                               (let ((prior-children (slot-value parent slot)))
-                                                 (append (subseq prior-children 0 index)
-                                                         new-resolution
-                                                         (subseq prior-children
-                                                                 (+ index
-                                                                    prior-len))))))))))))))
-        (t
-         `((:set (:stmt1 . ,parent)
-                 (:literal1 .
-                            ,(copy parent :children
-                                   (append (subseq (children parent)
-                                                   0
-                                                   (lastcar conflict-path))
-                                           new-resolution
-                                           (subseq (children parent)
-                                                   (+ (lastcar conflict-path)
-                                                      (length prior-resolution)))))))))))))
+             (insert-into-parent-slot-ops
+              parent slot arity index new-resolution prior-resolution)))
+          (t
+           (insert-into-parent-slot-ops
+            parent :children 0 (lastcar conflict-path)
+            new-resolution prior-resolution)))))))
 
 (defmethod apply-mutation ((software auto-mergeable-simple)
                            (mutation new-conflict-resolution))
