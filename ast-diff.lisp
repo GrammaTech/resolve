@@ -28,6 +28,7 @@
    :gt/full
    :software-evolution-library
    :software-evolution-library/software/parseable
+   #+nil
    :software-evolution-library/software/clang
    :software-evolution-library/software/simple
    :software-evolution-library/software/ir

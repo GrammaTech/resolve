@@ -26,13 +26,16 @@
         :resolve/software/parseable
         :software-evolution-library
         :software-evolution-library/components/file
+        #+nil
         :software-evolution-library/software/clang
         :software-evolution-library/software/simple
         :software-evolution-library/software/parseable
+        #+nil
         :software-evolution-library/software/clang
         :software-evolution-library/software/lisp
         :software-evolution-library/software/project
         :software-evolution-library/software/parseable-project
+        #+nil
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project
@@ -49,10 +52,12 @@
            :auto-mergeable
            :auto-mergeable-simple
            :auto-mergeable-parseable
+           #+nil
            :auto-mergeable-clang
            :auto-mergeable-javascript
            :auto-mergeable-lisp
            :auto-mergeable-project
+           #+nil
            :auto-mergeable-clang-project
            :auto-mergeable-javascript-project
            :auto-mergeable-lisp-project
@@ -77,12 +82,14 @@
 (define-software auto-mergeable () ())
 (define-software auto-mergeable-simple (auto-mergeable simple) ())
 (define-software auto-mergeable-parseable (auto-mergeable parseable) ())
+           #+nil
 (define-software auto-mergeable-clang (auto-mergeable-parseable clang) ())
 (define-software auto-mergeable-javascript (auto-mergeable-parseable javascript) ())
 (define-software auto-mergeable-json (auto-mergeable-parseable json) ())
 (define-software auto-mergeable-lisp (auto-mergeable-parseable lisp) ())
 
 (define-software auto-mergeable-project (auto-mergeable parseable-project) ())
+           #+nil
 (define-software auto-mergeable-clang-project
     (auto-mergeable-project clang-project) ())
 (define-software auto-mergeable-javascript-project
@@ -96,6 +103,7 @@
   (:documentation "Create an auto-mergeable software object from SOFT.")
   (:method ((obj simple) &key)
     (change-class (copy obj) 'auto-mergeable-simple))
+           #+nil
   (:method ((obj clang) &key)
     (change-class (copy obj) 'auto-mergeable-clang))
   (:method ((obj javascript) &key)

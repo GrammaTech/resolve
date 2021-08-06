@@ -82,6 +82,7 @@
                           (pathname-directory *this-file*)))))
   (:teardown (setf *forms* nil)))
 
+#+nil
 (defixture binary-search-clang
   (:setup
    (setf *binary-search*
@@ -112,6 +113,7 @@
   (:teardown
    (setf *old* nil *my* nil *your* nil)))
 
+#+nil
 (defixture gcd-conflict-clang
   (:setup
    (destructuring-bind (my old your)
@@ -584,6 +586,7 @@
 ;;;; Clang AST Diff tests
 (defsuite clang-ast-diff-tests "AST-level diffs of clang objects.")
 
+#+nil
 (deftest (diff-gets-back-on-track :long-running) ()
   (let ((obj1 (from-string (make-instance 'clang)
                            "int a; int b; int c; int d;"))
@@ -596,6 +599,7 @@
     (is (= 10 (nth-value 1 (ast-diff obj1 obj2 :ignore-whitespace t
                                     :base-cost 2))))))
 
+#+nil
 (deftest (diff-insert :long-running) ()
   (let ((orig (from-string (make-instance 'clang)
                            "int x; int y; int z;"))
@@ -629,6 +633,7 @@
                   '(:same :same :same :same :same
                     :same :insert :insert :same))))))
 
+#+nil
 (deftest (diff-delete :long-running) ()
   (let ((orig (from-string (make-instance 'clang)
                            "int x; int y; int z;"))
@@ -660,6 +665,7 @@
       (is (equal? (mapcar #'car diff-c)
                   '(:same :same :same :same :delete :delete :same))))))
 
+#+nil
 (deftest (diff-recursive :long-running) ()
   (let* ((orig (from-string (make-instance 'clang)
                             "int x = 1; int y = 2; int z = 3;"))
@@ -672,6 +678,7 @@
     (is (equal? (mapcar #'car diff)
                 '(:same :same :same :recurse :same :same :same)))))
 
+#+nil
 (deftest (diff-text-changes :long-running) ()
   (let ((orig (from-string (make-instance 'clang)
                            "/* 1 */ int x; /* 2 */ int y; int z; /* 3 */"))
@@ -703,6 +710,7 @@
       (is (equal? (mapcar #'car diff-c)
                   '(:same :same :same :same :same :same :recurse))))))
 
+#+nil
 (deftest diff-real-text ()
   (with-fixture binary-search-clang
     (let ((var (copy *binary-search*)))
@@ -725,6 +733,7 @@
                        (copy-list (remove-duplicates (flatten d))))
         #'string< :key #'symbol-name))
 
+#+nil
 (deftest diff-wrap/unwrap.1 ()
   (flet ((keys (d) (keys-of-diff d)))
     (let* ((s1 "int f() { return 1; }")
@@ -754,6 +763,7 @@
         (is (equal (keys diff) '(:recurse :replace :same)))
         (is (= cost 8))))))
 
+#+nil
 (deftest diff-sequence-wrap/unwrap.1 ()
   (let* ((s1 "int f(int x, int y) { int c = 1; int z = x+y; return z+c; }")
          (s2 "int f(int x, int y, int p) { int c = 1; if (p == 0) { int z = x+y; return z+c; } return 0; }")
@@ -777,6 +787,7 @@
       (let ((s (with-output-to-string (*standard-output*) (print-diff diff :no-color t))))
         (is (equal s "int f(int x, int y[-, int p-]) { int c = 1; [-if (p == 0) { -]int z = x+y; return z+c;[- } return 0;-] }"))))))
 
+#+nil
 (deftest diff-wrap-patch.1 ()
   (let* ((s1 "int f() { return 1; }")
          (s2 "int f() { return 1+2; }")
@@ -794,6 +805,7 @@
               (source-text ast3) (ast-to-list-form ast3)))
     (is (equal? ast2 ast3))))
 
+#+nil
 (deftest print-diff.1 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -803,6 +815,7 @@
 			      :stream s)))
 	      "int a; {+int b; +}int c;")))
 
+#+nil
 (deftest print-diff.2 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -813,6 +826,7 @@
 	      "int a; [-int b; -]int c;")
       "Print diff of a deletion"))
 
+#+nil
 (deftest print-diff.3 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -826,6 +840,7 @@
 
 ;; Increasing the base cost makes larger scale replacements
 ;; more prefered, vs. fine scaled replacement inside strings
+#+nil
 (deftest print-diff.3a ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -837,6 +852,7 @@
               "int a; int {+d+}[-b-]; int c;")
       "Print diff of a replacement"))
 
+#+nil
 (deftest print-diff.4 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -848,6 +864,7 @@
 	      "char *s = \"a[-b-]cd\";")
       "Print diff of deletion of a character in a string"))
 
+#+nil
 (deftest print-diff.4a ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -859,6 +876,7 @@
               "char *s = \"a[-b-]cd\";")
       "Print diff of deletion of a character in a string"))
 
+#+nil
 (deftest print-diff.5 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -870,6 +888,7 @@
 	      "char *s = \"a[-bc-]d\";")
       "Print diff of deletion of substring in a string"))
 
+#+nil
 (deftest print-diff.6 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -881,6 +900,7 @@
 	      "char *s = \"a{+bc+}d\";")
       "Print diff of insertion of a substring in a string"))
 
+#+nil
 (deftest print-diff.7 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'clang) s)))
@@ -945,6 +965,7 @@
 
 
 ;;;; AST edit tree tests
+#+nil
 (deftest edit-tree.1 ()
   (let* ((obj1 (from-string (make-instance 'clang) "int a; int b; int c; int d; int e;"))
          (obj2 (from-string (make-instance 'clang) "int a; int c; int e;"))
@@ -955,6 +976,7 @@
           "Edit tree with two differences expect 2 nodes. (~a) (~a)"
           count edit-tree))))
 
+#+nil
 (deftest edit-tree.2 ()
   (let* ((obj1 (from-string (make-instance 'clang) "int a;"))
          (obj2 (from-string (make-instance 'clang) "int a;"))
@@ -962,6 +984,7 @@
     (is (null edit-tree)
         "Empty diffs produce the null edit tree")))
 
+#+nil
 (deftest edit-tree.3 ()
   (let* ((obj1 (from-string (make-instance 'clang) "char *a = \"abcde\";"))
          (obj2 (from-string (make-instance 'clang) "char *a = \"ace\";"))

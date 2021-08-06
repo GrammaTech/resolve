@@ -10,7 +10,9 @@
         :software-evolution-library/components/test-suite
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
+        #+nil
         :software-evolution-library/software/clang
+        #+nil
         :software-evolution-library/software/clang-project
         :software-evolution-library/software/simple
         :resolve/core
@@ -127,14 +129,6 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                 (test-cases tests))
         (make-list (length (test-cases tests))
                    :initial-element most-positive-fixnum))))
-
-(defmethod auto-merge-test :around ((obj clang-project) (tests test-suite))
-  "Setup environment so the fitness of OBJ can be evaluated against TESTS."
-  ;; Bind *build-dir* so multiple builds can occur in a multi-threaded
-  ;; environment.
-  (with-temporary-directory (:pathname dir)
-    (let ((*build-dir* dir))
-      (call-next-method))))
 
 
 ;;; Evolution of a merge resolution.
