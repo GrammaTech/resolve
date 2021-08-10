@@ -1659,7 +1659,13 @@
                 {auto-merge-test _ (create-test-suite "true" 1)})))))
 
 (defun count-conflicts (sw)
-  (count-if (of-type 'conflict-ast) (genome sw)))
+  (let ((counter 0))
+    (mapc
+     (lambda (node)
+       (when (typep node 'conflict-ast)
+         (incf counter (length (aget :my (conflict-ast-child-alist node))))))
+     (genome sw))
+    counter))
 
 (defun try-merge (my old your)
   (let* ((my (create-auto-mergeable (from-string (make 'javascript) my)))
