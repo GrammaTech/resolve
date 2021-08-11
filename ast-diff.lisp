@@ -40,7 +40,8 @@
    :child-slots :slot-spec-slot
    :children-alist :slot-specifier)
   (:import-from :software-evolution-library/software/tree-sitter
-                :tree-sitter-ast)
+                :tree-sitter-ast
+                :output-transformation)
   (:export
    :ast-cost
    :ast-size
@@ -3274,7 +3275,8 @@ and convert it back to whatever internal form this kind of AST uses."))
                         :test #'member)))
            (consolidate-runs (calist)
              "Gather runs of children having the same slot specifier."
-             (runs (children ast) :key {child-slot-spec _ calist}))
+             (runs (remove-if-not (of-type 'ast) (output-transformation ast))
+                   :key {child-slot-spec _ calist}))
            (ordered-calist ()
              "Return an `alist' of (slot-spec . children) where the same
             slot-spec may occur more than once."
