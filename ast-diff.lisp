@@ -671,6 +671,41 @@ differencing of specialized AST structures.; `equal?',
         (values diff cost)
         (call-next-method))))
 
+;;; TODO: this is basically the same method as the ast/ast specialization.
+;;;       Refactor this in some way to reuse code. Do not merge before then.
+(defmethod ast-diff* ((ast-a tree-sitter-ast) (ast-b tree-sitter-ast))
+  #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
+                  (ast-can-recurse ast-a ast-b))
+  (let (diff cost)
+    (when (or (eql (ast-class ast-a) (ast-class ast-b))
+              ;; NOTE: choice expansion subclassing allows for an AST
+              ;;       with multiple possible representations/choices
+              ;;       to have each possibility represented as its own
+              ;;       subclass. In these cases, it's the superclass
+              ;;       that really matters.
+              (and (slot-exists-p ast-a 'sel/sw/ts::choice-superclass)
+                   (slot-exists-p ast-b 'sel/sw/ts::choice-superclass)
+                   (eql (sel/sw/ts::choice-superclass ast-a)
+                        (sel/sw/ts::choice-superclass ast-b))))
+      (setf (values diff cost)
+            (ast-diff*-lists (standardized-children ast-a)
+                             (standardized-children ast-b)
+                             ast-a ast-b)))
+    (when *wrap*
+      (multiple-value-bind (wrap-diff wrap-cost)
+          (ast-diff-wrap ast-a ast-b)
+        (when (and wrap-cost (or (null cost) (< wrap-cost cost)))
+          (setf diff wrap-diff
+                cost wrap-cost)))
+      (multiple-value-bind (unwrap-diff unwrap-cost)
+          (ast-diff-unwrap ast-a ast-b)
+        (when (and unwrap-cost (or (null cost) (< unwrap-cost cost)))
+          (setf diff unwrap-diff
+                cost unwrap-cost))))
+    (if diff
+        (values diff cost)
+        (call-next-method))))
+
 (defun map-ast-while-path (ast fn &optional path)
   "Apply FN to the nodes of AST A, stopping
 the descent when FN returns NIL.  FN is also passed a PATH
