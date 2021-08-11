@@ -21,7 +21,9 @@
         :resolve/software/project
         :resolve/software/auto-mergeable
         :resolve/software/parseable)
-  (:import-from :resolve/ast-diff)
+  (:import-from :resolve/ast-diff
+                :standardized-children
+                :copy-with-standardized-children)
   (:shadow :function-body)
   (:import-from :software-evolution-library/components/file
                 :file-w-attributes)
@@ -104,7 +106,8 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
     (iter (for (file . obj) in (evolve-files conflicted))
           (collect (if (get-conflicts obj)
                        (mapcar {cons file} (populate obj))
-                       (list (cons file (copy obj)))) into resolutions)
+                       (list (cons file (copy obj))))
+            into resolutions)
           (finally
             ;; Return all conflict resolution variants if the total number
             ;; is less than POP-SIZE.  Otherwise, return a random sample.
@@ -144,8 +147,80 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
           :other-files (map-files (other-files project)))))
 
 (defun try-reconcile-conflicts (sw &aux reconciliations)
-  "Attempt to reconcile conflict nodes in SW assuming they represent conflicting branches of a Git repository."
-  (labels ((get-reconciliations-by-intent (node)
+  "Attempt to reconcile conflict nodes in SW assuming they represent conflicting
+branches of a Git repository."
+  (labels ((propagate-alist-keys (alist)
+             "Propagate the keys in ALIST to each item in
+              their associated value."
+             ;; ((:key val1 val2 ...) ...)
+             ;;  ->
+             ;; (((:key val1) (:key val2) ...) ...)
+             (iter (for association in alist)
+               (collect (mapcar {list (car association)}
+                                (cdr association)))))
+           (expand-conflict-asts (children)
+             "Expand all conflict-asts in CHILDREN such that no conflict-ast
+              represents more than one conflict each."
+             (symbol-macrolet ((child-alist (conflict-ast-child-alist child)))
+               (iter
+                 (for child in children)
+                 (appending
+                  (cond
+                    ((typep child '(not conflict-ast)) (list child))
+                    ;; If there is only one item in the :my list,
+                    ;; the conflict AST hasn't been merged.
+                    ((= 1 (length (aget :my child-alist)))
+                     (list child))
+                    (t
+                     (apply
+                      #'mapcar
+                      (op (make-instance 'conflict-ast :child-alist (list _*)))
+                      (propagate-alist-keys child-alist))))))))
+           (expand-merged-conflict-asts (node)
+             "Expand all merged conflict-asts in NODE such that they only
+              represent one conflict each."
+             (typecase node
+               (ast
+                (let* ((standardized-children (standardized-children node))
+                       (expanded-children
+                         (mapcar #'expand-merged-conflict-asts
+                                 (expand-conflict-asts standardized-children))))
+                  (copy-with-standardized-children node expanded-children)))
+               (t node)))
+           (handle-3-way-conflict (node my your old)
+             "Handle a 3-way conflict between MY, YOUR, and OLD at NODE."
+             ;; TODO: don't use node and create a new one instead?
+             (cond ((equal? my your)
+                    ;; If both branches make the same change, we
+                    ;; should keep it.
+                    (push (cons node :v1) reconciliations))
+                   ;; If one branch has changed and the other
+                   ;; has not, we should keep the change.
+                   ((equal? old my)
+                    (push (cons node :v2) reconciliations))
+                   ((equal? old your)
+                    (push (cons node :v1) reconciliations))
+                   ;; TODO: is this needed?
+                   (t node)))
+           (handle-2-way-conflict (node my your)
+             "Handle a 2-way conflict between MY and YOUR at NODE."
+             ;; If both branches have made the same addition we
+             ;; should keep it.
+             (cond ((equal? my your)
+                    (push (cons node :v1) reconciliations))
+                   ;; TODO: is this needed?
+                   (t node)))
+           (get-conflict-reconciliations (node)
+             (match (conflict-ast-child-alist node)
+               ((alist (:my . my)
+                       (:your . your)
+                       (:old . old))
+                (mapcar {handle-3-way-conflict node} my your old))
+               ((alist (:my . my)
+                       (:your . your))
+                (mapcar {handle-2-way-conflict node} my your))
+               (otherwise node)))
+           (get-reconciliations-by-intent (node)
              (typecase node
                (auto-mergeable-project
                 (map-project-files #'get-reconciliations-by-intent node))
@@ -155,48 +230,25 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                       (mapcar #'get-reconciliations-by-intent
                               (genome node))))
                (conflict-ast
-                ;; Note that the child-alist slot of conflict-asts is
-                ;; no longer really an alist: it used to be that the
-                ;; cdr was a list of children, but now the cdr is
-                ;; always a list of a single element.
-                (match (conflict-ast-child-alist node)
-                  ((alist (:my . (list my))
-                          (:your . (list your))
-                          (:old . (list old)))
-                   (cond ((equal? my your)
-                          ;; If both branches make the same change, we
-                          ;; should keep it.
-                          (push (cons node :v1) reconciliations))
-                         ;; If one branch has changed and the other
-                         ;; has not, we should keep the change.
-                         ((equal? old my)
-                          (push (cons node :v2) reconciliations))
-                         ((equal? old your)
-                          (push (cons node :v1) reconciliations))
-                         (t node)))
-                  ((alist (:my . (list my))
-                          (:your . (list your)))
-                   ;; If both branches have made the same addition we
-                   ;; should keep it.
-                   (cond ((equal? my your)
-                          (push (cons node :v1) reconciliations))
-                         (t node)))
-                  (otherwise node)))
+                (get-conflict-reconciliations node))
                (otherwise node))))
     (etypecase sw
       (auto-mergeable-project
        (copy sw
              :evolve-files
-             (iter (for (file . obj) in (evolve-files sw))
-                   (collect (cons file (try-reconcile-conflicts obj))))))
+             (iter
+               (for (file . obj) in (evolve-files sw))
+               (collect (cons file (try-reconcile-conflicts obj))))))
       (auto-mergeable
-       (get-reconciliations-by-intent sw)
-       (reduce (lambda (variant node.strategy)
-                 (resolve-conflict (copy variant)
-                                   (car node.strategy)
-                                   :strategy (cdr node.strategy)))
-               reconciliations
-               :initial-value sw)))))
+       (let ((expanded-sw
+               (copy sw :genome (expand-merged-conflict-asts (genome sw)))))
+         (get-reconciliations-by-intent expanded-sw)
+         (reduce (lambda (variant node.strategy)
+                   (resolve-conflict (copy variant)
+                                     (car node.strategy)
+                                     :strategy (cdr node.strategy)))
+                 reconciliations
+                 :initial-value expanded-sw))))))
 
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target num-threads
