@@ -1540,9 +1540,10 @@
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
              (progn (with (copy *cnf*)
-                                 (first (conflict-nodes *cnf*))
-                                 (aget :my (conflict-ast-child-alist
-                                            (first (conflict-nodes *cnf*)))))
+                          (first (conflict-nodes *cnf*))
+                          (car
+                           (aget :my (conflict-ast-child-alist
+                                      (first (conflict-nodes *cnf*))))))
                     (length (aget :my (conflict-ast-child-alist
                                        (car (conflict-nodes *cnf*)))))))))))
 
