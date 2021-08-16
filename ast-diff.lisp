@@ -38,10 +38,11 @@
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :functional-trees
    :child-slots :slot-spec-slot
-   :children-alist :slot-specifier)
+   :children-alist :slot-specifier
+   :slot-specifier-slot)
   (:import-from :software-evolution-library/software/tree-sitter
-                :tree-sitter-ast
-                :output-transformation)
+   :tree-sitter-ast :output-transformation
+   :computed-text)
   (:export
    :ast-cost
    :ast-size
@@ -3301,25 +3302,27 @@ and convert it back to whatever internal form this kind of AST uses."))
   "The default method uses the ordinary CHILDREN function"
   (children ast))
 
+(defmethod standardized-children :around ((ast computed-text))
+  ;; Add information in for the 'text slot.
+  (let ((standardized-children (call-next-method)))
+    (if (children ast)
+        standardized-children
+        `(,(car standardized-children)
+          ,(make-instance 'slot-specifier
+                          :class (class-of ast) :slot 'text :arity 1)
+          ,(text ast)
+          ,@(cdr standardized-children)))))
+
 (defmethod standardized-children ((ast tree-sitter-ast))
   (check-child-lists ast)
-  (labels ((child-slot-spec (child calist)
-             "Return the spec for the slot that includes CHILD."
-             (car (find child calist
-                        :key #'cdr
-                        :test #'member)))
-           (consolidate-runs (calist)
-             "Gather runs of children having the same slot specifier."
-             (runs (remove-if-not (of-type 'ast) (output-transformation ast))
-                   :key {child-slot-spec _ calist}))
-           (ordered-calist ()
+  (labels ((ordered-calist ()
              "Return an `alist' of (slot-spec . children) where the same
             slot-spec may occur more than once."
-             (let ((calist (children-slot-specifier-alist ast)))
-               (mapcar (lambda (run)
-                         (cons (child-slot-spec (car run) calist)
-                               run))
-                       (consolidate-runs calist)))))
+             (mapcar
+              (lambda (ordering)
+                `(,(caar ordering)
+                  ,@(mappend #'cdr ordering)))
+              (assort (children-slot-specifier-alist ast) :key #'car))))
     (flatten (ordered-calist))))
 
 (defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
@@ -3342,6 +3345,22 @@ as the ordinary children list."
         (typecase c
           (slot-specifier (return nil))
           (conflict-ast (return t)))))
+
+(defmethod copy-with-standardized-children :around ((ast computed-text) (children list) &rest args)
+  (declare (ignorable args))
+  (labels ((text-slot-p (slot-specifier)
+             "Return T if SLOT-SPECIFIER represents a 'text slot."
+             (and (typep slot-specifier 'slot-specifier)
+                  (eql 'text (slot-specifier-slot slot-specifier))))
+           (set-text-slot (copy)
+             "Set the text slot of COPY if a value is provided in CHILDREN."
+             (prog1 copy
+               (when-let* ((text-slot-position
+                            (position-if #'text-slot-p children))
+                           (text (nth (1+ text-slot-position) children)))
+                 (assert (typep text 'string))
+                 (setf (text copy) text)))))
+    (set-text-slot (call-next-method))))
 
 (defmethod copy-with-standardized-children ((ast tree-sitter-ast) (children list) &rest args)
   (declare (special *a* *c*))
@@ -3377,7 +3396,7 @@ as the ordinary children list."
              "Create a copy of AST if it would differ from the values
               already in AST. Otherwise, return AST."
              (if (and (equal? (mapcar (lambda (p)
-                                        (cons (ft::slot-specifier-slot (car p))
+                                        (cons (slot-specifier-slot (car p))
                                               (cdr p)))
                                       child-alist)
                               (children-alist ast))
@@ -3445,7 +3464,7 @@ annotation."
              (push c (cdr slot-pair))
              ;; The extra layer here (a cons in a list) is to mimic
              ;; the format of `ft:position'.
-             (let ((slot (ft::slot-specifier-slot current-slot)))
+             (let ((slot (slot-specifier-slot current-slot)))
                (push (list (cons slot (1- (length (cdr slot-pair)))))
                      order)))))))
     (push (get-output-stream-string s) itext)
@@ -3491,7 +3510,7 @@ contents.  Uses ASSERT to cause failure if they do not."))
     (format t "~v@{ ~}~a~%" indent (ast-class ast))
     (format t "~v@{ ~}~s~%" indent (interleaved-text ast))
     (dolist (ss (child-slot-specifiers ast))
-      (let ((s (ft::slot-specifier-slot ss))
+      (let ((s (slot-specifier-slot ss))
             (n2 (+ indent 2)))
         (format t "~v@{ ~}~a:~%" indent s)
         (if (eql (ft::slot-specifier-arity ss) 1)
