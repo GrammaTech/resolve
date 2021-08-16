@@ -184,13 +184,17 @@ yours2() was crossed over from the genome of B into A."
   (multiple-value-bind (a-begin a-end b-begin b-end)
       (select-crossover-points a b)
     (if (and a-begin a-end b-begin b-end)
-        (let ((a-children (children (genome a)))
-              (b-children (children (genome b))))
-          (nest (copy a :genome)
-                (copy (genome a) :children)
-                (append (subseq a-children 0 a-begin)     ;; (1)
-                        (subseq b-children b-begin b-end) ;; (2)
-                        (subseq a-children a-end))))      ;; (3)
+        (let* ((a-children (children (genome a)))
+               (b-children (children (genome b)))
+               (children (append (subseq a-children 0 a-begin)     ;; (1)
+                                 (subseq b-children b-begin b-end) ;; (2)
+                                 (subseq a-children a-end))))      ;; (3)
+          ;; TODO: this can be removed once everything has been
+          ;;       converted to structured-text.
+          (assert (every (of-type 'ast) (aget :children children)))
+          ;; TODO: there's likely an issue with everything not being copied here
+          ;;       with named children.
+          (copy a :genome (copy (genome a) :children children)))
         (copy a))))
 
 (defmethod select-crossover-points ((a auto-mergeable-parseable)
