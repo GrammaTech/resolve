@@ -42,7 +42,7 @@
    :slot-specifier-slot)
   (:import-from :software-evolution-library/software/tree-sitter
    :tree-sitter-ast :output-transformation
-   :computed-text)
+   :computed-text :structured-text :choice-superclass)
   (:export
    :ast-cost
    :ast-size
@@ -648,46 +648,25 @@ differencing of specialized AST structures.; `equal?',
            (ast-diff* ast-a ast-b)
         (clear-ast-diff-table)))))
 
+(defgeneric same-class-p (object-a object-b)
+  (:documentation "Return T if OBJECT-1 and OBJECT-2 are of the same class.")
+  (:method ((ast-a ast) (ast-b ast)) (eql (ast-class ast-a) (ast-class ast-b)))
+  (:method ((ast-a structured-text) (ast-b structured-text))
+    (or (eql (ast-class ast-a) (ast-class ast-b))
+        ;; NOTE: choice expansion subclassing allows for an AST
+        ;;       with multiple possible representations/choices
+        ;;       to have each possibility represented as its own
+        ;;       subclass. In these cases, it's the superclass
+        ;;       that really matters.
+        (and (slot-exists-p ast-a 'choice-superclass)
+             (slot-exists-p ast-b 'choice-superclass)
+             (eql (choice-superclass ast-a) (choice-superclass ast-b))))))
+
 (defmethod ast-diff* ((ast-a ast) (ast-b ast))
   #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
                   (ast-can-recurse ast-a ast-b))
   (let (diff cost)
-    (when (eql (ast-class ast-a) (ast-class ast-b))
-      (setf (values diff cost)
-            (ast-diff*-lists (standardized-children ast-a)
-                             (standardized-children ast-b)
-                             ast-a ast-b)))
-    (when *wrap*
-      (multiple-value-bind (wrap-diff wrap-cost)
-          (ast-diff-wrap ast-a ast-b)
-        (when (and wrap-cost (or (null cost) (< wrap-cost cost)))
-          (setf diff wrap-diff
-                cost wrap-cost)))
-      (multiple-value-bind (unwrap-diff unwrap-cost)
-          (ast-diff-unwrap ast-a ast-b)
-        (when (and unwrap-cost (or (null cost) (< unwrap-cost cost)))
-          (setf diff unwrap-diff
-                cost unwrap-cost))))
-    (if diff
-        (values diff cost)
-        (call-next-method))))
-
-;;; TODO: this is basically the same method as the ast/ast specialization.
-;;;       Refactor this in some way to reuse code. Do not merge before then.
-(defmethod ast-diff* ((ast-a tree-sitter-ast) (ast-b tree-sitter-ast))
-  #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
-                  (ast-can-recurse ast-a ast-b))
-  (let (diff cost)
-    (when (or (eql (ast-class ast-a) (ast-class ast-b))
-              ;; NOTE: choice expansion subclassing allows for an AST
-              ;;       with multiple possible representations/choices
-              ;;       to have each possibility represented as its own
-              ;;       subclass. In these cases, it's the superclass
-              ;;       that really matters.
-              (and (slot-exists-p ast-a 'sel/sw/ts::choice-superclass)
-                   (slot-exists-p ast-b 'sel/sw/ts::choice-superclass)
-                   (eql (sel/sw/ts::choice-superclass ast-a)
-                        (sel/sw/ts::choice-superclass ast-b))))
+    (when (same-class-p ast-a ast-b)
       (setf (values diff cost)
             (ast-diff*-lists (standardized-children ast-a)
                              (standardized-children ast-b)
