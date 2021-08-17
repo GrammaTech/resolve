@@ -1504,8 +1504,6 @@
                      "-")))
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
-;;; TODOL FIXME: this is failing with the first string missing a blank line
-#+broken
 (deftest (resolve-to-single-equals-original/old :long-running) ()
   (with-fixture javascript-converge-conflict
     (is (string= (genome-string (astyle (resolve-to (copy *cnf*) :old)))
