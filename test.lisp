@@ -1627,13 +1627,13 @@
                             (converge my old your :conflict t)))
           (chunks (remove-if-not {typep _ 'conflict-ast}
                                  (child-asts (genome conflicted) :recursive t)))
-          (*population* (populate conflicted))))
-   (is (= (length *population*) (expt 5 (length chunks)))
-       "Population has the expected size ~d = 5^|chunks| => ~d."
-       (length *population*) (expt 5 (length chunks)))
-   (is (not (some [{some {typep _ 'conflict-ast}} {child-asts _ :recursive t}]
-                  *population*))
-       "Population has no conflict ASTs remaining.")))
+          (*population* (populate conflicted)))
+     (is (= (length *population*) (expt 5 (length chunks)))
+         "Population has the expected size ~d = 5^|chunks| => ~d."
+         (length *population*) (expt 5 (length chunks)))
+     (is (not (some [{some {typep _ 'conflict-ast}} {child-asts _ :recursive t}]
+                    *population*))
+         "Population has no conflict ASTs remaining."))))
 
 (deftest can-merge-when-one-side-is-invalid ()
   (nest
