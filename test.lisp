@@ -1615,9 +1615,6 @@
 (deftest targeted-populate-run ()
   )
 
-;;; TODO: FIXME: this is currently having problems
-;;;              with adding or removing from interleaved-text.
-#+broken
 (deftest (can-populate-from-conflicted-merges :long-running) ()
   (nest
    (with-fixture javascript-converge-conflict)
@@ -1631,7 +1628,8 @@
      (is (= (length *population*) (expt 5 (length chunks)))
          "Population has the expected size ~d = 5^|chunks| => ~d."
          (length *population*) (expt 5 (length chunks)))
-     (is (not (some [{some {typep _ 'conflict-ast}} {child-asts _ :recursive t}]
+     (is (not (some [{some {typep _ 'conflict-ast}} {child-asts _ :recursive t}
+                     #'genome]
                     *population*))
          "Population has no conflict ASTs remaining."))))
 
