@@ -1425,8 +1425,6 @@
 
 
 ;;; Automatic merge tests
-;;; TODO: FIXME:
-#+broken
 (deftest (merges-and-test-of-abacus-variants :long-running) ()
   (with-fixture javascript-abacus-variants
     (let ((orig (aget :orig *variants*))

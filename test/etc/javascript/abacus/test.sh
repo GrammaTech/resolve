@@ -120,6 +120,8 @@ test_case(){
 
 if [ ! -z $VERBOSE ];then set -x;fi
 
+chmod +x $EXE
+
 IFS=,
 for FLAVOR in $FLAVORS;do
   if [ -z $TEST_CASE ];then

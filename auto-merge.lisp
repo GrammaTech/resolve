@@ -49,7 +49,8 @@
       (lambda (ast)
         #+debug (format t "Replacing conflict at ~S~%" (ast-path conflicted ast))
         (prog1
-            (with conflicted ast (car (aget option (conflict-ast-child-alist ast))))
+            (less (splice conflicted ast (aget option (conflict-ast-child-alist ast)))
+                  ast)
           #+debug (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
           #+debug (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
           #+debug (incf counter))))
