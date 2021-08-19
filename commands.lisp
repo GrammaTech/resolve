@@ -256,9 +256,6 @@ command-line options processed by the returned function."
   "Given LANG, a guess or resolved language, return a preferred language.
 At the moment that means /not/ using tree-sitter."
   (case lang
-    (ts:python 'python)
-    (ts:javascript 'javascript)
-    (ts:json 'json)
     (t lang)))
 
 (define-command-rest ast-diff
