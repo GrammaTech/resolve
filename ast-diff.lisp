@@ -3281,16 +3281,30 @@ and convert it back to whatever internal form this kind of AST uses."))
   "The default method uses the ordinary CHILDREN function"
   (children ast))
 
-(defmethod standardized-children :around ((ast computed-text))
-  ;; Add information in for the 'text slot.
-  (let ((standardized-children (call-next-method)))
-    (if (children ast)
-        standardized-children
-        `(,(car standardized-children)
-          ,(make-instance 'slot-specifier
-                          :class (class-of ast) :slot 'text :arity 1)
-          ,(text ast)
-          ,@(cdr standardized-children)))))
+(let ((text-slot-specifier
+        (make-instance 'slot-specifier :class t :slot 'text :arity 1)))
+  (defmethod standardized-children :around ((ast computed-text))
+    ;; Add information in for the 'text slot.
+    (let ((standardized-children (call-next-method)))
+      (if (children ast)
+          standardized-children
+          `(,text-slot-specifier
+            ,(text ast)
+            ,@standardized-children)))))
+
+(let ((before-text-slot-specifier
+        (make-instance 'slot-specifier
+                       :class t :slot 'sel/sw/ts::before-text :arity 1))
+      (after-text-slot-specifier
+        (make-instance 'slot-specifier
+                       :class t :slot 'sel/sw/ts::after-text :arity 1)))
+  (defmethod standardized-children :around ((ast structured-text))
+    ;; Add information in for the 'text slot.
+    `(,before-text-slot-specifier
+      ,(sel/sw/ts::before-text ast)
+      ,@(call-next-method)
+      ,after-text-slot-specifier
+      ,(sel/sw/ts::after-text ast))))
 
 (defmethod standardized-children ((ast tree-sitter-ast))
   (check-child-lists ast)
@@ -3349,19 +3363,12 @@ as the ordinary children list."
   (labels ((add-every-slot (child-alist)
              "Return a child alist which contains every slot even
               if the slot doesn't have any children."
-             (iter
-               (for slot-specifier in (child-slot-specifiers ast))
-               (collecting
-                 (or (assoc slot-specifier child-alist)
-                     ;; empty slot.
-                     (list slot-specifier))
-                 into full-child-alist)
-               (finally
-                (assert (eql (length full-child-alist) (length (child-slots ast)))
-                  ()
-                  "CHILD-ALIST and (CHILD-SLOTS AST) have different lengths.~%~a~%~a~%~a~%~a"
-                  full-child-alist (child-slots ast) ast children)
-                (return full-child-alist))))
+             (map nil
+                  (lambda (slot-specifier)
+                    (unless (assoc slot-specifier child-alist)
+                      (push (list slot-specifier) child-alist)))
+                  (child-slot-specifiers ast))
+             child-alist)
            (copy-ast (child-alist)
              "Create a copy of ast with values based on CHILD-ALIST."
              (lret ((new (multiple-value-call #'copy-with-children-alist
@@ -3370,16 +3377,31 @@ as the ordinary children list."
                            :stored-hash nil
                            (values-list args))))
                (check-child-lists new)))
+           (get-amended-children-alist (ast)
+             "Return a version of the child-alist of AST with surrounding text
+              slots added and a text slot if the AST is a computed text node."
+             `(,@(when (typep ast 'computed-text)
+                   `((text ,(text ast))))
+               (sel/sw/ts::before-text ,(sel/sw/ts::before-text ast))
+               (sel/sw/ts::after-text ,(sel/sw/ts::after-text ast))
+               ,@(children-alist ast)))
+           (child-alist-equal? (child-alist)
+             "Return T if CHILD-ALIST is #'equal? to children alist of the
+              AST being copied."
+             (not
+              (occurs
+               nil
+               (mapcar (op (mapcar #'equal? _ _))
+                       (mapcar (lambda (p)
+                                 (cons (slot-specifier-slot (car p))
+                                       (cdr p)))
+                               child-alist)
+                       (get-amended-children-alist ast)))))
            ;; TODO: find a better name for this function.
            (maybe-get-copy (child-alist)
              "Create a copy of AST if it would differ from the values
               already in AST. Otherwise, return AST."
-             (if (and (equal? (mapcar (lambda (p)
-                                        (cons (slot-specifier-slot (car p))
-                                              (cdr p)))
-                                      child-alist)
-                              (children-alist ast))
-                      (null args))
+             (if (and (child-alist-equal? child-alist) (null args))
                  ast
                  (copy-ast (add-every-slot child-alist)))))
     (if (or (some #'is-conflict-node-with-slot-specifier children)
