@@ -3400,27 +3400,15 @@ as the ordinary children list."
      :default-children (list (copy-with-standardized-children parent def)))))
 
 (defun unstandardize-children (children)
-  "Extract interleaved-text from a standardized list of children,
-introducing empty strings or merging strings as needed.
-
-Return three values.
-
-The first value is the new values of the child slots, grouped as an
+  " Return the new values of the child slots, grouped as an
 alist of (slot . children), ordered by the first textual appearance of
-each slot.
-
-The second value is the interleaved text.
-
-The third value is a list suitable for use as the :child-order
-annotation."
+each slot. ."
   ;; Note that this fails if there's a non-string child that occurs
   ;; before any slot-specifier.  This may happen, for example,
   ;; if a conflict node is generated that "swallows" slot-specifiers.
   ;; For that reason, conflict nodes need to be moved up to the parent
   ;; level when that happens.
-  (let ((s (make-string-output-stream))
-        (itext nil)
-        (child-alist nil)
+  (let ((child-alist nil)
         (current-slot nil)
         ;; Capture the current order of the first occurrence of each
         ;; of the slot specifiers.
@@ -3430,7 +3418,6 @@ annotation."
       (unless children (return))
       (let ((c (pop children)))
         (typecase c
-          (string (write-string c s))
           (slot-specifier
            (setf current-slot c)
            (unless (assoc c child-alist)
@@ -3438,7 +3425,6 @@ annotation."
           (otherwise
            (unless current-slot
              (error "Child ~a occurs before any slot-specifier" c))
-           (push (get-output-stream-string s) itext)
            (let ((slot-pair (assoc current-slot child-alist)))
              (push c (cdr slot-pair))
              ;; The extra layer here (a cons in a list) is to mimic
@@ -3446,11 +3432,9 @@ annotation."
              (let ((slot (slot-specifier-slot current-slot)))
                (push (list (cons slot (1- (length (cdr slot-pair)))))
                      order)))))))
-    (push (get-output-stream-string s) itext)
     (dolist (p child-alist)
       (setf (cdr p) (nreverse (cdr p))))
     (values (sort child-alist ordering :key #'car)
-            (nreverse itext)
             (nreverse order))))
 
 (defgeneric check-child-lists (ast)
