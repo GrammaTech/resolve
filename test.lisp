@@ -997,8 +997,6 @@
     (is (null edit-tree)
         "Empty diffs produce the null edit tree")))
 
-;;; TODO: FIXME
-#+broken
 (deftest edit-tree.3 ()
   (let* ((obj1 (from-string (make-instance 'c) "char *a = \"abcde\";"))
          (obj2 (from-string (make-instance 'c) "char *a = \"ace\";"))

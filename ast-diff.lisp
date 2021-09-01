@@ -1570,8 +1570,8 @@ source, build the edit tree corresponding to the script."))
   (if (and (typep source 'ast)
            (typep target 'ast))
       (change-segments-on-seqs
-       (children source)
-       (children target)
+       (standardized-children source)
+       (standardized-children target)
        script
        (lambda (source-segment-start source-segment-length
                 target-segment-start target-segment-length
