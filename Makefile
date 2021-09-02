@@ -8,7 +8,6 @@ endif
 PACKAGE_NAME = resolve
 DOC_PACKAGES =				\
 		resolve/alist		\
-		resolve/ast-diff	\
 		resolve/commands	\
 		resolve/html		\
 		resolve/string
@@ -17,7 +16,7 @@ LISP_DEPS =				\
 	$(wildcard *.lisp)		\
 	$(wildcard software/*.lisp)
 
-BINS = ast-diff ast-merge auto-merge serve-ast-diff serve-auto-merge
+BINS = ast-merge auto-merge serve-auto-merge
 
 BIN_TEST_DIR = test/bin
 BIN_TESTS =						\

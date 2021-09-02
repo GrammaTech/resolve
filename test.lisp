@@ -24,7 +24,6 @@
   (:shadow :function-body)
   (:import-from :uiop/stream :read-file-forms)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
-                :simplify-diff-for-printing
                 :has-conflict-node-before-slot-specifiers
                 :standardized-children
                 :unstandardize-children
@@ -534,30 +533,6 @@
   (is (equal (ast-diff-alist-test '((a . 1)) '((b . 2) (a . 3)))
              '((a . 3) (b . 2)))))
 
-(deftest print-lisp-diff.1 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '() '()) :no-color t :stream s))
-              "")
-      "Print diff of empty lists"))
-
-(deftest print-lisp-diff.2 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '(()) '(())) :no-color t :stream s))
-              "()")
-      "Print diff of list of empty list"))
-
-(deftest print-lisp-diff.3 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '() '(())) :no-color t :stream s))
-              "{+()+}")
-      "Print diff of insertion of empty list"))
-
-(deftest print-lisp-diff.4 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '(()) '()) :no-color t :stream s))
-              "[-()-]")
-      "Print diff of deletion of empty list"))
-
 (deftest sexp-diff-on-ast-file ()
   (with-fixture resolve-asd-file-forms
     (is (zerop (nth-value 1 (ast-diff *forms* *forms*)))
@@ -729,8 +704,6 @@
                        (copy-list (remove-duplicates (flatten d))))
         #'string< :key #'symbol-name))
 
-;;; TODO: FIXME:
-#+broken
 (deftest diff-wrap/unwrap.1 ()
   (flet ((keys (d) (keys-of-diff d)))
     (let* ((s1 "int f() { return 1; }")
@@ -739,30 +712,22 @@
            (obj2 (from-string (make-instance 'c) s2)))
       (multiple-value-bind (diff cost)
           (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000 :base-cost 0)
-        (is (equal (keys diff) '(:binaryoperator :recurse :same :wrap)))
-        (is (= cost 3))
-        (print-diff diff :no-color t)
-        (is (equal (with-output-to-string (*standard-output*)
-                     (print-diff diff :no-color t))
-                   "int f() { return 1{++2+}; }")))
+        (is (equal (keys diff)
+                   '(c-binary-expression :delete :recurse :same :wrap)))
+        (is (= cost 4)))
       (multiple-value-bind (diff cost)
           (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000 :base-cost 0)
-        (is (equal (keys diff) '(:recurse :same :unwrap)))
-        (is (= cost 3))
-        (is (equal (with-output-to-string (*standard-output*)
-                     (print-diff diff :no-color t))
-                   "int f() { return 1[-+2-]; }")))
+        (is (equal (keys diff) '(:insert :recurse :same :unwrap)))
+        (is (= cost 4)))
       (multiple-value-bind (diff cost)
           (ast-diff obj1 obj2 :wrap t :max-wrap-diff -100 :base-cost 0)
         (is (equal (keys diff) '(:recurse :replace :same)))
-        (is (= cost 8)))
+        (is (= cost 10)))
       (multiple-value-bind (diff cost)
           (ast-diff obj2 obj1 :wrap t :max-wrap-diff -100 :base-cost 0)
         (is (equal (keys diff) '(:recurse :replace :same)))
-        (is (= cost 8))))))
+        (is (= cost 10))))))
 
-;;; TODO: FIXME:
-#+broken
 (deftest diff-sequence-wrap/unwrap.1 ()
   (let* ((s1 "int f(int x, int y) { int c = 1; int z = x+y; return z+c; }")
          (s2 "int f(int x, int y, int p) { int c = 1; if (p == 0) { int z = x+y; return z+c; } return 0; }")
@@ -772,19 +737,15 @@
         (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000
                   :wrap-sequences t)
       (let ((k (keys-of-diff diff)))
-        (is (equal k '(:ifstmt :insert :recurse :same :wrap-sequence))))
-      (is (= cost 58))
-      (let ((s (with-output-to-string (*standard-output*)
-                 (print-diff diff :no-color t))))
-        (is (equal s "int f(int x, int y{+, int p+}) { int c = 1; {+if (p == 0) { +}int z = x+y; return z+c;{+ } return 0;+} }"))))
+        (is (equal k '(software-evolution-library/software/tree-sitter::c-if-statement-1
+                       :insert :recurse :same :wrap-sequence))))
+      (is (= cost 35)))
     (multiple-value-bind (diff cost)
         (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000
                   :wrap-sequences t)
       (let ((k (keys-of-diff diff)))
         (is (equal k '(:delete :recurse :same :unwrap-sequence))))
-      (is (= cost 58))
-      (let ((s (with-output-to-string (*standard-output*) (print-diff diff :no-color t))))
-        (is (equal s "int f(int x, int y[-, int p-]) { int c = 1; [-if (p == 0) { -]int z = x+y; return z+c;[- } return 0;-] }"))))))
+      (is (= cost 35)))))
 
 (deftest diff-wrap-patch.1 ()
   (let* ((s1 "int f() { return 1; }")
@@ -803,121 +764,6 @@
               (source-text ast3) (ast-to-list-form ast3)))
     (is (equal? ast2 ast3))))
 
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.1 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "int a; int c;")
-					(%f "int a; int b; int c;"))
-                              :no-color t
-			      :stream s)))
-	      "int a; {+int b; +}int c;")))
-
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.2 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "int a; int b; int c;")
-					(%f "int a; int c;"))
-                              :no-color t
-			      :stream s)))
-	      "int a; [-int b; -]int c;")
-      "Print diff of a deletion"))
-
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.3 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "int a; int b; int c;")
-                                        (%f "int a; int d; int c;")
-                                        :base-cost 0)
-                              :no-color t
-			      :stream s)))
-	      "int a; int {+d+}[-b-]; int c;")
-      "Print diff of a replacement"))
-
-;; Increasing the base cost makes larger scale replacements
-;; more prefered, vs. fine scaled replacement inside strings
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.3a ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "int a; int b; int c;")
-                                        (%f "int a; int d; int c;")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
-              "int a; int {+d+}[-b-]; int c;")
-      "Print diff of a replacement"))
-
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.4 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-                                        (%f "char *s = \"acd\";")
-                                        :base-cost 2)
-                              :no-color t
-			      :stream s)))
-	      "char *s = \"a[-b-]cd\";")
-      "Print diff of deletion of a character in a string"))
-
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.4a ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-                                        (%f "char *s = \"acd\";")
-                                        :base-cost 3)
-                              :no-color t
-			      :stream s)))
-              "char *s = \"a[-b-]cd\";")
-      "Print diff of deletion of a character in a string"))
-
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.5 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-                                        (%f "char *s = \"ad\";")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
-	      "char *s = \"a[-bc-]d\";")
-      "Print diff of deletion of substring in a string"))
-
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.6 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "char *s = \"ad\";")
-                                        (%f "char *s = \"abcd\";")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
-	      "char *s = \"a{+bc+}d\";")
-      "Print diff of insertion of a substring in a string"))
-
-;;; TODO: FIXME:
-#+broken
-(deftest print-diff.7 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "char *s = \"ad\";")
-                                        (%f "char *s = \"abd\";")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
-	      "char *s = \"a{+b+}d\";")
-      "Print diff of insertion of a character in a string"))
 
 ;;;; Simple object ast-diff tests
 (deftest simple.ast-diff.1 ()
@@ -1718,15 +1564,6 @@
   (is (equal (unastify (copy (astify '(x y)))) '(x y)))
   (is (equal (unastify (copy (astify '(x . y)))) '(x . y))))
 
-(deftest simplify-diff-for-printing-test ()
-  (is (equal (simplify-diff-for-printing
-              '((:insert x) (:delete y) (:delete w)))
-             '((:insert x) (:delete y) (:delete w))))
-  (is (equal (simplify-diff-for-printing '((:delete y) (:insert x)))
-             '((:insert x) (:delete y))))
-  (is (equal (simplify-diff-for-printing
-              '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))
-             '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))))
 
 ;;; Functions for interactive testing and experimentation.
 (defun do-populate (my your)

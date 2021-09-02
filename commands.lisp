@@ -1,33 +1,6 @@
 ;;; commands.lisp --- Calculate and render AST diffs at the command line
 ;;;
-;;; The following git configuration will register ast-diff as a tool
-;;; to be used with @code{git difftool} (see
-;;; @url{https://git-scm.com/docs/git-difftool}).
-;;;
-;;;     # Set ast-diff as the default difftool.
-;;;     [diff]
-;;;     	tool = ast-diff
-;;;
-;;;     # Command-line to use with ast-diff.  Piping through
-;;;     # colordiff is optional but nice to highlight diffs.
-;;;     [difftool "ast-diff"]
-;;;     	cmd = "ast-diff $LOCAL $REMOTE|colordiff"
-;;;
-;;;     # Optionally don't prompt.
-;;;     [difftool]
-;;;     	prompt = false
-;;;
-;;; For clang language differences and merges, to help clang resolve
-;;; includes, it may be necessary to add include paths to the
-;;; invocation of ast-diff.  E.g., putting the following in the
-;;; .git/config of a particular repo with headers in a "src/"
-;;; subdirectory will ensure clang can find those headers.  (By
-;;; default -I takes "." passing the working directory to clang.)
-;;;
-;;;     [difftool "ast-diff"]
-;;;     	cmd = "ast-diff -I .,src $LOCAL $REMOTE"
-;;;
-;;; @texi{ast-diff-commands}
+;;; TODO: add documentation for auto-merge.
 (defpackage :resolve/commands
   (:use :gt/full
         :resolve/core
@@ -56,9 +29,8 @@
   (:import-from :spinneret :with-html)
   (:import-from :uiop/stream :println :writeln)
   (:import-from :md5 :md5sum-string)
-  (:shadow :merge :ast-diff)
-  (:export :ast-diff
-           :ast-merge
+  (:shadow :merge)
+  (:export :ast-merge
            :rest-diff
            :render-json-diff-to-html
            :lookup-json-diff-hash
@@ -162,15 +134,6 @@ command-line options processed by the returned function."
                     (concatenate 'string documentation " for " which " file"))))
                 multipliers))))
   (nest
-   (defparameter +ast-diff-command-line-options+)
-   (append +command-line-options+)
-   (append +ast-diff-only-command-line-options+)
-   (mappend (argument-multiplier "old" "new"))
-   (append +clang-command-line-options+
-           +project-command-line-options+
-           +clang-project-command-line-options+))
-
-  (nest
    (defparameter +ast-merge-command-line-options+)
    (append +command-line-options+)
    (append +ast-merge-only-command-line-options+)
@@ -257,163 +220,6 @@ command-line options processed by the returned function."
 At the moment that means /not/ using tree-sitter."
   (case lang
     (t lang)))
-
-(define-command-rest ast-diff
-    (old-file new-file &spec +ast-diff-command-line-options+
-              &aux diff old-file-temp-path new-file-temp-path)
-  "Compare source code in OLD-FILE and NEW-FILE by AST."
-  #.(format nil
-            "~%Built from SEL ~a, Resolve ~a, and ~a ~a on ~a.~%"
-            +software-evolution-library-version+
-            +resolve-version+
-            (lisp-implementation-type) (lisp-implementation-version)
-            (multiple-value-bind (second minute hour date month year)
-                (get-decoded-time)
-              (format nil "~4d-~2,'0d-~2,'0d ~2,'0d:~2,'0d:~2,'0d"
-                      year month date hour minute second)))
-  (declare (ignorable quiet verbose))
-  #+drop-dead
-  (drop-dead-date ()
-    (exit-command ast-diff 2
-                  (progn (format *error-output* "Software no longer valid.~%")
-                         (finish-output *error-output*)
-                         (quit 2))))
-  (when help (show-help-for-ast-diff))
-  (setf *note-out* (list *error-output*))
-  (unwind-protect
-       (progn
-         (if (and (find #\Newline old-file) (find #\Newline new-file))
-             ;; We have text with newlines so it is probably the raw text.
-             (progn
-               (unless language
-                 (error "Must specify language when differencing strings."))
-               (setf language
-                     (preferred-language
-                      (resolve-language-from-language-and-source language)))
-               (let ((type (case language
-                             (javascript "js")
-                             (json "json")
-                             (clang "cxx")
-                             (lisp "lisp")
-                             (simple "txt"))))
-                 (setf old-file-temp-path (temp-file-name :type type)
-                       new-file-temp-path (temp-file-name :type type))
-                 (string-to-file old-file old-file-temp-path)
-                 (string-to-file new-file new-file-temp-path)
-                 (setf old-file old-file-temp-path
-                       new-file new-file-temp-path)))
-             ;; We have paths to resources, files, directories, or repositories.
-             (progn
-               (unless (every #'resolve-file (list old-file new-file))
-                 (exit-command ast-diff 2 (error "Missing source.")))
-               (unless language
-                 (setf language
-                       (preferred-language
-                        (guess-language old-file new-file))))
-               ()))
-         (with-prof profile
-         ;; Create the diff.
-         (let* ((old-sw (expand-options-for-which-files language "OLD"))
-                (new-sw (expand-options-for-which-files language "NEW"))
-                (softwares (list old-sw new-sw)))
-           (setf diff (resolve/ast-diff:ast-diff
-                       old-sw new-sw
-                       :wrap wrap :max-wrap-diff max-wrap
-                       :wrap-sequences wrap-sequences
-                       :base-cost base-cost
-                       :strings strings))
-           ;; Special handling for non-AST diffs, which don't have newlines.
-           (when (and (not (typep old-sw 'parseable))
-                      (not (typep new-sw 'parseable)))
-             (setf diff
-                   (mapt (lambda (element)
-                           (if (stringp element)
-                               (concatenate 'string element (list #\Newline))
-                               element))
-                         diff)))
-           ;; Print according to the RAW option.
-           (cond
-             (raw (writeln (ast-diff-elide-same diff) :readably t))
-             (edit-tree
-              (when coherence
-                (let ((n (let ((*read-eval* nil))
-                           (read-from-string coherence))))
-                  (unless (typep n '(real 0 1))
-                    (error "coherence must be a number in range [0.0,1.0]"))
-                  (setf coherence n)))
-              (create-and-print-edit-tree
-               softwares diff
-               :print-asts print-asts
-               :coherence coherence))
-             (json (println (encode-json-to-string
-                             (mapcar «list #'car #'cdr» diff))))
-             (t
-              (if (zerop unified)
-                  (print-diff diff :no-color no-color)
-                  (let ((diff-lines
-                         (split-sequence
-                          #\Newline
-                          (with-output-to-string (str)
-                            (print-diff diff :no-color no-color :stream str))))
-                        (in-diff-p nil)
-                        (trailing-context 0)
-                        (context-buffer nil)
-                        (skipped-last-p nil)
-                        (line-counter 0))
-                    ;; TODO: Find a solution to noticing diff lines that doesn't
-                    ;;       rely on patterns in the text.
-                    (flet ((diff-start-p (line)
-                             (if no-color
-                                 (scan "({\\+|\\[-)" line)
-                                 (or (search +color-GRN+ line)
-                                     (search +color-RED+ line))))
-                           (diff-end-p (line)
-                             (if no-color
-                                 (scan "(\\+}|-])" line)
-                                 (search +color-RST+ line))))
-                      ;; Print with a buffer of size UNIFIED
-                      ;; before/after every diff line.
-                      (dolist (line diff-lines)
-                        (incf line-counter)
-                        (cond
-                          ((diff-start-p line)
-                           (when skipped-last-p
-                             (println
-                              (format nil "~aline: ~d~a"
-                                      (if no-color "" +color-CYA+)
-                                      (- line-counter
-                                         (min unified (length context-buffer)))
-                                      (if no-color "" +color-RST+))))
-                           (setf skipped-last-p nil)
-                           (setf trailing-context unified)
-                           (when context-buffer
-                             (mapc #'println
-                                   (nreverse (take unified context-buffer)))
-                             (setf context-buffer nil))
-                           (setf in-diff-p
-                                 (let ((start-point (diff-start-p line))
-                                       (end-point (diff-end-p line)))
-                                   (or (not end-point)
-                                       (< end-point start-point))))
-                           (println line))
-                          ((diff-end-p line)
-                           (setf skipped-last-p nil)
-                           (setf in-diff-p nil)
-                           (println line))
-                          (in-diff-p
-                           (println line))
-                          ((> trailing-context 0)
-                           (decf trailing-context)
-                           (println line))
-                          (t (setf skipped-last-p t)
-                             (push line context-buffer)))))))))
-           ;; Only exit with 0 if the two inputs match.
-           (wait-on-manual manual)))
-         (exit-command ast-diff
-                       (if (every [{eql :same} #'car] diff) 0 1)
-                       diff))
-    (when old-file-temp-path (delete-file old-file-temp-path))
-    (when new-file-temp-path (delete-file new-file-temp-path))))
 
 (defun md5string (text)
   (format nil "~{~X~}" (coerce (md5:md5sum-string text) 'list)))
