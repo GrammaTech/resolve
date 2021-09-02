@@ -713,14 +713,6 @@
                   '(:same :same :same :same :same :same
                     :recurse :same :same :same :same))))))
 
-;; TODO: FIXME: this sporadically fails. It is likely an issue with mutating.
-#+broken
-(deftest diff-real-text ()
-  (with-fixture binary-search-c
-    (let ((var (copy *binary-search*)))
-      (mutate var)
-      (ast-diff *binary-search* var))))
-
 ;; TODO: FIXME: this is likely an issue with mutating.
 #+broken
 (deftest diff-elide-same-test ()
