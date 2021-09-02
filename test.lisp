@@ -688,16 +688,14 @@
                   '(:same :same :same :same :same :same
                     :recurse :same :same :same :same))))))
 
-;; TODO: FIXME: this is likely an issue with mutating.
-#+broken
 (deftest diff-elide-same-test ()
-  (with-fixture binary-search-c
-    (let ((var (copy *binary-search*)))
-      (setf var (mutate var))
+  (with-fixture javascript-abacus-variants
+    (let ((orig (aget :orig *variants*))
+          (bead (aget :bead *variants*)))
       (is (every
            [{member _ '(:delete :insert :replace :delete-sequence :insert-sequence)}
             #'second]
-           (ast-diff-elide-same (ast-diff *binary-search* var)))))))
+           (ast-diff-elide-same (ast-diff orig bead)))))))
 
 (defun keys-of-diff (d)
   (sort (remove-if-not #'symbolp
@@ -1451,26 +1449,6 @@
 #+manual          ; This test is only useful for manual investigation.
 (deftest targeted-populate-run ()
   )
-
-;; TODO: FIXME: this is likely an issue with mutating.
-#+broken
-(deftest (can-populate-from-conflicted-merges :long-running) ()
-  (nest
-   (with-fixture javascript-converge-conflict)
-   (destructuring-bind (my old your)
-       (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
-   (let* ((conflicted (nest (create-auto-mergeable)
-                            (converge my old your :conflict t)))
-          (chunks (remove-if-not {typep _ 'conflict-ast}
-                                 (child-asts (genome conflicted) :recursive t)))
-          (*population* (populate conflicted)))
-     (is (= (length *population*) (expt 5 (length chunks)))
-         "Population has the expected size ~d = 5^|chunks| => ~d."
-         (length *population*) (expt 5 (length chunks)))
-     (is (not (some [{some {typep _ 'conflict-ast}} {child-asts _ :recursive t}
-                     #'genome]
-                    *population*))
-         "Population has no conflict ASTs remaining."))))
 
 (deftest can-merge-when-one-side-is-invalid ()
   (nest
