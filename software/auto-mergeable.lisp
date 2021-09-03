@@ -26,17 +26,12 @@
         :resolve/software/parseable
         :software-evolution-library
         :software-evolution-library/components/file
-        #+nil
-        :software-evolution-library/software/clang
         :software-evolution-library/software/simple
         :software-evolution-library/software/parseable
-        #+nil
-        :software-evolution-library/software/clang
         :software-evolution-library/software/lisp
         :software-evolution-library/software/project
+        :software-evolution-library/software/c-project
         :software-evolution-library/software/parseable-project
-        #+nil
-        :software-evolution-library/software/clang-project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project
         :software-evolution-library/software/tree-sitter)
@@ -49,13 +44,13 @@
            :auto-mergeable
            :auto-mergeable-simple
            :auto-mergeable-parseable
-           #+nil
-           :auto-mergeable-clang
+           :auto-mergeable-c
+           :auto-mergeable-cpp
            :auto-mergeable-javascript
            :auto-mergeable-lisp
            :auto-mergeable-project
-           #+nil
-           :auto-mergeable-clang-project
+           :auto-mergeable-c-project
+           :auto-mergeable-cpp-project
            :auto-mergeable-javascript-project
            :auto-mergeable-lisp-project
            :create-auto-mergeable
@@ -76,19 +71,21 @@
 ;;  subclass of the software object when creating the auto-mergeable
 ;;  mixin variant to ensure proper operation when calling overridden
 ;;  routines.
+
+;;; TODO: refactor to auto generate tree-sitter stuff?
 (define-software auto-mergeable () ())
 (define-software auto-mergeable-simple (auto-mergeable simple) ())
 (define-software auto-mergeable-parseable (auto-mergeable parseable) ())
-           #+nil
-(define-software auto-mergeable-clang (auto-mergeable-parseable clang) ())
 (define-software auto-mergeable-javascript (auto-mergeable-parseable javascript) ())
+(define-software auto-mergeable-c (auto-mergeable-parseable c) ())
+(define-software auto-mergeable-cpp (auto-mergeable-parseable c) ())
 (define-software auto-mergeable-json (auto-mergeable-parseable json) ())
 (define-software auto-mergeable-lisp (auto-mergeable-parseable lisp) ())
-
 (define-software auto-mergeable-project (auto-mergeable parseable-project) ())
-           #+nil
-(define-software auto-mergeable-clang-project
-    (auto-mergeable-project clang-project) ())
+(define-software auto-mergeable-c-project
+    (auto-mergeable-project c-project) ())
+(define-software auto-mergeable-cpp-project
+    (auto-mergeable-project cpp-project) ())
 (define-software auto-mergeable-javascript-project
     (auto-mergeable-project javascript-project) ())
 (define-software auto-mergeable-lisp-project
@@ -100,11 +97,12 @@
   (:documentation "Create an auto-mergeable software object from SOFT.")
   (:method ((obj simple) &key)
     (change-class (copy obj) 'auto-mergeable-simple))
-           #+nil
-  (:method ((obj clang) &key)
-    (change-class (copy obj) 'auto-mergeable-clang))
   (:method ((obj javascript) &key)
     (change-class (copy obj) 'auto-mergeable-javascript))
+  (:method ((obj c) &key)
+    (change-class (copy obj) 'auto-mergeable-c))
+  (:method ((obj cpp) &key)
+    (change-class (copy obj) 'auto-mergeable-cpp))
   (:method ((obj json) &key)
     (change-class (copy obj) 'auto-mergeable-json))
   (:method ((obj lisp) &key)
