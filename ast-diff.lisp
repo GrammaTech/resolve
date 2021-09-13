@@ -28,8 +28,6 @@
    :gt/full
    :software-evolution-library
    :software-evolution-library/software/parseable
-   #+nil
-   :software-evolution-library/software/clang
    :software-evolution-library/software/simple
    :software-evolution-library/software/ir
    :resolve/string
@@ -3209,7 +3207,6 @@ as the ordinary children list."
                (when-let* ((text-slot-position
                             (position-if #'text-slot-p children))
                            (text (nth (1+ text-slot-position) children)))
-                 (assert (typep text 'string))
                  (setf (text copy) text)))))
     (set-text-slot (call-next-method))))
 

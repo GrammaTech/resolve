@@ -10,10 +10,6 @@
         :software-evolution-library/components/test-suite
         :software-evolution-library/software/parseable
         :software-evolution-library/software/project
-        #+nil
-        :software-evolution-library/software/clang
-        #+nil
-        :software-evolution-library/software/clang-project
         :software-evolution-library/software/simple
         :resolve/core
         :resolve/ast-diff
