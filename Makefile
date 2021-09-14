@@ -10,7 +10,8 @@ DOC_PACKAGES =				\
 		resolve/alist		\
 		resolve/commands	\
 		resolve/html		\
-		resolve/string
+		resolve/string		\
+		resolve/ast-diff
 
 LISP_DEPS =				\
 	$(wildcard *.lisp)		\
