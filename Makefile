@@ -19,32 +19,32 @@ LISP_DEPS =				\
 BINS = ast-merge auto-merge serve-auto-merge
 
 BIN_TEST_DIR = test/bin
-BIN_TESTS =						\
-	ast-diff-on-lisp-has-lines			\
-	ast-diff-on-simple-has-lines			\
-	clang-diff-on-gcd				\
-	lisp-diff-on-gcd				\
-	lisp-diff-on-gcd-raw				\
+# BIN_TESTS =	                                     \
+#     can-auto-merge-gcd-single-file  \
+#     can-auto-merge-gcd-single-file-evolve \
+#     can-auto-merge-gcd-project \
+#     can-auto-merge-gcd-project-evolve \
+#     can-auto-merge-gcd-project-insert-file-evolve \
+#     can-auto-merge-gcd-project-delete-file-evolve \
+#     can-auto-merge-text-single-file \
+#     can-auto-merge-text-single-file-evolve \
+#     can-auto-merge-text-project \
+#     can-auto-merge-text-project-evolve \
+#     can-auto-merge-text-project-insert-file-evolve \
+#     can-auto-merge-text-project-delete-file-evolve
+#    ast-diff-on-lisp-has-lines                   \
+#    ast-diff-on-simple-has-lines                 \
+#    lisp-diff-on-gcd				             \
+#    lisp-diff-on-gcd-raw				         \
+#    clang-diff-on-gcd
 # FIXME:
 #
 # Convert to tree-sitter:
-# clang-diff-on-gcd-edit-tree
-# clang-diff-on-gcd-edit-tree-coherence
+# clang-diff-on-gcd-edit-tree # error
+# clang-diff-on-gcd-edit-tree-coherence # error
 # octomap-diff
-# octomap-diff-count
-# octomap-diff-edit-tree
-# can-auto-merge-gcd-single-file
-# can-auto-merge-gcd-single-file-evolve
-# can-auto-merge-gcd-project
-# can-auto-merge-gcd-project-evolve
-# can-auto-merge-gcd-project-insert-file-evolve
-# can-auto-merge-gcd-project-delete-file-evolve
-# can-auto-merge-text-single-file
-# can-auto-merge-text-single-file-evolve
-# can-auto-merge-text-project
-# can-auto-merge-text-project-evolve
-# can-auto-merge-text-project-insert-file-evolve
-# can-auto-merge-text-project-delete-file-evolve
+# octomap-diff-count # not sure
+# octomap-diff-edit-tree # not sure
 #
 # Old failures:
 # ast-diff-on-json-has-lines
@@ -58,13 +58,13 @@ BIN_TESTS =						\
 # This issue may be related to an incorrect installation of CCL; see also
 # https://lists.clozure.com/pipermail/openmcl-devel/2011-January/008283.html.
 # For now, we are punting and disabling these tests on CCL builds.
-ifneq (,$(findstring sbcl, $(LISP)))
-BIN_TESTS +=					\
-	rest-ast-diff-returns-json		\
-	rest-ast-diff-can-return-and-serve-link
-    # FIXME
-	# rest-ast-diff-takes-full-strings	\
+# ifneq (,$(findstring sbcl, $(LISP)))
+# BIN_TESTS +=					\
+# 	rest-ast-diff-returns-json		\
+# 	rest-ast-diff-can-return-and-serve-link
+#     # FIXME
+# 	# rest-ast-diff-takes-full-strings	\
 
-endif
+# endif
 
 include .cl-make/cl.mk
