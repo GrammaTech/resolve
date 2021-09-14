@@ -187,9 +187,6 @@ yours2() was crossed over from the genome of B into A."
                (children (append (subseq a-children 0 a-begin)     ;; (1)
                                  (subseq b-children b-begin b-end) ;; (2)
                                  (subseq a-children a-end))))      ;; (3)
-          ;; TODO: this can be removed once everything has been
-          ;;       converted to structured-text.
-          (assert (every (of-type 'ast) (aget :children children)))
           ;; TODO: there's likely an issue with everything not being copied here
           ;;       with named children.
           (copy a :genome (copy (genome a) :children children)))
@@ -370,9 +367,6 @@ conflict AST resolution with an alternative option."
         (format t "new-resolution = ~a~%" new-resolution)
         (format t "conflict-path = ~a~%" conflict-path)
         (format t "parent = ~a~%" parent))
-      ;; TODO: remove this before merge. This is to ensure interleaved-text
-      ;;       isn't still present.
-      (assert (every (of-type 'ast) (append prior-resolution new-resolution)))
       ;; Replace the prior resolution children with the new resolution
       (nlet retry ((lccp (lastcar conflict-path)))
         (cond
