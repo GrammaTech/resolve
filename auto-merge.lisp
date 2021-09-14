@@ -37,7 +37,9 @@
 (defgeneric resolve-to (conflicted option &key)
   (:documentation "Resolve every conflict in CONFLICTED to OPTION.")
   (:method ((conflicted parseable) option &key root
-            &aux #+debug (cp (copy conflicted)))
+            ;; TODO: counter will need to be special and passed in as a keyword
+            ;;       arg for it to properly name files.
+            &aux #+debug (counter 0))
     (labels ((replacing-splice-at (position new-sequence sequence)
                "Replace POSITION in SEQUENCE with the items in NEW-SEQUENCE."
                (iter
@@ -50,7 +52,7 @@
                   (return
                     (append
                      initial-split new-sequence (cdr traversal-sequence))))))
-             (splice-with (ast)
+             (splice-with (conflicted ast)
                "Replace the conflict node AST with the revelant resolution."
                (let* ((path (ast-path conflicted ast))
                       (parent (lookup conflicted (butlast path)))
@@ -65,28 +67,25 @@
                       (replacement (copy parent
                                          (make-keyword slot) new-slot-value
                                          :stored-hash nil)))
-                 (with conflicted parent replacement)
                  ;; NOTE: this handles nested conflict ASTs which aren't
                  ;;       handled by collect-if.
-                 (map nil {resolve-to conflicted option :root} new-values))))
-      (nest
-       #+debug (let ((counter 0))
-                 (to-file cp (format nil "/tmp/resolve-original.c")))
-       ;; Modify the parent of all conflict nodes to replace with OPTION.
-       (mapc
-        (lambda (ast)
-          #+debug (format t "Replacing conflict at ~S~%" (ast-path conflicted ast))
-          (prog1
-              (splice-with ast)
-            #+debug (to-file conflicted (format nil "/tmp/resolve-to-~d.c" counter))
-            #+debug (to-file cp (format nil "/tmp/resolve-cp-~d.c" counter))
-            #+debug (incf counter))))
+                 (reduce (lambda (conflicted root)
+                           (resolve-to conflicted option :root root))
+                         new-values
+                         :initial-value (with conflicted parent replacement)))))
+      #+debug (to-file conflicted (format nil "/tmp/resolve-original.c"))
+      ;; Modify the parent of all conflict nodes to replace with OPTION.
+      (reduce
+       (lambda (conflicted ast)
+         #+debug (format t "Replacing conflict at ~S~%" (ast-path conflicted ast))
+         (let ((new-conflicted (splice-with conflicted ast)))
+           #+debug (to-file new-conflicted (format nil "/tmp/resolve-to-~d.c" counter))
+           #+debug (to-file conflicted (format nil "/tmp/resolve-cp-~d.c" counter))
+           #+debug (incf counter)
+           new-conflicted))
        ;; Modify conflict nodes in reverse to work up the tree.
-       (reverse (collect-if (of-type 'conflict-ast) (or root (genome conflicted)))))
-      ;; NOTE: this is a bit of a hack to get around insertions, and it
-      ;;       should really be called after every function that resolves
-      ;;       conflicts.
-      conflicted)))
+       (reverse (collect-if (of-type 'conflict-ast) (or root (genome conflicted))))
+       :initial-value conflicted))))
 
 (defgeneric resolve-conflict (conflicted conflict &key strategy)
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
