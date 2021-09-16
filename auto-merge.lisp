@@ -91,10 +91,15 @@
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
-    (apply-mutation conflicted
-                    (make-instance 'new-conflict-resolution
-                      :targets conflict
-                      :strategy strategy))))
+    (handler-bind
+        ((sel/sw/ts::rule-matching-error
+           (lambda (c)
+             (declare (ignorable c))
+             (invoke-restart 'software-evolution-library/software/parseable::skip-mutation))))
+      (apply-mutation conflicted
+                      (make-instance 'new-conflict-resolution
+                                     :targets conflict
+                                     :strategy strategy)))))
 
 
 ;;; Generation of the initial population.
@@ -114,14 +119,16 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
       (if (< num-solutions pop-size)
           (mapc (lambda (chunk)
                   (setf pop
-                        (mappend
-                         (lambda (variant)
-                           (mapcar
-                            (lambda (strategy)
-                              (resolve-conflict (copy variant) chunk
-                                                :strategy strategy))
-                            (get-conflict-strategies chunk)))
-                         pop)))
+                        (remove
+                         nil
+                         (mappend
+                          (lambda (variant)
+                            (mapcar
+                             (lambda (strategy)
+                               (resolve-conflict (copy variant) chunk
+                                                 :strategy strategy))
+                             (get-conflict-strategies chunk)))
+                          pop))))
                 (reverse chunks))
           (setf pop
                 (iter (for i below pop-size)

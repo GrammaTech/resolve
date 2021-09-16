@@ -1450,6 +1450,26 @@
 (deftest targeted-populate-run ()
   )
 
+(deftest (can-populate-from-conflicted-merges :long-running) ()
+  (nest
+   (with-fixture javascript-converge-conflict)
+   (destructuring-bind (my old your)
+       (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
+   (let* ((conflicted (nest (create-auto-mergeable)
+                            (converge my old your :conflict t)))
+          (chunks (remove-if-not {typep _ 'conflict-ast}
+                                 (child-asts (genome conflicted) :recursive t)))
+          (*population* (populate conflicted)))
+     ;; TODO: is this still the expected size?
+     #+nil
+     (is (= (length *population*) (expt 5 (length chunks)))
+         "Population has the expected size ~d = 5^|chunks| => ~d."
+         (length *population*) (expt 5 (length chunks)))
+     (is (not (some [{some {typep _ 'conflict-ast}} {child-asts _ :recursive t}
+                     #'genome]
+                    *population*))
+         "Population has no conflict ASTs remaining."))))
+
 (deftest can-merge-when-one-side-is-invalid ()
   (nest
    (with-temporary-directory (:pathname orig))
