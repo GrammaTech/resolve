@@ -95,6 +95,7 @@
         ((sel/sw/ts::rule-matching-error
            (lambda (c)
              (declare (ignorable c))
+             (note 3 "Skipping mutation due to ~a" c)
              (invoke-restart 'software-evolution-library/software/parseable::skip-mutation))))
       (apply-mutation conflicted
                       (make-instance 'new-conflict-resolution
