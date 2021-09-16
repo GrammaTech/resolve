@@ -37,6 +37,8 @@
         :software-evolution-library/software/tree-sitter)
   (:shadow :function-body)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
+  (:import-from :software-evolution-library/utility/debug
+                :note)
   (:import-from :functional-trees :slot-specifier :slot-specifier-slot
    :slot-specifier-arity :slot-specifier-for-slot)
   (:import-from :software-evolution-library/utility/task :task-map)
