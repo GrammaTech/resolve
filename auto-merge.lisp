@@ -312,7 +312,7 @@ Extra keys are passed through to EVOLVE.")
               ((:wrap *wrap*) *wrap*)
               ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
               ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*))
-    (note 2 "Populate candidate merge resolutions.")
+    (note 2 "Merge ASTs")
     (let* ((initial (converge my old your :conflict t))
            (converged (try-reconcile-conflicts initial))
            *population*
@@ -339,6 +339,7 @@ Extra keys are passed through to EVOLVE.")
         (note 2 "No conflicts found.")
         (return-from resolve converged))
 
+      (note 2 "Populate candidate merge resolutions.")
       (setf *population* (populate converged))
 
       ;; Evaluate the fitness of the initial population
