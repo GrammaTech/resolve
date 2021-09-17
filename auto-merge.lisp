@@ -28,7 +28,8 @@
            :populate
            :resolve-to
            :resolve-conflict
-           :try-reconcile-conflicts))
+           :try-reconcile-conflicts
+           :*auto-merge-meta*))
 (in-package :resolve/auto-merge)
 (in-readtable :curry-compose-reader-macros)
 
@@ -288,9 +289,14 @@ branches of a Git repository."
                  reconciliations
                  :initial-value expanded-sw))))))
 
+(defvar-unbound *auto-merge-meta*
+  "Optional hash table to use to store metadata about the run.")
+
 (defgeneric resolve (my old your test &rest rest
                      &key evolve? target num-threads
-                       strings base-cost wrap wrap-sequences max-wrap-diff &allow-other-keys)
+                       strings base-cost wrap wrap-sequences max-wrap-diff
+                       meta
+                     &allow-other-keys)
   (:documentation
    "Resolve merge conflicts between software versions MY OLD and YOUR.
 Keyword argument EVOLVE? is a boolean specifying whether to attempt evolution
@@ -311,10 +317,13 @@ Extra keys are passed through to EVOLVE.")
               ((:base-cost *base-cost*) *base-cost*)
               ((:wrap *wrap*) *wrap*)
               ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
-              ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*))
+              ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
+              (meta (or (bound-value '*auto-merge-meta*)
+                        (make-hash-table))))
     (note 2 "Merge ASTs")
     (let* ((initial (converge my old your :conflict t))
            (converged (try-reconcile-conflicts initial))
+           ;; Metadata.
            *population*
            ;; Because each variant is tested against a test suite,
            ;; where the test script may be repeated over an index, the
@@ -329,10 +338,13 @@ Extra keys are passed through to EVOLVE.")
            (*fitness-evals* 0)
            (*fitness-predicate* #'<))
 
+      (dict* meta
+             :initial-conflict-count (length (get-conflicts initial))
+             :converged-conflict-count (length (get-conflicts converged)))
       (note 2 "AST merging eliminated ~d/~d conflict~:p"
-            (- (length (get-conflicts initial))
-               (length (get-conflicts converged)))
-            (length (get-conflicts initial)))
+            (- (gethash :initial-conflict-count meta)
+               (gethash :converged-conflict-count meta))
+            (gethash :initial-conflict-count meta))
 
       ;; Special case - there are no conflicts to be resolved
       (unless (get-conflicts converged)
@@ -344,16 +356,18 @@ Extra keys are passed through to EVOLVE.")
 
       ;; Evaluate the fitness of the initial population
       (note 2 "Number of conflicts found: ~d."
-            (length (get-conflicts converged)))
+            (gethash :converged-conflict-count meta))
+      (setf (gethash :popcount meta) (length *population*))
       (note 2 "Evaluate ~d population members."
-              (length *population*))
+            (gethash :popcount meta))
       (task-map num-threads
                 (lambda (variant)
                   (unless (some {funcall *target-fitness-p*} *population*)
                     (evaluate test variant)))
                 *population*)
 
-      (note 2 "Evaluated ~a variant~:p" (count-if #'fitness *population*))
+      (setf (gethash :evalcount meta) (count-if #'fitness *population*))
+      (note 2 "Evaluated ~a variant~:p" (gethash :evalcount meta))
 
       ;; Update global vars after evaluating initial population. If we
       ;; hit the target fitness early there may be variants that were
@@ -369,7 +383,9 @@ Extra keys are passed through to EVOLVE.")
             (progn
               (note 2 "Merge resolution found.")
               (return-from resolve best))
-            (note 2 "Best fitness: ~a." (fitness best))))
+            (progn
+              (setf (gethash :best-fitness meta) (fitness best))
+              (note 2 "Best fitness: ~a." (gethash :best-fitness meta)))))
       (when (and (not evolve?)
                  (every failed? *population*))
         (error "No variant has survived selection."))
