@@ -283,9 +283,15 @@ branches of a Git repository."
                (copy sw :genome (expand-merged-conflict-asts (genome sw)))))
          (get-reconciliations-by-intent expanded-sw)
          (reduce (lambda (variant node.strategy)
-                   (resolve-conflict (copy variant)
-                                     (car node.strategy)
-                                     :strategy (cdr node.strategy)))
+                   (destructuring-bind (node . strategy) node.strategy
+                     (note 4 "Resolved by strategy ~a: ~%~a"
+                           strategy
+                           (mapcar (lambda (cons)
+                                     (cons (car cons)
+                                           (source-text (cdr cons))))
+                                   (conflict-ast-child-alist node)))
+                     (resolve-conflict (copy variant) node
+                                       :strategy strategy)))
                  reconciliations
                  :initial-value expanded-sw))))))
 
