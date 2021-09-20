@@ -270,30 +270,38 @@ branches of a Git repository."
                               (genome node))))
                (conflict-ast
                 (get-conflict-reconciliations node))
-               (otherwise node))))
-    (etypecase sw
-      (auto-mergeable-project
-       (copy sw
-             :evolve-files
-             (iter
-               (for (file . obj) in (evolve-files sw))
-               (collect (cons file (try-reconcile-conflicts obj))))))
-      (auto-mergeable
-       (let ((expanded-sw
-               (copy sw :genome (expand-merged-conflict-asts (genome sw)))))
-         (get-reconciliations-by-intent expanded-sw)
-         (reduce (lambda (variant node.strategy)
-                   (destructuring-bind (node . strategy) node.strategy
-                     (note 4 "Resolved by strategy ~a: ~%~a"
-                           strategy
-                           (mapcar (lambda (cons)
-                                     (cons (car cons)
-                                           (source-text (cdr cons))))
-                                   (conflict-ast-child-alist node)))
-                     (resolve-conflict (copy variant) node
-                                       :strategy strategy)))
-                 reconciliations
-                 :initial-value expanded-sw))))))
+               (otherwise node)))
+           (reconcile-expanded-conflicts (sw)
+             (etypecase sw
+               (auto-mergeable-project
+                (copy sw
+                      :evolve-files
+                      (iter
+                       (for (file . obj) in (evolve-files sw))
+                       (collect (cons file (try-reconcile-conflicts obj))))))
+               (auto-mergeable
+                (let ((expanded-sw
+                       (copy sw :genome (expand-merged-conflict-asts (genome sw)))))
+                  (get-reconciliations-by-intent expanded-sw)
+                  (reduce (lambda (variant node.strategy)
+                            (destructuring-bind (node . strategy)
+                                node.strategy
+                              (note 4 "Resolved by strategy ~a: ~%~a"
+                                    strategy
+                                    (mapcar (lambda (cons)
+                                              (cons (car cons)
+                                                    (source-text (cdr cons))))
+                                            (conflict-ast-child-alist node)))
+                              (resolve-conflict (copy variant) node
+                                                :strategy strategy)))
+                          reconciliations
+                          :initial-value expanded-sw))))))
+    (let ((reconciliation (reconcile-expanded-conflicts sw)))
+      ;; Use the original if we end up with more conflicts.
+      (if (< (length (get-conflicts reconciliation))
+             (length (get-conflicts sw)))
+          reconciliation
+          sw))))
 
 (defvar-unbound *auto-merge-meta*
   "Optional hash table to use to store metadata about the run.")
