@@ -144,13 +144,22 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                              (get-conflict-strategies chunk)))
                           pop))))
                 (reverse chunks))
-          (setf pop
-                (iter (for i below pop-size)
-                      (collect
-                       (reduce (lambda (variant chunk)
-                                 (resolve-conflict (copy variant) chunk))
-                               (reverse chunks)
-                               :initial-value (copy conflicted)))))))
+          (nest
+           (setf pop)
+           (iter (for i below pop-size))
+           (collect)
+           (reduce (lambda (variant chunk)
+                     ;; Try all the available strategies in random
+                     ;; order until you get a valid one.
+                     (or (some
+                          (lambda (strategy)
+                            (resolve-conflict (copy variant) chunk
+                                              :strategy strategy))
+                          (reshuffle
+                           (get-conflict-strategies chunk)))
+                         (error "Cannot resolve ~a" chunk)))
+                   (reverse chunks)
+                   :initial-value (copy conflicted)))))
     (assert (notany #'get-conflicts pop))
     (mapcar #'remove-ast-stubs pop))
   (:method ((conflicted auto-mergeable-project)
