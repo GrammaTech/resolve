@@ -103,6 +103,18 @@
                                      :targets conflict
                                      :strategy strategy)))))
 
+(defgeneric remove-ast-stubs (variant)
+  (:documentation "Remove AST stubs from the genome of VARIANT.
+
+AST stubs must be removed lest their presence cause extra commas or
+other delimiters to be inserted.")
+  (:method ((variant software))
+    variant)
+  (:method ((variant parseable))
+    (copy variant :genome (remove-ast-stubs (genome variant))))
+  (:method ((genome ast))
+    (remove-if (of-type 'ast-stub) genome)))
+
 
 ;;; Generation of the initial population.
 (defgeneric populate (conflicted)
@@ -139,7 +151,8 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                                  (resolve-conflict (copy variant) chunk))
                                (reverse chunks)
                                :initial-value (copy conflicted)))))))
-    pop)
+    (assert (notany #'get-conflicts pop))
+    (mapcar #'remove-ast-stubs pop))
   (:method ((conflicted auto-mergeable-project)
             &aux (pop-size (or *max-population-size* (expt 2 10))))
     (iter (for (file . obj) in (evolve-files conflicted))
