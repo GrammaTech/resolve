@@ -2223,6 +2223,7 @@ process with the rest of the script."
         (let ((class (pop classes)))
           (assert class)
           (setf ast (copy base-ast
+                          :serial-number nil
                           :class class
                           :children (append (pop left-wrap)
                                             (list ast)
