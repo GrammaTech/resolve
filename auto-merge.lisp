@@ -90,18 +90,32 @@
 
 (defgeneric resolve-conflict (conflicted conflict &key strategy)
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
-  (:method ((conflicted auto-mergeable) (conflict conflict-ast)
-            &key (strategy (random-elt (get-conflict-strategies conflict))))
+  (:method-combination standard/context)
+  (:method :context ((conflicted auto-mergeable)
+                     (conflict conflict-ast)
+                     &key strategy)
+    "Catch rule matching errors."
+    (declare (ignore strategy))
     (handler-bind
         ((sel/sw/ts::rule-matching-error
            (lambda (c)
              (declare (ignorable c))
              (note 3 "Skipping mutation due to ~a" c)
              (invoke-restart 'software-evolution-library/software/parseable::skip-mutation))))
-      (apply-mutation conflicted
-                      (make-instance 'new-conflict-resolution
-                                     :targets conflict
-                                     :strategy strategy)))))
+      (call-next-method)))
+  (:method :around ((conflicted auto-mergeable-parseable)
+                    (conflict conflict-ast)
+                    &key strategy)
+    "Check that the result is printable before returning it."
+    (declare (ignore strategy))
+    (lret ((result (call-next-method)))
+      (source-text (genome result) :stream (make-broadcast-stream))))
+  (:method ((conflicted auto-mergeable) (conflict conflict-ast)
+            &key (strategy (random-elt (get-conflict-strategies conflict))))
+    (apply-mutation conflicted
+                    (make-instance 'new-conflict-resolution
+                                   :targets conflict
+                                   :strategy strategy))))
 
 (defgeneric remove-ast-stubs (variant)
   (:documentation "Remove AST stubs from the genome of VARIANT.
