@@ -88,6 +88,20 @@
        (reverse (collect-if (of-type 'conflict-ast) (or root (genome conflicted))))
        :initial-value conflicted))))
 
+(defgeneric printable? (software)
+  (:method (software) t)
+  (:method ((software auto-mergeable-parseable))
+    (values
+     (ignore-errors
+      (source-text (genome software) :stream (make-broadcast-stream))
+      t)))
+  (:method ((project auto-mergeable-project))
+    (every #'printable? (evolve-files project))))
+
+(defun check-printable (software)
+  (unless (printable? software)
+    (error "Cannot be printed: ~a" software)))
+
 (defgeneric resolve-conflict (conflicted conflict &key strategy)
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
   (:method-combination standard/context)
@@ -109,8 +123,7 @@
     "Check that the result is printable before returning it."
     (declare (ignore strategy))
     (lret ((result (call-next-method)))
-      (when result
-        (source-text (genome result) :stream (make-broadcast-stream)))))
+      (check-printable result)))
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
     (apply-mutation conflicted
@@ -175,8 +188,9 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                          (error "Cannot resolve ~a" chunk)))
                    (reverse chunks)
                    :initial-value (copy conflicted)))))
-    (assert (notany #'get-conflicts pop))
-    (mapcar #'remove-ast-stubs pop))
+    (lret ((pop (mapcar #'remove-ast-stubs pop)))
+      (assert (notany #'get-conflicts pop))
+      (assert (every #'printable? pop))))
   (:method ((conflicted auto-mergeable-project)
             &aux (pop-size (or *max-population-size* (expt 2 10))))
     (iter (for (file . obj) in (evolve-files conflicted))
