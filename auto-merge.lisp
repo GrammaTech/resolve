@@ -141,7 +141,15 @@ other delimiters to be inserted.")
   (:method ((variant parseable))
     (copy variant :genome (remove-ast-stubs (genome variant))))
   (:method ((genome ast))
-    (remove-if (of-type 'ast-stub) genome)))
+    (let ((ast-stubs (collect-if (of-type 'ast-stub) genome)))
+      (reduce (lambda (genome stub)
+                (ematch (children stub)
+                  ((list)
+                   (less genome stub))
+                  ((list child)
+                   (with genome stub child))))
+              ast-stubs
+              :initial-value genome))))
 
 
 ;;; Generation of the initial population.
