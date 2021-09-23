@@ -352,7 +352,10 @@ branches of a Git repository."
       (if (< (length (get-conflicts reconciliation))
              (length (get-conflicts sw)))
           reconciliation
-          sw))))
+          (progn
+            (note 3 "Reconciling made ~a worse, using original." sw)
+            (check-printable sw)
+            sw)))))
 
 (defvar-unbound *auto-merge-meta*
   "Optional hash table to use to store metadata about the run.")
