@@ -126,8 +126,9 @@
     "Check that the result is printable before returning it."
     (declare (ignore strategy))
     (lret ((result (call-next-method)))
-      (check-printable result)
-      (remove-ast-stubs result)))
+      (when result
+        (check-printable result)
+        (remove-ast-stubs result))))
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
     (apply-mutation conflicted
