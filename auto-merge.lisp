@@ -23,6 +23,8 @@
   (:shadow :function-body)
   (:import-from :software-evolution-library/components/file
                 :file-w-attributes)
+  (:import-from :software-evolution-library/software/tree-sitter
+                :rule-matching-error)
   (:export :resolve
            :auto-merge-test
            :populate
@@ -111,7 +113,7 @@
     "Catch rule matching errors."
     (declare (ignore strategy))
     (handler-bind
-        ((sel/sw/ts::rule-matching-error
+        ((rule-matching-error
            (lambda (c)
              (declare (ignorable c))
              (note 3 "Skipping mutation due to ~a" c)
