@@ -125,6 +125,8 @@
              (declare (ignorable c))
              (note 3 "Skipping mutation due to ~a" c)
              (maybe-invoke-restart 'skip-mutation)
+             ;; If the error happens outside an actual mutation (while
+             ;; testing that the variant is printable), return nil.
              (return-from resolve-conflict nil))))
       (call-next-method)))
   (:method :around ((conflicted auto-mergeable-parseable)
@@ -135,6 +137,9 @@
     (lret ((result (call-next-method)))
       (when result
         (check-printable result)
+        ;; Check that removing AST stubs won't cause rule violations
+        ;; -- but don't remove them yet as we still need
+        ;; them around for metadata.
         (remove-ast-stubs result))))
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
@@ -146,11 +151,11 @@
 (defgeneric remove-ast-stubs (variant)
   (:documentation "Remove AST stubs from the genome of VARIANT.
 
-AST stubs must be removed lest their presence cause extra commas or
-other delimiters to be inserted.")
-  (:method ((variant software))
-    variant)
+AST stubs must be removed lest their presence cause extra delimiters
+to be inserted and make the output unparseable.")
+  (:method ((variant software)) variant)
   (:method ((variant parseable))
+    "If the genome is just an AST stub, don't try to remove it."
     (let ((genome (genome variant)))
       (copy variant
             :genome (if (typep genome 'ast-stub)
