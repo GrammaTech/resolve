@@ -115,7 +115,8 @@
            (lambda (c)
              (declare (ignorable c))
              (note 3 "Skipping mutation due to ~a" c)
-             (invoke-restart 'software-evolution-library/software/parseable::skip-mutation))))
+             (maybe-invoke-restart 'software-evolution-library/software/parseable::skip-mutation)
+             (return-from resolve-conflict nil))))
       (call-next-method)))
   (:method :around ((conflicted auto-mergeable-parseable)
                     (conflict conflict-ast)
@@ -123,7 +124,8 @@
     "Check that the result is printable before returning it."
     (declare (ignore strategy))
     (lret ((result (call-next-method)))
-      (check-printable result)))
+      (check-printable result)
+      (remove-ast-stubs result)))
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
     (apply-mutation conflicted
