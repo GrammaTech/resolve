@@ -151,7 +151,11 @@ other delimiters to be inserted.")
   (:method ((variant software))
     variant)
   (:method ((variant parseable))
-    (copy variant :genome (remove-ast-stubs (genome variant))))
+    (let ((genome (genome variant)))
+      (copy variant
+            :genome (if (typep genome 'ast-stub)
+                        genome
+                        (remove-ast-stubs (genome variant))))))
   (:method ((genome ast))
     (let ((ast-stubs (collect-if (of-type 'ast-stub) genome)))
       (reduce (lambda (genome stub)
