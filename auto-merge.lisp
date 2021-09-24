@@ -23,6 +23,8 @@
   (:shadow :function-body)
   (:import-from :software-evolution-library/components/file
                 :file-w-attributes)
+  (:import-from :software-evolution-library/software/parseable
+                :skip-mutation)
   (:import-from :software-evolution-library/software/tree-sitter
                 :rule-matching-error)
   (:export :resolve
@@ -104,6 +106,11 @@
   (unless (printable? software)
     (error "Cannot be printed: ~a" software)))
 
+(defun check-remove-ast-stubs (software)
+  (let ((software (remove-ast-stubs software)))
+    (if (genome software) software
+        (error "AST stub at root: ~a" software))))
+
 (defgeneric resolve-conflict (conflicted conflict &key strategy)
   (:documentation "Resolve CONFLICT in CONFLICTED using STRATEGY.")
   (:method-combination standard/context)
@@ -117,7 +124,7 @@
            (lambda (c)
              (declare (ignorable c))
              (note 3 "Skipping mutation due to ~a" c)
-             (maybe-invoke-restart 'software-evolution-library/software/parseable::skip-mutation)
+             (maybe-invoke-restart 'skip-mutation)
              (return-from resolve-conflict nil))))
       (call-next-method)))
   (:method :around ((conflicted auto-mergeable-parseable)
