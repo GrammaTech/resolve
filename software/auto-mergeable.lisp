@@ -361,6 +361,7 @@ conflict AST resolution with an alternative option."
                                                  :strategy strategy))
            (conflict-path (ast-path software (car prior-resolution)))
            (parent (@ software (butlast conflict-path))))
+      (assert (find (car prior-resolution) (genome software)))
       #+auto-mergeable-debug
       (progn
         (format t "conflict-ast = ~a~%" conflict-ast)
