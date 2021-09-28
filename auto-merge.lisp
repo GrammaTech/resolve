@@ -173,6 +173,15 @@ to be inserted and make the output unparseable.")
               :initial-value genome))))
 
 
+(defun resolve-chunk (software chunk)
+  (assure conflict-ast
+    (etypecase chunk
+      (conflict-ast
+       (when (typep software 'parseable)
+         (assert (find chunk (genome software))))
+       chunk)
+      (list (lookup software chunk)))))
+
 ;;; Generation of the initial population.
 (defgeneric populate (conflicted)
   (:documentation "Return a population suitable for evolution from MERGED
@@ -183,6 +192,9 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
               (pop-size (or *max-population-size* (expt 2 10))))
     ;; Initially population is just a list of the base object.
     (let* ((chunks (get-conflicts conflicted))
+           (chunk-paths
+            (and (typep conflicted 'parseable)
+                 (mapcar (op (ast-path conflicted _)) chunks)))
            (num-solutions (reduce #'* chunks
                                   :key [#'length #'get-conflict-strategies])))
       ;; Create all conflict resolution variants if the total number
@@ -196,26 +208,35 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                           (lambda (variant)
                             (mapcar
                              (lambda (strategy)
-                               (resolve-conflict (copy variant) chunk
-                                                 :strategy strategy))
-                             (get-conflict-strategies chunk)))
+                               (let* ((variant (copy variant))
+                                      (chunk (resolve-chunk variant chunk)))
+                                 (resolve-conflict variant
+                                                   chunk
+                                                   :strategy strategy)))
+                             (get-conflict-strategies
+                              (resolve-chunk conflicted chunk))))
                           pop))))
-                (reverse chunks))
+                (reverse (or chunk-paths chunks)))
           (nest
            (setf pop)
            (iter (for i below pop-size))
            (collect)
            (reduce (lambda (variant chunk)
-                     ;; Try all the available strategies in random
-                     ;; order until you get a valid one.
-                     (or (some
-                          (lambda (strategy)
-                            (resolve-conflict (copy variant) chunk
-                                              :strategy strategy))
-                          (reshuffle
-                           (get-conflict-strategies chunk)))
-                         (error "Cannot resolve ~a" chunk)))
-                   (reverse chunks)
+                     (let ((chunk (resolve-chunk variant chunk)))
+                       (declare (conflict-ast chunk))
+                       ;; Try all the available strategies in random
+                       ;; order until you get a valid one.
+                       (or (some
+                            (lambda (strategy)
+                              (let* ((variant (copy variant))
+                                     (chunk (resolve-chunk variant chunk)))
+                                (resolve-conflict variant
+                                                  chunk
+                                                  :strategy strategy)))
+                            (reshuffle
+                             (get-conflict-strategies chunk)))
+                           (error "Cannot resolve ~a" chunk))))
+                   (reverse (or chunk-paths chunks))
                    :initial-value (copy conflicted)))))
     (lret ((pop (mapcar #'remove-ast-stubs pop)))
       (assert (notany #'get-conflicts pop))
@@ -230,17 +251,17 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
                        (list (cons file (copy obj))))
             into resolutions)
           (finally
-            ;; Return all conflict resolution variants if the total number
-            ;; is less than POP-SIZE.  Otherwise, return a random sample.
-            (if (< (reduce #'* resolutions :key #'length) pop-size)
-                (return (mapcar (lambda (resolution)
-                                  (copy conflicted :evolve-files resolution))
-                                (cartesian resolutions)))
-                (return (iter (for i below pop-size)
-                              (collect (copy conflicted :evolve-files
-                                             (mapcar (lambda (objs)
-                                                       (random-elt objs))
-                                                     resolutions))))))))))
+           ;; Return all conflict resolution variants if the total number
+           ;; is less than POP-SIZE.  Otherwise, return a random sample.
+           (if (< (reduce #'* resolutions :key #'length) pop-size)
+               (return (mapcar (lambda (resolution)
+                                 (copy conflicted :evolve-files resolution))
+                               (cartesian resolutions)))
+               (return (iter (for i below pop-size)
+                             (collect (copy conflicted :evolve-files
+                                            (mapcar (lambda (objs)
+                                                      (random-elt objs))
+                                                    resolutions))))))))))
 
 
 ;;; Fitness testing
@@ -374,8 +395,12 @@ branches of a Git repository."
                                               (cons (car cons)
                                                     (source-text (cdr cons))))
                                             (conflict-ast-child-alist node)))
-                              (resolve-conflict (copy variant) node
-                                                :strategy strategy)))
+                              (let* ((path (ast-path expanded-sw node))
+                                     (variant (copy variant))
+                                     (node (lookup variant path)))
+                                (declare (conflict-ast node))
+                                (resolve-conflict variant node
+                                                  :strategy strategy))))
                           reconciliations
                           :initial-value expanded-sw))))))
     (let ((reconciliation (reconcile-expanded-conflicts sw)))
