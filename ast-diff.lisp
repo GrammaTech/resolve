@@ -2225,9 +2225,13 @@ process with the rest of the script."
           (setf ast (copy base-ast
                           :serial-number nil
                           :class class
-                          :children (append (pop left-wrap)
-                                            (list ast)
-                                            (pop right-wrap))))))
+                          :children
+                          ;; Use tree-copy to avoid possible interval
+                          ;; collisions.
+                          (mapcar #'tree-copy
+                                  (append (pop left-wrap)
+                                          (list ast)
+                                          (pop right-wrap)))))))
   #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (source-text ast))
   ast)
 
