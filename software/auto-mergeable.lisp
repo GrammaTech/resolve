@@ -439,7 +439,7 @@ using STRATEGY.")
   (:method ((conflict ast)
             &key (strategy (random-elt (get-conflict-strategies conflict)))
             &aux (options (conflict-ast-child-alist conflict)))
-    (labels ((normalize (children)
+    (labels ((normalize (children &key tree-copy)
                "Normalize CHILDREN by adding the conflict AST
                to each child AST's annotations.  If there are no children,
                create a NullStmt AST with this annotations.  The annotations
@@ -453,7 +453,10 @@ using STRATEGY.")
                                  (make-instance 'ast-stub
                                   :children (list child)
                                   :annotations `((:conflict-ast . ,conflict)))))
-                           children)
+                           ;; Tree copy avoids possible interval collisions.
+                           (if tree-copy
+                               (mapcar #'tree-copy children)
+                               children))
                    (list (make-instance 'ast-stub
                           :annotations `((:conflict-ast . ,conflict)))))))
       ;; Five ways of resolving a conflict:
@@ -463,8 +466,10 @@ using STRATEGY.")
         ;; 2. (V2) version 2
         (:V2 (normalize (aget :your options)))
         ;; 3. (CC) concatenate versions (either order)
-        (:C1 (normalize (append (aget :my options) (aget :your options))))
-        (:C2 (normalize (append (aget :your options) (aget :my options))))
+        (:C1 (normalize (append (aget :my options) (aget :your options))
+                        :tree-copy t))
+        (:C2 (normalize (append (aget :your options) (aget :my options))
+                        :tree-copy t))
         ;; 4. (NN) select the base version
         (:NN (normalize (aget :old options)))))))
 
