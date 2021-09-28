@@ -95,16 +95,11 @@
 (defgeneric printable? (software)
   (:method (software) t)
   (:method ((software auto-mergeable-parseable))
-    (values
-     (ignore-errors
-      (source-text (genome software) :stream (make-broadcast-stream))
-      t)))
+    (source-text (genome software) :stream (make-broadcast-stream))
+    t)
   (:method ((project auto-mergeable-project))
     (every #'printable? (evolve-files project))))
 
-(defun check-printable (software)
-  (unless (printable? software)
-    (error "Cannot be printed: ~a" software)))
 
 (defun check-remove-ast-stubs (software)
   (let ((software (remove-ast-stubs software)))
@@ -136,7 +131,7 @@
     (declare (ignore strategy))
     (lret ((result (call-next-method)))
       (when result
-        (check-printable result)
+        (assert (printable? result))
         ;; Check that removing AST stubs won't cause rule violations
         ;; -- but don't remove them yet as we still need
         ;; them around for metadata.
@@ -410,7 +405,7 @@ branches of a Git repository."
           reconciliation
           (progn
             (note 3 "Reconciling made ~a worse, using original." sw)
-            (check-printable sw)
+            (assert (printable? sw))
             sw)))))
 
 (defvar-unbound *auto-merge-meta*
