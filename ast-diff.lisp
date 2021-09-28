@@ -2222,16 +2222,20 @@ process with the rest of the script."
   (iter (while left-wrap)
         (let ((class (pop classes)))
           (assert class)
-          (setf ast (copy base-ast
-                          :serial-number nil
-                          :class class
-                          :children
-                          ;; Use tree-copy to avoid possible interval
-                          ;; collisions.
-                          (mapcar #'tree-copy
-                                  (append (pop left-wrap)
-                                          (list ast)
-                                          (pop right-wrap)))))))
+          (setf ast
+                ;; TODO This doesn't do what it's supposed to do. It
+                ;; only writes to the children slot, not the actual
+                ;; slots used to store children.
+                (copy base-ast
+                      :serial-number nil
+                      :class class
+                      :children
+                      ;; Use tree-copy to avoid possible interval
+                      ;; collisions.
+                      (mapcar #'tree-copy
+                              (append (pop left-wrap)
+                                      (list ast)
+                                      (pop right-wrap)))))))
   #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (source-text ast))
   ast)
 
