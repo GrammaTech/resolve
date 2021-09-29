@@ -2226,16 +2226,16 @@ process with the rest of the script."
                 ;; TODO This doesn't do what it's supposed to do. It
                 ;; only writes to the children slot, not the actual
                 ;; slots used to store children.
-                (copy base-ast
-                      :serial-number nil
-                      :class class
-                      :children
-                      ;; Use tree-copy to avoid possible interval
-                      ;; collisions.
-                      (mapcar #'tree-copy
-                              (append (pop left-wrap)
-                                      (list ast)
-                                      (pop right-wrap)))))))
+                (copy
+                 ;; Use tree-copy to avoid possible interval
+                 ;; collisions.
+                 (tree-copy base-ast)
+                 :serial-number nil
+                 :class class
+                 :children
+                 (append (pop left-wrap)
+                         (list ast)
+                         (pop right-wrap))))))
   #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (source-text ast))
   ast)
 
