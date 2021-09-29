@@ -443,7 +443,11 @@ using STRATEGY.")
                "Normalize CHILDREN by adding the conflict AST
                to each child AST's annotations.  If there are no children,
                create a NullStmt AST with this annotations.  The annotations
-               are required for the `new-conflict-resolution` mutation."
+               are required for the `new-conflict-resolution` mutation.
+
+               If TREE-COPY is non-nil, then the children are copied
+               to ensure that there are no conflicts in their serial
+               numbers."
                (if children
                    (mapcar (lambda (child)
                              (if (typep child 'ast)
