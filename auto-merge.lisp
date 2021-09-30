@@ -135,7 +135,7 @@
         ;; Check that removing AST stubs won't cause rule violations
         ;; -- but don't remove them yet as we still need
         ;; them around for metadata.
-        (remove-ast-stubs result))))
+        (assert (printable? (remove-ast-stubs result))))))
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
     (apply-mutation conflicted
