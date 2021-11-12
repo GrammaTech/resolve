@@ -49,11 +49,13 @@
            :auto-mergeable-c
            :auto-mergeable-cpp
            :auto-mergeable-javascript
+           :auto-mergeable-typescript
            :auto-mergeable-lisp
            :auto-mergeable-project
            :auto-mergeable-c-project
            :auto-mergeable-cpp-project
            :auto-mergeable-javascript-project
+           :auto-mergeable-typescript-project
            :auto-mergeable-lisp-project
            :create-auto-mergeable
            ;; auto-mergeable mutations
@@ -79,6 +81,7 @@
 (define-software auto-mergeable-simple (auto-mergeable simple) ())
 (define-software auto-mergeable-parseable (auto-mergeable parseable) ())
 (define-software auto-mergeable-javascript (auto-mergeable-parseable javascript) ())
+(define-software auto-mergeable-typescript (auto-mergeable-parseable typescript) ())
 (define-software auto-mergeable-c (auto-mergeable-parseable c) ())
 (define-software auto-mergeable-cpp (auto-mergeable-parseable c) ())
 (define-software auto-mergeable-json (auto-mergeable-parseable json) ())
@@ -90,6 +93,8 @@
     (auto-mergeable-project cpp-project) ())
 (define-software auto-mergeable-javascript-project
     (auto-mergeable-project javascript-project) ())
+(define-software auto-mergeable-typescript-project
+    (auto-mergeable-project typescript-project) ())
 (define-software auto-mergeable-lisp-project
     (auto-mergeable-project lisp-project) ())
 
@@ -101,6 +106,8 @@
     (change-class (copy obj) 'auto-mergeable-simple))
   (:method ((obj javascript) &key)
     (change-class (copy obj) 'auto-mergeable-javascript))
+  (:method ((obj typescript) &key)
+    (change-class (copy obj) 'auto-mergeable-typescript))
   (:method ((obj c) &key)
     (change-class (copy obj) 'auto-mergeable-c))
   (:method ((obj cpp) &key)
