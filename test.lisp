@@ -139,12 +139,27 @@
   (:teardown
    (setf *old* nil *my* nil *your* nil)))
 
-(defun populate-js-abacus-variants ()
+(defixture gcd-conflict-typescript
+    (:setup
+     (destructuring-bind (my old your)
+         (mapcar
+          (lambda (name)
+            (from-file
+             (make-instance 'typescript)
+             (make-pathname :directory +gcd-dir+
+                            :type "js"
+                            :name name)))
+          '("gcd-fix" "gcd" "gcd-prose"))
+       (setf *my* my *old* old *your* your)))
+  (:teardown
+   (setf *old* nil *my* nil *your* nil)))
+
+(defun populate-js-abacus-variants (&key (as 'javascript))
   (mapcar
    (lambda (name)
      (cons (make-keyword (string-upcase name))
            (from-file
-            (make-instance 'javascript)
+            (make-instance as)
             (make-pathname :directory (append +javascript-dir+ '("abacus"))
                            :type "js"
                            :name (concatenate 'string "abacus-" name)))))
@@ -156,12 +171,26 @@
   (:teardown
    (setf *variants* nil)))
 
+(defixture typescript-abacus-variants
+    (:setup
+     (setf *variants* (populate-js-abacus-variants :as 'typescript)))
+  (:teardown
+   (setf *variants* nil)))
+
 (defixture javascript-converge-conflict
   (:setup (setf *variants* (populate-js-abacus-variants)
                 *cnf* (converge (aget :borders *variants*)
                                 (aget :orig *variants*)
                                 (aget :min-lines *variants*) :conflict t
                                 :base-cost 5)))
+  (:teardown (setf *variants* nil *cnf* nil)))
+
+(defixture typescript-converge-conflict
+    (:setup (setf *variants* (populate-js-abacus-variants :as 'typescript)
+                  *cnf* (converge (aget :borders *variants*)
+                                  (aget :orig *variants*)
+                                  (aget :min-lines *variants*) :conflict t
+                                                               :base-cost 5)))
   (:teardown (setf *variants* nil *cnf* nil)))
 
 (defroot test)
@@ -689,7 +718,7 @@
                     :recurse :same :same :same :same))))))
 
 (deftest diff-elide-same-test ()
-  (with-fixture javascript-abacus-variants
+  (with-each-fixture (javascript-abacus-variants typescript-abacus-variants)
     (let ((orig (aget :orig *variants*))
           (bead (aget :bead *variants*)))
       (is (every
@@ -1263,7 +1292,7 @@
       #+regression (is unstable))))
 
 (deftest (gcd-conflict-merge3-js :long-running) ()
-  (with-fixture gcd-conflict-javascript
+  (with-each-fixture (gcd-conflict-javascript gcd-conflict-typescript)
     (multiple-value-bind (merged unstable)
         (converge *my* *old* *your* :conflict t)
       (declare (ignorable merged unstable))
@@ -1273,7 +1302,7 @@
 
 ;;; Automatic merge tests
 (deftest (merges-and-test-of-abacus-variants :long-running) ()
-  (with-fixture javascript-abacus-variants
+  (with-each-fixture (javascript-abacus-variants typescript-abacus-variants)
     (let ((orig (aget :orig *variants*))
           ;; Expected to work on a simple merge.
           (expected-functional-pairs
@@ -1327,7 +1356,7 @@
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
 (deftest (merges-of-abacus-variants-w-conflicts :long-running) ()
-  (with-fixture javascript-abacus-variants
+  (with-each-fixture (javascript-abacus-variants typescript-abacus-variants)
     (let ((orig (aget :orig *variants*)))
       (mapcar
        (lambda (pair)
@@ -1350,17 +1379,17 @@
        (pairs (remove-if [{eql :orig} #'car] *variants*))))))
 
 (deftest (resolve-to-single-equals-original/old :long-running) ()
-  (with-fixture javascript-converge-conflict
+  (with-each-fixture (javascript-converge-conflict typescript-converge-conflict)
     (is (string= (genome-string (astyle (resolve-to (copy *cnf*) :old)))
                  (genome-string (astyle (aget :orig *variants*)))))))
 
 (deftest (resolve-to-single-equals-original/my :long-running) ()
-  (with-fixture javascript-converge-conflict
+  (with-each-fixture (javascript-converge-conflict typescript-converge-conflict)
     (is (string= (genome-string (astyle (resolve-to (copy *cnf*) :my)))
                  (genome-string (astyle (aget :borders *variants*)))))))
 
 (deftest (resolve-to-single-equals-original/your :long-running) ()
-  (with-fixture javascript-converge-conflict
+  (with-each-fixture (javascript-converge-conflict typescript-converge-conflict)
     (is (string= (genome-string (astyle (resolve-to (copy *cnf*) :your)))
                  (genome-string (astyle (aget :min-lines *variants*)))))))
 
@@ -1375,7 +1404,7 @@
              #+debug (format t "Conflict nodes:~%")
              #+debug (dolist (cn result) (format t "~a~%" cn))
              result)))
-    (with-fixture javascript-converge-conflict
+    (with-each-fixture (javascript-converge-conflict typescript-converge-conflict)
       (is (= (length (aget :my (conflict-ast-child-alist
                                 (car (conflict-nodes *cnf*)))))
              (progn (with (copy *cnf*)
@@ -1388,7 +1417,7 @@
 
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested
           :long-running) ()
-  (with-fixture javascript-converge-conflict
+  (with-each-fixture (javascript-converge-conflict typescript-converge-conflict)
     (let* ((orig-genome-string (genome-string *cnf*))
            (my (resolve-to (copy *cnf*) :my)))
       (is (not (string= orig-genome-string (genome-string my)))
@@ -1400,21 +1429,21 @@
 
 (deftest (resolve-to-of-copy-leaves-original-genome-unmollested-simple
           :long-running) ()
-  (with-fixture javascript-converge-conflict
+  (with-each-fixture (javascript-converge-conflict typescript-converge-conflict)
     (is (typep (@ *cnf* '(2)) 'conflict-ast)
         "Path (3) is a conflict ast in the original.")
     (let* ((old (@ *cnf* '(2)))
            (new (with (copy *cnf*)
                       (ast-path *cnf* old)
                       (car (aget :my (conflict-ast-child-alist old))))))
-      (is (typep (@ new '(2)) 'javascript-ast)
-          "Path (1) is a JavaScript ast in result of with.")
+      (is (typep (@ new '(2)) 'ecma-ast)
+          "Path (1) is a ECMA ast in result of with.")
       (is (typep (@ *cnf* '(2)) 'conflict-ast)
           "Path (1) is STILL a conflict-ast in the original ~
            after with."))))
 
 (deftest (resolve-to-selects-alternatives-of-conflicts :long-running) ()
-  (with-fixture javascript-converge-conflict
+  (with-each-fixture (javascript-converge-conflict typescript-converge-conflict)
     ;; Conflicted software object has ASTs.
     (is (not (zerop (size *cnf*))))
     ;; Conflicted software object has conflcit ASTs.
@@ -1452,7 +1481,8 @@
 
 (deftest (can-populate-from-conflicted-merges :long-running) ()
   (nest
-   (with-fixture javascript-converge-conflict)
+   (with-each-fixture (javascript-converge-conflict
+                       typescript-converge-conflict))
    (destructuring-bind (my old your)
        (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
    (let* ((conflicted (nest (create-auto-mergeable)
@@ -1566,7 +1596,7 @@
 ;;; Functions for interactive testing and experimentation.
 (defun do-populate (my your)
   "Build a population of resolutions of conflicts from the merge of MY and YOUR."
-  (with-fixture javascript-abacus-variants
+  (with-each-fixture (javascript-abacus-variants typescript-abacus-variants)
     (setf *population* (populate (converge (aget my *variants*)
                                            (aget :orig *variants*)
                                            (aget your *variants*)
@@ -1598,7 +1628,7 @@
   (setf *fitness-evals* 0)
   (nest
    (let ((*note-level* 0)))
-   (with-fixture javascript-converge-conflict)
+   (with-each-fixture (javascript-converge-conflict typescript-converge-conflict))
    (destructuring-bind (my old your)
        (mapcar {aget _ *variants*} (list my-name :orig your-name)))
    ;; Target is 6 + 5 = 11.
