@@ -215,12 +215,6 @@ command-line options processed by the returned function."
                            map-edit-tree ast-patch merge-diffs-on-syms))))
   (drop-dead-method-all))
 
-(defun preferred-language (lang)
-  "Given LANG, a guess or resolved language, return a preferred language.
-At the moment that means /not/ using tree-sitter."
-  (case lang
-    (t lang)))
-
 (defun md5string (text)
   (format nil "~{~X~}" (coerce (md5:md5sum-string text) 'list)))
 
@@ -317,8 +311,7 @@ At the moment that means /not/ using tree-sitter."
   (setf old-file (namestring (truename old-file))
         my-file (namestring (truename my-file))
         your-file (namestring (truename your-file))
-        language (preferred-language
-                  (or language (guess-language old-file my-file your-file))))
+        language (or language (guess-language old-file my-file your-file)))
   ;; Force OUT-DIR when running as a command line utility and merging
   ;; whole directories.  We can't write multiple files to STDOUT.
   (when (and (directory-p old-file) (not out-dir))
@@ -413,8 +406,7 @@ At the moment that means /not/ using tree-sitter."
           old-file (namestring (truename old-file))
           my-file (namestring (truename my-file))
           your-file (namestring (truename your-file))
-          language (preferred-language
-                    (or language (guess-language old-file my-file your-file)))
+          language (or language (guess-language old-file my-file your-file))
           num-tests (resolve-num-tests-from-num-tests num-tests)
           tests (create-test-suite test-script num-tests))
     (note 2 "Create software objects.")
