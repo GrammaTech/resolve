@@ -126,13 +126,21 @@
                           (lambda (obj)
                             (cons (fn obj) obj))
                           objects)))
+             (necessary? (file-obj-pair)
+               (string-case (car file-obj-pair)
+                 ("package.json" t)
+                 ("tsconfig.json" t)
+                 (t nil)))
              (already-merged? (file-obj-pair)
                (contains? already-merged (car file-obj-pair)))
+             (ignorable? (file.obj)
+               (and (already-merged? file.obj)
+                    (not (necessary? file.obj))))
              (parseable-file-p (file-obj-pair)
                "Filter files which can be parsed into ASTs."
                (nest
                 (when (typep (cdr file-obj-pair) 'parseable))
-                (unless (already-merged? file-obj-pair))
+                (unless (ignorable? file-obj-pair))
                 (handler-case
                     (genome (cdr file-obj-pair))
                   (mutate (c) (declare (ignorable c)) nil))))
@@ -142,7 +150,7 @@
                (mapcar (lambda-bind ((file . obj))
                          (cons file (create-auto-mergeable obj)))
                        (task-filter #'parseable-file-p
-                                    (remove-if #'already-merged?
+                                    (remove-if #'ignorable?
                                                (all-files obj)))))
              (other-files ()
                "Return a list of `auto-mergeable-simple` software objects
@@ -153,7 +161,7 @@
                                (from-file (make-instance 'auto-mergeable-simple)
                                           (original-path obj))))
                        (remove-if #'parseable-file-p
-                                  (remove-if #'already-merged?
+                                  (remove-if #'ignorable?
                                              (all-files obj))))))
       (change-class (copy obj :evolve-files (evolve-files)
                               :other-files (other-files))
