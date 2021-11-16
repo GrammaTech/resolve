@@ -263,7 +263,9 @@ returned is limited by the *MAX-POPULATION-SIZE* global variable.")
 (defmethod auto-merge-test ((obj software) (tests test-suite))
   "Determine the fitness of OBJ against TESTS."
   (with-temporary-file (:pathname bin)
-    (if (ignore-phenome-errors (phenome obj :bin bin))
+    (if (ignore-phenome-errors
+         (note 3 "Emitting phenome for ~a" obj)
+         (phenome obj :bin bin))
         (mapcar (lambda (test-case)
                   (nth-value 2 (run-test bin test-case)))
                 (test-cases tests))
