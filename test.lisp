@@ -844,23 +844,24 @@
 					(%f "int a; int b; int c;"))
                               :no-color t
 			      :stream s)))
-	      "int a; {+int b; +}int c;")))
+              "int a; {+int b; +}int c;")))
 
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.2 ()
+  "Print diff of a deletion"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
 					(%f "int a; int c;"))
                               :no-color t
 			      :stream s)))
-	      "int a; [-int b; -]int c;")
-      "Print diff of a deletion"))
+	      "int a; [-int b; -]int c;")))
 
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.3 ()
+  "Print diff of a replacement"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
@@ -868,14 +869,14 @@
                                         :base-cost 0)
                               :no-color t
 			      :stream s)))
-	      "int a; int {+d+}[-b-]; int c;")
-      "Print diff of a replacement"))
+	      "int a; int {+d+}[-b-]; int c;")))
 
 ;; Increasing the base cost makes larger scale replacements
 ;; more prefered, vs. fine scaled replacement inside strings
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.3a ()
+  "Print diff of a replacement"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
@@ -883,12 +884,12 @@
                                         :base-cost 1)
                               :no-color t
 			      :stream s)))
-              "int a; int {+d+}[-b-]; int c;")
-      "Print diff of a replacement"))
+              "int a; int {+d+}[-b-]; int c;")))
 
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.4 ()
+  "Print diff of deletion of a character in a string"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
@@ -896,12 +897,12 @@
                                         :base-cost 2)
                               :no-color t
 			      :stream s)))
-	      "char *s = \"a[-b-]cd\";")
-      "Print diff of deletion of a character in a string"))
+	      "char *s = \"a[-b-]cd\";")))
 
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.4a ()
+  "Print diff of deletion of a character in a string"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
@@ -909,12 +910,12 @@
                                         :base-cost 3)
                               :no-color t
 			      :stream s)))
-              "char *s = \"a[-b-]cd\";")
-      "Print diff of deletion of a character in a string"))
+              "char *s = \"a[-b-]cd\";")))
 
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.5 ()
+  "Print diff of deletion of substring in a string"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
@@ -922,12 +923,12 @@
                                         :base-cost 1)
                               :no-color t
 			      :stream s)))
-	      "char *s = \"a[-bc-]d\";")
-      "Print diff of deletion of substring in a string"))
+	      "char *s = \"a[-bc-]d\";")))
 
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.6 ()
+  "Print diff of insertion of a substring in a string"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
@@ -935,12 +936,12 @@
                                         :base-cost 1)
                               :no-color t
 			      :stream s)))
-	      "char *s = \"a{+bc+}d\";")
-      "Print diff of insertion of a substring in a string"))
+	      "char *s = \"a{+bc+}d\";")))
 
 ;;; TODO: FIXME:
 #+broken
 (deftest print-diff.7 ()
+  "Print diff of insertion of a character in a string"
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
@@ -948,8 +949,7 @@
                                         :base-cost 1)
                               :no-color t
 			      :stream s)))
-	      "char *s = \"a{+b+}d\";")
-      "Print diff of insertion of a character in a string"))
+	      "char *s = \"a{+b+}d\";")))
 
 ;;;; Simple object ast-diff tests
 (deftest simple.ast-diff.1 ()
