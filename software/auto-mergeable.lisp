@@ -31,10 +31,15 @@
         :software-evolution-library/software/lisp
         :software-evolution-library/software/project
         :software-evolution-library/software/c-project
+        :software-evolution-library/software/cpp-project
         :software-evolution-library/software/parseable-project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp-project
-        :software-evolution-library/software/tree-sitter)
+        :software-evolution-library/software/tree-sitter
+        :software-evolution-library/software/c
+        :software-evolution-library/software/cpp
+        :software-evolution-library/software/javascript
+        :software-evolution-library/software/typescript)
   (:shadow :function-body)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :software-evolution-library/utility/debug
