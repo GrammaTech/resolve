@@ -57,7 +57,6 @@
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
   (:import-from :spinneret :with-html)
   (:import-from :uiop/stream :println :writeln)
-  (:import-from :md5 :md5sum-string)
   (:shadow :merge :ast-diff)
   (:export :ast-diff
            :ast-merge
