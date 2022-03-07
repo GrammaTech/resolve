@@ -22,13 +22,14 @@
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/lisp
         :software-evolution-library/software/lisp)
-  (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
+  (:local-nicknames
+   (:ts :software-evolution-library/software/tree-sitter)
+   (:md5 #+sbcl :sb-md5 #-sbcl :md5))
   (:shadow :css)
   (:shadowing-import-from :software-evolution-library/terminal
                           :+color-RED+ :+color-GRN+ :+color-CYA+ :+color-RST+)
   (:import-from :spinneret :with-html)
   (:import-from :uiop/stream :println :writeln)
-  (:import-from :md5 :md5sum-string)
   (:shadow :merge)
   (:export :ast-merge
            :rest-diff
