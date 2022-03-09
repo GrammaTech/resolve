@@ -2707,118 +2707,120 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
             (sort-insert-delete t))
   "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
-  (let ((*print-escape* nil)
-        (*deletep* nil)
-        (*insertp* nil)
-        (insert-buffer nil)
-        (delete-buffer nil))
-    (declare (special *insertp* *deletep*))
-    (labels ((%p (c)
-               (write-string
-                (typecase c
-                  (null "()")
-                  (structured-text
-                   (continue-color
-                    (string+ (ts:before-text c)
-                             (source-text c)
-                             (ts:after-text c))))
-                  (t (continue-color (source-text c))))
-                stream))
-             (continue-color (text)
-               (cond
-                 (no-color text)
-                 (*deletep*
-                  (regex-replace-all (string #\Newline) text
-                                     (format nil "~%~a" +color-RED+)))
-                 (*insertp*
-                  (regex-replace-all (string #\Newline) text
-                                     (format nil "~%~a" +color-GRN+)))
-                 (t text)))
-             (purge-insert ()
-               (setf *insertp* t)
-               (when insert-buffer
-                 (mapc #'%p (reverse insert-buffer))
-                 (write insert-end :stream stream)
-                 (setf insert-buffer nil))
-               (setf *insertp* nil))
-             (purge-delete ()
-               (setf *deletep* t)
-               (when delete-buffer
-                 (mapc #'%p (reverse delete-buffer))
-                 (write delete-end :stream stream)
-                 (setf delete-buffer nil))
-               (setf *deletep* nil))
-             (push-insert (c)
-               (unless (equal c "")
-                 (purge-delete)
-                 (unless insert-buffer (write insert-start :stream stream))
-                 (push c insert-buffer)))
-             (push-inserts (l) (mapc #'push-insert l))
-             (push-delete (c)
-               (unless (equal c "")
-                 (purge-insert)
-                 (unless delete-buffer (write delete-start :stream stream))
-                 (push c delete-buffer)))
-             (push-deletes (l) (mapc #'push-delete l))
-             (purge ()
-               (purge-insert)
-               (purge-delete))
-             (pr (c) (purge) (%p c))
-             (%print-wrap (content)
-               (destructuring-bind (sub-diff path left-wrap
-                                             right-wrap . rest)
-                   content
-                 (declare (ignore path rest))
-                 (mapc #'push-inserts left-wrap)
-                 (%print-diff sub-diff)
-                 (mapc #'push-inserts (reverse right-wrap))))
-             (%print-unwrap (content)
-               (destructuring-bind (sub-diff path left-wrap right-wrap)
-                   content
-                 (declare (ignore path))
-                 (mapc #'push-deletes left-wrap)
-                 (%print-diff sub-diff)
-                 (mapc #'push-deletes (reverse right-wrap))))
-             (%print-diff (diff)
-               (case (car diff)
-                 ((:wrap) (%print-wrap (cdr diff)))
-                 ((:unwrap) (%print-unwrap (cdr diff)))
-                 (t
-                  (assert (every #'consp diff))
-                  (when sort-insert-delete
-                    (setf diff (simplify-diff-for-printing diff)))
-                  (mapc (lambda-bind ((type . content))
-                                     (ecase type
-                                       (:same (pr content))
-                                       (:delete (push-delete content))
-                                       (:insert (push-insert content))
-                                       ;; The :replace case is used only when
-                                       ;; sort-insert-delete is NIL.  Otherwise,
-                                       ;; these have been broken up into :insert
-                                       ;; and :delete already                                     
-                                       (:replace
-                                        (push-insert (cadr content))
-                                        (push-delete (car content)))
-                                       (:recurse (%print-diff content))
-                                       (:same-sequence (map nil #'pr content))
-                                       (:insert-sequence
-                                        (map nil #'push-insert content))
-                                       (:delete-sequence
-                                        (map nil #'push-delete content))
-                                       (:same-tail (map nil #'pr content))
-                                       (:wrap-sequence (%print-wrap (cdr content)))
-                                       (:unwrap-sequence (%print-unwrap content))
-                                       (:recurse-tail
-                                        (%print-diff
-                                         (remove-if
-                                          (lambda (e)
-                                            (or (equal e '(:delete))
-                                                (equal e '(:insert))))
-                                          content)))))
-                        diff)))))
-      (%print-diff diff)
-      (purge)
-      (values))))
+  (nest
+   (let ((*print-escape* nil)
+         (*deletep* nil)
+         (*insertp* nil)
+         (insert-buffer nil)
+         (delete-buffer nil))
+     (declare (special *insertp* *deletep*)))
+   (with-string (stream stream))
+   (labels ((%p (c)
+              (write-string
+               (typecase c
+                 (null "()")
+                 (structured-text
+                  (continue-color
+                   (string+ (ts:before-text c)
+                            (source-text c)
+                            (ts:after-text c))))
+                 (t (continue-color (source-text c))))
+               stream))
+            (continue-color (text)
+              (cond
+                (no-color text)
+                (*deletep*
+                 (regex-replace-all (string #\Newline) text
+                                    (format nil "~%~a" +color-RED+)))
+                (*insertp*
+                 (regex-replace-all (string #\Newline) text
+                                    (format nil "~%~a" +color-GRN+)))
+                (t text)))
+            (purge-insert ()
+              (setf *insertp* t)
+              (when insert-buffer
+                (mapc #'%p (reverse insert-buffer))
+                (write insert-end :stream stream)
+                (setf insert-buffer nil))
+              (setf *insertp* nil))
+            (purge-delete ()
+              (setf *deletep* t)
+              (when delete-buffer
+                (mapc #'%p (reverse delete-buffer))
+                (write delete-end :stream stream)
+                (setf delete-buffer nil))
+              (setf *deletep* nil))
+            (push-insert (c)
+              (unless (equal c "")
+                (purge-delete)
+                (unless insert-buffer (write insert-start :stream stream))
+                (push c insert-buffer)))
+            (push-inserts (l) (mapc #'push-insert l))
+            (push-delete (c)
+              (unless (equal c "")
+                (purge-insert)
+                (unless delete-buffer (write delete-start :stream stream))
+                (push c delete-buffer)))
+            (push-deletes (l) (mapc #'push-delete l))
+            (purge ()
+              (purge-insert)
+              (purge-delete))
+            (pr (c) (purge) (%p c))
+            (%print-wrap (content)
+              (destructuring-bind (sub-diff path left-wrap
+                                   right-wrap . rest)
+                  content
+                (declare (ignore path rest))
+                (mapc #'push-inserts left-wrap)
+                (%print-diff sub-diff)
+                (mapc #'push-inserts (reverse right-wrap))))
+            (%print-unwrap (content)
+              (destructuring-bind (sub-diff path left-wrap right-wrap)
+                  content
+                (declare (ignore path))
+                (mapc #'push-deletes left-wrap)
+                (%print-diff sub-diff)
+                (mapc #'push-deletes (reverse right-wrap))))
+            (%print-diff (diff)
+              (case (car diff)
+                ((:wrap) (%print-wrap (cdr diff)))
+                ((:unwrap) (%print-unwrap (cdr diff)))
+                (t
+                 (assert (every #'consp diff))
+                 (when sort-insert-delete
+                   (setf diff (simplify-diff-for-printing diff)))
+                 (mapc (lambda-bind ((type . content))
+                                    (ecase type
+                                      (:same (pr content))
+                                      (:delete (push-delete content))
+                                      (:insert (push-insert content))
+                                      ;; The :replace case is used only when
+                                      ;; sort-insert-delete is NIL.  Otherwise,
+                                      ;; these have been broken up into :insert
+                                      ;; and :delete already
+                                      (:replace
+                                       (push-insert (cadr content))
+                                       (push-delete (car content)))
+                                      (:recurse (%print-diff content))
+                                      (:same-sequence (map nil #'pr content))
+                                      (:insert-sequence
+                                       (map nil #'push-insert content))
+                                      (:delete-sequence
+                                       (map nil #'push-delete content))
+                                      (:same-tail (map nil #'pr content))
+                                      (:wrap-sequence (%print-wrap (cdr content)))
+                                      (:unwrap-sequence (%print-unwrap content))
+                                      (:recurse-tail
+                                       (%print-diff
+                                        (remove-if
+                                         (lambda (e)
+                                           (or (equal e '(:delete))
+                                               (equal e '(:insert))))
+                                         content)))))
+                       diff)))))
+     (%print-diff diff)
+     (purge)
+     (values))))
 
 (defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the

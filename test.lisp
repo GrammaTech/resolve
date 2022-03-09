@@ -870,13 +870,12 @@
 ;;; TODO: FIXME:
 (deftest print-diff.3a ()
   "Print diff of a replacement"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "int a; int b; int c;")
-                                        (%f "int a; int d; int c;")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
+  (is (equalp (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (print-diff (ast-diff (%f "int a; int b; int c;")
+                                      (%f "int a; int d; int c;")
+                                      :base-cost 1)
+                            :no-color t
+                            :stream nil))
               "int a; int {+d+}[-b-]; int c;")))
 
 (deftest print-diff.4 ()
