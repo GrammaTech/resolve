@@ -835,8 +835,6 @@
               (source-text ast3) (ast-to-list-form ast3)))
     (is (equal? ast2 ast3))))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.1 ()
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s) (from-string (make-instance 'c) s)))
@@ -846,8 +844,6 @@
 			      :stream s)))
               "int a; {+int b; +}int c;")))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.2 ()
   "Print diff of a deletion"
   (is (equalp (with-output-to-string (s)
@@ -858,8 +854,6 @@
 			      :stream s)))
 	      "int a; [-int b; -]int c;")))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.3 ()
   "Print diff of a replacement"
   (is (equalp (with-output-to-string (s)
@@ -874,7 +868,6 @@
 ;; Increasing the base cost makes larger scale replacements
 ;; more prefered, vs. fine scaled replacement inside strings
 ;;; TODO: FIXME:
-#+broken
 (deftest print-diff.3a ()
   "Print diff of a replacement"
   (is (equalp (with-output-to-string (s)
@@ -886,8 +879,6 @@
 			      :stream s)))
               "int a; int {+d+}[-b-]; int c;")))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.4 ()
   "Print diff of deletion of a character in a string"
   (is (equalp (with-output-to-string (s)
@@ -899,8 +890,6 @@
 			      :stream s)))
 	      "char *s = \"a[-b-]cd\";")))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.4a ()
   "Print diff of deletion of a character in a string"
   (is (equalp (with-output-to-string (s)
@@ -912,8 +901,6 @@
 			      :stream s)))
               "char *s = \"a[-b-]cd\";")))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.5 ()
   "Print diff of deletion of substring in a string"
   (is (equalp (with-output-to-string (s)
@@ -925,8 +912,6 @@
 			      :stream s)))
 	      "char *s = \"a[-bc-]d\";")))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.6 ()
   "Print diff of insertion of a substring in a string"
   (is (equalp (with-output-to-string (s)
@@ -938,8 +923,6 @@
 			      :stream s)))
 	      "char *s = \"a{+bc+}d\";")))
 
-;;; TODO: FIXME:
-#+broken
 (deftest print-diff.7 ()
   "Print diff of insertion of a character in a string"
   (is (equalp (with-output-to-string (s)
