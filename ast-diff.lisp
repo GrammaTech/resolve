@@ -41,6 +41,7 @@
   (:import-from :software-evolution-library/software/tree-sitter
    :tree-sitter-ast :output-transformation
    :computed-text :structured-text :choice-superclass)
+  (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
   (:export
    :ast-cost
    :ast-size
@@ -2712,9 +2713,17 @@ Numerous options are provided to control presentation."
         (insert-buffer nil)
         (delete-buffer nil))
     (declare (special *insertp* *deletep*))
-    (labels ((%p (c) (if (null c)
-                         (princ "()" stream)
-                         (write (continue-color (source-text c)) :stream stream)))
+    (labels ((%p (c)
+               (write-string
+                (typecase c
+                  (null "()")
+                  (structured-text
+                   (continue-color
+                    (string+ (ts:before-text c)
+                             (source-text c)
+                             (ts:after-text c))))
+                  (t (continue-color (source-text c))))
+                stream))
              (continue-color (text)
                (cond
                  (no-color text)
