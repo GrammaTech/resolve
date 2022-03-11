@@ -836,23 +836,21 @@
     (is (equal? ast2 ast3))))
 
 (deftest print-diff.1 ()
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "int a; int c;")
-					(%f "int a; int b; int c;"))
-                              :no-color t
-			      :stream s)))
-              "int a; {+int b; +}int c;")))
+  (is (equalp (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (print-diff (ast-diff (%f "int a; int c;")
+                                      (%f "int a; int b; int c;"))
+                            :no-color t
+                            :stream nil))
+              "int a;{+ int b;+} int c;")))
 
 (deftest print-diff.2 ()
   "Print diff of a deletion"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "int a; int b; int c;")
-					(%f "int a; int c;"))
-                              :no-color t
-			      :stream s)))
-	      "int a; [-int b; -]int c;")))
+  (is (equalp (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (print-diff (ast-diff (%f "int a; int b; int c;")
+                                      (%f "int a; int c;"))
+                            :no-color t
+                            :stream nil))
+	      "int a;[- int b;-] int c;")))
 
 (deftest print-diff.3 ()
   "Print diff of a replacement"
