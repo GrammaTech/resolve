@@ -2730,11 +2730,11 @@ Numerous options are provided to control presentation."
               (cond
                 (no-color text)
                 (*deletep*
-                 (regex-replace-all (string #\Newline) text
-                                    (format nil "~%~a" +color-RED+)))
+                 (string-replace-all (string #\Newline) text
+                                     (format nil "~%~a" +color-RED+)))
                 (*insertp*
-                 (regex-replace-all (string #\Newline) text
-                                    (format nil "~%~a" +color-GRN+)))
+                 (string-replace-all (string #\Newline) text
+                                     (format nil "~%~a" +color-GRN+)))
                 (t text)))
             (purge-insert ()
               (setf *insertp* t)
