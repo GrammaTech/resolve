@@ -2709,13 +2709,15 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
 Numerous options are provided to control presentation."
   (nest
    (let ((*print-escape* nil)
+         ;; These are used to track what color we should be printing
+         ;; in.
          (*deletep* nil)
          (*insertp* nil)
          (insert-buffer nil)
          (delete-buffer nil))
      (declare (special *insertp* *deletep*)))
    (with-string (stream stream))
-   (labels ((%p (c)
+   (labels ((%p (c) "Print."
               (write-string
                (typecase c
                  (null "()")
@@ -2753,13 +2755,15 @@ Numerous options are provided to control presentation."
             (push-insert (c)
               (unless (equal c "")
                 (purge-delete)
-                (unless insert-buffer (write insert-start :stream stream))
+                (unless insert-buffer
+                  (write insert-start :stream stream))
                 (push c insert-buffer)))
             (push-inserts (l) (mapc #'push-insert l))
             (push-delete (c)
               (unless (equal c "")
                 (purge-insert)
-                (unless delete-buffer (write delete-start :stream stream))
+                (unless delete-buffer
+                  (write delete-start :stream stream))
                 (push c delete-buffer)))
             (push-deletes (l) (mapc #'push-delete l))
             (purge ()
