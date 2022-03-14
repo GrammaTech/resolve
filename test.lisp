@@ -33,7 +33,8 @@
   (:import-from :software-evolution-library/command-line
                 :create-software
                 :create-test-suite)
-  (:export :test :batch-test))
+  (:export :test :batch-test
+           :pack-intertext-recursively))
 (in-package :resolve/test)
 (in-readtable :curry-compose-reader-macros)
 
@@ -836,16 +837,28 @@
     (is (equal? ast2 ast3))))
 
 (deftest print-diff.1 ()
-  (is (equalp (flet ((%f (s) (from-string (make-instance 'c) s)))
+  (is (equalp (flet ((%f (s)
+                       (pack-intertext! (from-string (make-instance 'c) s))))
                 (print-diff (ast-diff (%f "int a; int c;")
                                       (%f "int a; int b; int c;"))
                             :no-color t
                             :stream nil))
               "int a;{+ int b;+} int c;")))
 
+(deftest print-diff.1a ()
+  "Like print-diff.1, but a deletion instead of an insertion."
+  (is (equalp (flet ((%f (s)
+                       (pack-intertext! (from-string (make-instance 'c) s))))
+                (print-diff (ast-diff (%f "int a; int b; int c;")
+                                      (%f "int a; int c;"))
+                            :no-color t
+                            :stream nil))
+              "int a;[- int b;-] int c;")))
+
 (deftest print-diff.2 ()
   "Print diff of a deletion"
-  (is (equalp (flet ((%f (s) (from-string (make-instance 'c) s)))
+  (is (equalp (flet ((%f (s)
+                       (pack-intertext! (from-string (make-instance 'c) s))))
                 (print-diff (ast-diff (%f "int a; int b; int c;")
                                       (%f "int a; int c;"))
                             :no-color t
@@ -855,7 +868,8 @@
 (deftest print-diff.3 ()
   "Print diff of a replacement"
   (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (flet ((%f (s)
+                         (pack-intertext! (from-string (make-instance 'c) s))))
 		  (print-diff (ast-diff (%f "int a; int b; int c;")
                                         (%f "int a; int d; int c;")
                                         :base-cost 0)
@@ -868,7 +882,8 @@
 ;;; TODO: FIXME:
 (deftest print-diff.3a ()
   "Print diff of a replacement"
-  (is (equalp (flet ((%f (s) (from-string (make-instance 'c) s)))
+  (is (equalp (flet ((%f (s)
+                       (pack-intertext! (from-string (make-instance 'c) s))))
                 (print-diff (ast-diff (%f "int a; int b; int c;")
                                       (%f "int a; int d; int c;")
                                       :base-cost 1)
@@ -878,19 +893,22 @@
 
 (deftest print-diff.4 ()
   "Print diff of deletion of a character in a string"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
-		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-                                        (%f "char *s = \"acd\";")
-                                        :base-cost 2)
-                              :no-color t
-			      :stream s)))
+  (is (equalp (flet ((%f (s)
+                       (pack-intertext-recursively!
+                        (from-string (make-instance 'c) s))))
+                (print-diff (ast-diff (%f "char *s = \"abcd\";")
+                                      (%f "char *s = \"acd\";")
+                                      :base-cost 2)
+                            :no-color t
+                            :stream nil))
 	      "char *s = \"a[-b-]cd\";")))
 
 (deftest print-diff.4a ()
   "Print diff of deletion of a character in a string"
   (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (flet ((%f (s)
+                         (lret ((software (from-string (make-instance 'c) s)))
+                           (pack-intertext-recursively (genome software)))))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
                                         (%f "char *s = \"acd\";")
                                         :base-cost 3)

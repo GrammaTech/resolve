@@ -84,7 +84,8 @@
    :*wrap-sequences*
    :*strings*
    ;; :*ignore-whitespace*
-   ))
+   :pack-intertext-recursively!
+   :pack-intertext!))
 (in-package :resolve/ast-diff)
 (in-readtable :curry-compose-reader-macros)
 ;;; Comments on further algorithm improvements
@@ -2696,6 +2697,46 @@ and replicating the others."
 FILE-DIFFS is an alist mapping strings (?) to diffs, which are as
 in AST-PATCH.  Returns a new SOFT with the patched files."))
 
+(defun pack-intertext-1! (ast)
+  (let* ((ot
+           (nest
+            (remove nil)
+            (append (list (aget 'packed-before-text (ast-annotations ast)))
+                    (remove-if (conjoin #'stringp #'emptyp)
+                               ;; The output transformation begins and ends
+                               ;; with the before and after text of AST itself.
+                               (slice (output-transformation ast) 1 -1))
+                    (list (aget 'packed-after-text (ast-annotations ast))))))
+         (runs (runs ot :key (of-type 'ast))))
+    (nlet rec ((runs runs))
+      (ematch runs
+        ((list))
+        ((list _))
+        ((list* (cl:last (list (and ast (type ast))) 1)
+                (and right (list* (type string) _))
+                rest)
+         (with-slots (annotations) ast
+           (push (cons 'packed-after-text (apply #'string+ right))
+                 annotations))
+         (rec rest))
+        ((list* (and left (list* (type string) _))
+                (list* (and ast (type ast)) _)
+                rest)
+         (with-slots (annotations) ast
+           (push (cons 'packed-before-text (apply #'string+ left))
+                 annotations))
+         (rec rest))))
+    ast))
+
+(defun pack-intertext! (ast)
+  (typecase ast
+    (software
+     (copy ast :genome (pack-intertext! (genome ast))))
+    (ast
+     (pack-intertext-1! ast)
+     (mapc #'pack-intertext! (children ast))
+     ast)))
+
 (defun print-diff
     (diff &key
             (stream *standard-output*)
@@ -2722,10 +2763,14 @@ Numerous options are provided to control presentation."
                (typecase c
                  (null "()")
                  (structured-text
-                  (continue-color
-                   (string+ (ts:before-text c)
-                            (source-text c)
-                            (ts:after-text c))))
+                  (with-slots (annotations) c
+                    (continue-color
+                     (string+
+                      (or (aget 'packed-before-text annotations) "")
+                      (ts:before-text c)
+                      (source-text c)
+                      (ts:after-text c)
+                      (or (aget 'packed-after-text annotations) "")))))
                  (slot-specifier "")
                  (t (continue-color (source-text c))))
                stream))
@@ -2795,33 +2840,33 @@ Numerous options are provided to control presentation."
                  (when sort-insert-delete
                    (setf diff (simplify-diff-for-printing diff)))
                  (mapc (lambda-bind ((type . content))
-                                    (ecase type
-                                      (:same (pr content))
-                                      (:delete (push-delete content))
-                                      (:insert (push-insert content))
-                                      ;; The :replace case is used only when
-                                      ;; sort-insert-delete is NIL.  Otherwise,
-                                      ;; these have been broken up into :insert
-                                      ;; and :delete already
-                                      (:replace
-                                       (push-insert (cadr content))
-                                       (push-delete (car content)))
-                                      (:recurse (%print-diff content))
-                                      (:same-sequence (map nil #'pr content))
-                                      (:insert-sequence
-                                       (map nil #'push-insert content))
-                                      (:delete-sequence
-                                       (map nil #'push-delete content))
-                                      (:same-tail (map nil #'pr content))
-                                      (:wrap-sequence (%print-wrap (cdr content)))
-                                      (:unwrap-sequence (%print-unwrap content))
-                                      (:recurse-tail
-                                       (%print-diff
-                                        (remove-if
-                                         (lambda (e)
-                                           (or (equal e '(:delete))
-                                               (equal e '(:insert))))
-                                         content)))))
+                         (ecase type
+                           (:same (pr content))
+                           (:delete (push-delete content))
+                           (:insert (push-insert content))
+                           ;; The :replace case is used only when
+                           ;; sort-insert-delete is NIL.  Otherwise,
+                           ;; these have been broken up into :insert
+                           ;; and :delete already
+                           (:replace
+                            (push-insert (cadr content))
+                            (push-delete (car content)))
+                           (:recurse (%print-diff content))
+                           (:same-sequence (map nil #'pr content))
+                           (:insert-sequence
+                            (map nil #'push-insert content))
+                           (:delete-sequence
+                            (map nil #'push-delete content))
+                           (:same-tail (map nil #'pr content))
+                           (:wrap-sequence (%print-wrap (cdr content)))
+                           (:unwrap-sequence (%print-unwrap content))
+                           (:recurse-tail
+                            (%print-diff
+                             (remove-if
+                              (lambda (e)
+                                (or (equal e '(:delete))
+                                    (equal e '(:insert))))
+                              content)))))
                        diff)))))
      (%print-diff diff)
      (purge)
