@@ -894,7 +894,7 @@
 (deftest print-diff.4 ()
   "Print diff of deletion of a character in a string"
   (is (equalp (flet ((%f (s)
-                       (pack-intertext-recursively!
+                       (pack-intertext!
                         (from-string (make-instance 'c) s))))
                 (print-diff (ast-diff (%f "char *s = \"abcd\";")
                                       (%f "char *s = \"acd\";")
@@ -908,7 +908,7 @@
   (is (equalp (with-output-to-string (s)
                 (flet ((%f (s)
                          (lret ((software (from-string (make-instance 'c) s)))
-                           (pack-intertext-recursively (genome software)))))
+                           (pack-intertext! (genome software)))))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
                                         (%f "char *s = \"acd\";")
                                         :base-cost 3)
@@ -919,7 +919,8 @@
 (deftest print-diff.5 ()
   "Print diff of deletion of substring in a string"
   (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (flet ((%f (s)
+                         (pack-intertext! (from-string (make-instance 'c) s))))
 		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
                                         (%f "char *s = \"ad\";")
                                         :base-cost 1)
@@ -930,7 +931,8 @@
 (deftest print-diff.6 ()
   "Print diff of insertion of a substring in a string"
   (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (flet ((%f (s)
+                         (pack-intertext! (from-string (make-instance 'c) s))))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
                                         (%f "char *s = \"abcd\";")
                                         :base-cost 1)
@@ -941,7 +943,8 @@
 (deftest print-diff.7 ()
   "Print diff of insertion of a character in a string"
   (is (equalp (with-output-to-string (s)
-                (flet ((%f (s) (from-string (make-instance 'c) s)))
+                (flet ((%f (s)
+                         (pack-intertext! (from-string (make-instance 'c) s))))
 		  (print-diff (ast-diff (%f "char *s = \"ad\";")
                                         (%f "char *s = \"abd\";")
                                         :base-cost 1)
