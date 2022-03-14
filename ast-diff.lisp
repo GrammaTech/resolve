@@ -2726,6 +2726,7 @@ Numerous options are provided to control presentation."
                    (string+ (ts:before-text c)
                             (source-text c)
                             (ts:after-text c))))
+                 (slot-specifier "")
                  (t (continue-color (source-text c))))
                stream))
             (continue-color (text)
