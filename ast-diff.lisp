@@ -2715,18 +2715,34 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
         ((list* (cl:last (list (and ast (type ast))) 1)
                 (and right (list* (type string) _))
                 rest)
-         (with-slots (annotations) ast
-           (push (cons 'packed-after-text (apply #'string+ right))
-                 annotations))
+         (let ((right-text (apply #'string+ right)))
+           (with-accessors ((after-text ts:after-text)) ast
+             (setf after-text (string+ after-text right-text)))
+           (with-slots (annotations) ast
+             (push (cons 'packed-after-text right-text)
+                   annotations)))
          (rec rest))
         ((list* (and left (list* (type string) _))
                 (list* (and ast (type ast)) _)
                 rest)
-         (with-slots (annotations) ast
-           (push (cons 'packed-before-text (apply #'string+ left))
-                 annotations))
+         (let ((left-text (apply #'string+ left)))
+           (with-accessors ((before-text ts:before-text)) ast
+             (setf before-text (string+ left-text before-text)))
+           (with-slots (annotations) ast
+             (push (cons 'packed-before-text left-text)
+                   annotations)))
          (rec rest))))
     ast))
+
+(defun unpack-intertext-1! (ast)
+  (let ((packed-before-text (aget 'packed-before-text (ast-annotations ast)))
+        (packed-after-text (aget 'packed-after-text (ast-annotations ast))))
+    (with-accessors ((before-text ts:before-text)
+                     (after-text ts:after-text))
+        ast
+      (setf before-text (drop-prefix packed-before-text before-text)
+            after-text (drop-suffix packed-after-text after-text))))
+  ast)
 
 (defun pack-intertext! (ast)
   (typecase ast
@@ -2735,6 +2751,15 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
     (ast
      (pack-intertext-1! ast)
      (mapc #'pack-intertext! (children ast))
+     ast)))
+
+(defun unpack-intertext! (ast)
+  (typecase ast
+    (software
+     (copy ast :genome (unpack-intertext! (genome ast))))
+    (ast
+     (unpack-intertext-1! ast)
+     (mapc #'unpack-intertext! (children ast))
      ast)))
 
 (defun print-diff
@@ -2763,14 +2788,12 @@ Numerous options are provided to control presentation."
                (typecase c
                  (null "()")
                  (structured-text
-                  (with-slots (annotations) c
-                    (continue-color
+                  (continue-color
+                   (let ((c (unpack-intertext! c)))
                      (string+
-                      (or (aget 'packed-before-text annotations) "")
                       (ts:before-text c)
                       (source-text c)
-                      (ts:after-text c)
-                      (or (aget 'packed-after-text annotations) "")))))
+                      (ts:after-text c)))))
                  (slot-specifier "")
                  (t (continue-color (source-text c))))
                stream))
@@ -3356,9 +3379,19 @@ and convert it back to whatever internal form this kind of AST uses."))
     (let ((standardized-children (call-next-method)))
       (if (children ast)
           standardized-children
-          `(,text-slot-specifier
-            ,(text ast)
-            ,@standardized-children)))))
+          (let ((insert-point
+                  (member-if (lambda (child)
+                               (match child
+                                 ((slot-specifier :slot (eql 'children))
+                                  child)))
+                             standardized-children)))
+            (if (no insert-point)
+                `(,text-slot-specifier
+                  ,(text ast)
+                  ,@standardized-children)
+                `(,(ldiff standardized-children insert-point)
+                  ,text-slot-specifier ,(text ast)
+                  ,@insert-point)))))))
 
 (let ((before-text-slot-specifier
         (make-instance 'slot-specifier
