@@ -344,24 +344,18 @@ option."))
                      (software auto-mergeable-parseable))
   "Return a list of parseable mutation operations to replace an existing
 conflict AST resolution with an alternative option."
-  (labels ((replace-at (sequence index item drop)
-             "Create a copy of SEQUENCE which drops DROP values at INDEX
-              and replaces them with ITEM."
-             (append
-              (subseq sequence 0 index)
-              item
-              (subseq sequence (+ index drop))))
-           (insert-into-parent-slot-ops
+  (labels ((insert-into-parent-slot-ops
                (parent slot arity index new-resolution prior-resolution)
              "Return ops to insert NEW-RESOLUTION at INDEX of SLOT in PARENT."
              (let* ((parent-slot-children (slot-value parent slot))
                     (new-slot-value
                       (if (eql arity 1)
                           (car new-resolution)
-                          (replace-at
-                           parent-slot-children index
-                           new-resolution
-                           (length prior-resolution)))))
+                          (splice-seq
+                           parent-slot-children
+                           :start index
+                           :new new-resolution
+                           :end (+ index (length prior-resolution))))))
                #+nil
                (let ((pos (position (@ parent lccp) (children parent))))
                  ;; TODO: does this assertion still make sense to have?
