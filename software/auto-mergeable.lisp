@@ -353,14 +353,43 @@ option."))
                            parent-slot-children
                            :start index
                            :new new-resolution
-                           :end (+ index (length prior-resolution))))))
+                           :end (+ index (length prior-resolution)))))
+                    (new-parent
+                     (copy parent (make-keyword slot) new-slot-value)))
                #+nil
                (let ((pos (position (@ parent lccp) (children parent))))
                  ;; TODO: does this assertion still make sense to have?
                  (assert pos))
-               (with software
-                     parent
-                     (copy parent (make-keyword slot) new-slot-value)))))
+               (with software parent new-parent)))
+           (insert-normalizing-path (conflict-path parent new-resolution prior-resolution)
+             (nlet retry ((lccp (lastcar conflict-path)))
+               (cond
+                 ((null conflict-path)
+                  (with software
+                        conflict-path
+                        (car new-resolution)))
+                 ((symbolp lccp)
+                  ;; Retry after normalizing lccp.
+                  (retry (cons lccp 0)))
+                 ((typep lccp '(cons symbol integer))
+                  (retry (cons (slot-specifier-for-slot parent (car lccp))
+                               (cdr lccp))))
+                 ((typep lccp '(cons (or slot-specifier symbol) integer))
+                  (let* ((slot-specifier (car lccp))
+                         (index (cdr lccp))
+                         (arity (slot-specifier-arity slot-specifier))
+                         (slot (slot-specifier-slot slot-specifier)))
+                    #+auto-mergeable-debug
+                    (progn
+                      (format t "slot = ~a~%" slot)
+                      (format t "arity = ~a~%" arity)
+                      (format t "slot-value = ~a~%" (slot-value parent slot)))
+                    (insert-into-parent-slot
+                     parent slot arity index new-resolution prior-resolution)))
+                 (t
+                  (insert-into-parent-slot
+                   parent :children 0 lccp
+                   new-resolution prior-resolution))))))
     (let* ((conflict-ast (targets mutation))
            (strategy (or (strategy mutation)
                          (random-elt (get-conflict-strategies conflict-ast))))
@@ -384,34 +413,7 @@ option."))
         (format t "conflict-path = ~a~%" conflict-path)
         (format t "parent = ~a~%" parent))
       ;; Replace the prior resolution children with the new resolution
-      (nlet retry ((lccp (lastcar conflict-path)))
-        (cond
-          ((null conflict-path)
-           (with software
-                 conflict-path
-                 (car new-resolution)))
-          ((symbolp lccp)
-           ;; Retry after normalizing lccp.
-           (retry (cons lccp 0)))
-          ((typep lccp '(cons symbol integer))
-           (retry (cons (slot-specifier-for-slot parent (car lccp))
-                        (cdr lccp))))
-          ((typep lccp '(cons (or slot-specifier symbol) integer))
-           (let* ((slot-specifier (car lccp))
-                  (index (cdr lccp))
-                  (arity (slot-specifier-arity slot-specifier))
-                  (slot (slot-specifier-slot slot-specifier)))
-             #+auto-mergeable-debug
-             (progn
-               (format t "slot = ~a~%" slot)
-               (format t "arity = ~a~%" arity)
-               (format t "slot-value = ~a~%" (slot-value parent slot)))
-             (insert-into-parent-slot
-              parent slot arity index new-resolution prior-resolution)))
-          (t
-           (insert-into-parent-slot
-            parent :children 0 (lastcar conflict-path)
-            new-resolution prior-resolution)))))))
+      (insert-normalizing-path conflict-path parent new-resolution prior-resolution))))
 
 (defmethod apply-mutation ((software auto-mergeable-simple)
                            (mutation new-conflict-resolution))
