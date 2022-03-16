@@ -340,11 +340,10 @@ of conflict ASTs."
   (:documentation "Replace a conflict AST resolution with an alternative
 option."))
 
-(defmethod build-op ((mutation new-conflict-resolution)
-                     (software auto-mergeable-parseable))
-  "Return a list of parseable mutation operations to replace an existing
-conflict AST resolution with an alternative option."
-  (labels ((insert-into-parent-slot-ops
+(defmethod apply-mutation ((software auto-mergeable-parseable)
+                           (mutation new-conflict-resolution))
+  "Replace an existing conflict AST resolution with an alternative option."
+  (labels ((insert-into-parent-slot
                (parent slot arity index new-resolution prior-resolution)
              "Return ops to insert NEW-RESOLUTION at INDEX of SLOT in PARENT."
              (let* ((parent-slot-children (slot-value parent slot))
@@ -360,9 +359,9 @@ conflict AST resolution with an alternative option."
                (let ((pos (position (@ parent lccp) (children parent))))
                  ;; TODO: does this assertion still make sense to have?
                  (assert pos))
-               `((:set
-                  (:stmt1 . ,parent)
-                  (:literal1 . ,(copy parent (make-keyword slot) new-slot-value)))))))
+               (with software
+                     parent
+                     (copy parent (make-keyword slot) new-slot-value)))))
     (let* ((conflict-ast (targets mutation))
            (strategy (or (strategy mutation)
                          (random-elt (get-conflict-strategies conflict-ast))))
@@ -375,6 +374,7 @@ conflict AST resolution with an alternative option."
                                                  :strategy strategy))
            (conflict-path (ast-path software (car prior-resolution)))
            (parent (@ software (butlast conflict-path))))
+      (declare (list new-resolution))
       (assert (find (car prior-resolution) (genome software)))
       #+auto-mergeable-debug
       (progn
@@ -388,8 +388,9 @@ conflict AST resolution with an alternative option."
       (nlet retry ((lccp (lastcar conflict-path)))
         (cond
           ((null conflict-path)
-           `((:set (:stmt1 . ,conflict-path)
-                   (:literal1 . ,(car new-resolution)))))
+           (with software
+                 conflict-path
+                 (car new-resolution)))
           ((symbolp lccp)
            ;; Retry after normalizing lccp.
            (retry (cons lccp 0)))
@@ -406,10 +407,10 @@ conflict AST resolution with an alternative option."
                (format t "slot = ~a~%" slot)
                (format t "arity = ~a~%" arity)
                (format t "slot-value = ~a~%" (slot-value parent slot)))
-             (insert-into-parent-slot-ops
+             (insert-into-parent-slot
               parent slot arity index new-resolution prior-resolution)))
           (t
-           (insert-into-parent-slot-ops
+           (insert-into-parent-slot
             parent :children 0 (lastcar conflict-path)
             new-resolution prior-resolution)))))))
 
