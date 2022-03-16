@@ -40,7 +40,6 @@
         :software-evolution-library/software/cpp
         :software-evolution-library/software/javascript
         :software-evolution-library/software/typescript)
-  (:shadow :function-body)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :software-evolution-library/utility/debug
                 :note)

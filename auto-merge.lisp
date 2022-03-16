@@ -20,7 +20,6 @@
   (:import-from :resolve/ast-diff
                 :standardized-children
                 :copy-with-standardized-children)
-  (:shadow :function-body)
   (:import-from :software-evolution-library/components/file
                 :file-w-attributes)
   (:import-from :software-evolution-library/software/parseable
