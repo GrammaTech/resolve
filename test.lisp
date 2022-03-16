@@ -1489,6 +1489,7 @@
                             (converge my old your :conflict t)))
           (chunks (remove-if-not {typep _ 'conflict-ast}
                                  (child-asts (genome conflicted) :recursive t)))
+          ;; There should not be any (unresolved) mutation errors.
           (*population* (populate conflicted)))
      ;; TODO: is this still the expected size?
      #+nil

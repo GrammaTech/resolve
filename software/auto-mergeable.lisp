@@ -40,6 +40,7 @@
         :software-evolution-library/software/cpp
         :software-evolution-library/software/javascript
         :software-evolution-library/software/typescript)
+  (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :software-evolution-library/utility/debug
                 :note)
@@ -342,20 +343,58 @@ option."))
 (defmethod apply-mutation ((software auto-mergeable-parseable)
                            (mutation new-conflict-resolution))
   "Replace an existing conflict AST resolution with an alternative option."
-  (labels ((insert-into-parent-slot
+  (labels ((new-slot-value (parent slot arity index new-resolution prior-resolution)
+             (if (eql arity 1)
+                 (car new-resolution)
+                 (splice-seq
+                  (slot-value parent slot)
+                  :start index
+                  :new new-resolution
+                  :end (+ index (length prior-resolution)))))
+           (insert-into-parent-slot
                (parent slot arity index new-resolution prior-resolution)
              "Return ops to insert NEW-RESOLUTION at INDEX of SLOT in PARENT."
-             (let* ((parent-slot-children (slot-value parent slot))
-                    (new-slot-value
-                      (if (eql arity 1)
-                          (car new-resolution)
-                          (splice-seq
-                           parent-slot-children
-                           :start index
-                           :new new-resolution
-                           :end (+ index (length prior-resolution)))))
+             (let* ((new-slot-value
+                     (new-slot-value parent slot arity index
+                                     new-resolution prior-resolution))
+                    (slot-keyword (make-keyword slot))
                     (new-parent
-                     (copy parent (make-keyword slot) new-slot-value)))
+                     (copy parent slot-keyword new-slot-value)))
+               ;; Check if the resulting AST is valid by trying to get
+               ;; its list of children. If it is invalid, and if we
+               ;; are inserting multiple ASTs, it's probably invalid
+               ;; because we are inserting multiple children into a
+               ;; slot that doesn't actually allow them \(the slot
+               ;; might be variadic but still have a rule that doesn't
+               ;; allow two ASTs of the same kind a row.) Instead, we
+               ;; move up the tree to the grandparent, wrap each AST
+               ;; in new-resolution in a copy of the parent, and
+               ;; insert them as children of the grandparent.
+               (handler-bind
+                   ((rule-matching-error
+                     (nest
+                      (lambda (e) (declare (ignore e)))
+                       (when (and (member (strategy mutation) '(:c1 :c2))
+                                  (or (rest new-slot-value))
+                                  (not (typep parent 'root-ast))))
+                       (return-from apply-mutation)
+                       (insert-normalizing-path
+                        (ast-path software parent)
+                        (get-parent-ast software parent)
+                        (mapcar
+                         (lambda (nr)
+                           (tree-copy (copy parent
+                                            slot-keyword
+                                            (new-slot-value
+                                             parent
+                                             slot
+                                             arity
+                                             index
+                                             (list nr)
+                                             prior-resolution))))
+                         new-resolution)
+                        (list parent)))))
+                 (children new-parent))
                #+nil
                (let ((pos (position (@ parent lccp) (children parent))))
                  ;; TODO: does this assertion still make sense to have?
