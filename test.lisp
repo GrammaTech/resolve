@@ -727,9 +727,14 @@
            (ast-diff-elide-same (ast-diff orig bead)))))))
 
 (defun keys-of-diff (d)
-  (sort (remove-if-not #'symbolp
-                       (copy-list (remove-duplicates (flatten d))))
-        #'string< :key #'symbol-name))
+  ;; Use tree-sitter-class-name to promote the names of choice
+  ;; subclasses to their class in the tree-sitter grammar so the tests
+  ;; aren't exposed to internal details of the tree-sitter
+  ;; implementation.
+  (mapcar #'tree-sitter-class-name
+          (sort (remove-if-not #'symbolp
+                               (copy-list (remove-duplicates (flatten d))))
+                #'string< :key #'symbol-name)))
 
 (deftest diff-wrap/unwrap.1 ()
   (flet ((keys (d) (keys-of-diff d)))
@@ -764,7 +769,7 @@
         (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000
                   :wrap-sequences t)
       (let ((k (keys-of-diff diff)))
-        (is (equal k '(software-evolution-library/software/tree-sitter::c-if-statement-1
+        (is (equal k '(c-if-statement
                        :insert :recurse :same :wrap-sequence))))
       (is (= cost 35)))
     (multiple-value-bind (diff cost)
