@@ -1492,9 +1492,12 @@
        (mapcar {aget _ *variants*} '(:borders :orig :min-lines)))
    (let* ((conflicted (nest (create-auto-mergeable)
                             (converge my old your :conflict t)))
-          (chunks (remove-if-not {typep _ 'conflict-ast}
-                                 (child-asts (genome conflicted) :recursive t)))
+          (chunks
+           (finishes
+            (remove-if-not {typep _ 'conflict-ast}
+                           (child-asts (genome conflicted) :recursive t))))
           ;; There should not be any (unresolved) mutation errors.
+          (*debug-auto-merge-mutation-errors* t)
           (*population* (populate conflicted)))
      ;; TODO: is this still the expected size?
      #+nil

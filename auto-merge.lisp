@@ -32,9 +32,13 @@
            :resolve-to
            :resolve-conflict
            :try-reconcile-conflicts
-           :*auto-merge-meta*))
+           :*auto-merge-meta*
+           :*debug-auto-merge-mutation-errors*))
 (in-package :resolve/auto-merge)
 (in-readtable :curry-compose-reader-macros)
+
+(defvar *debug-auto-merge-mutation-errors* nil
+  "If nil, handle mutation errors internally.")
 
 
 ;;; Utility functions
@@ -118,10 +122,11 @@
            (lambda (c)
              (declare (ignorable c))
              (note 3 "Skipping mutation due to ~a" c)
-             (maybe-invoke-restart 'skip-mutation)
-             ;; If the error happens outside an actual mutation (while
-             ;; testing that the variant is printable), return nil.
-             (return-from resolve-conflict nil))))
+             (unless *debug-auto-merge-mutation-errors*
+               (maybe-invoke-restart 'skip-mutation)
+               ;; If the error happens outside an actual mutation (while
+               ;; testing that the variant is printable), return nil.
+               (return-from resolve-conflict nil)))))
       (call-next-method)))
   (:method :around ((conflicted auto-mergeable-parseable)
                     (conflict conflict-ast)
