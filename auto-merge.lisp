@@ -142,10 +142,10 @@
         (assert (printable? (remove-ast-stubs result))))))
   (:method ((conflicted auto-mergeable) (conflict conflict-ast)
             &key (strategy (random-elt (get-conflict-strategies conflict))))
-    (apply-mutation conflicted
-                    (make-instance 'new-conflict-resolution
-                                   :targets conflict
-                                   :strategy strategy))))
+    (apply-new-conflict-resolution
+     conflicted
+     conflict
+     :strategy strategy)))
 
 (defgeneric remove-ast-stubs (variant)
   (:documentation "Remove AST stubs from the genome of VARIANT.

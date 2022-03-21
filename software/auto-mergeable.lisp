@@ -67,7 +67,8 @@
            :get-conflicts
            :get-resolved-conflicts
            :get-conflict-strategies
-           :new-conflict-resolution))
+           :new-conflict-resolution
+           :apply-new-conflict-resolution))
 (in-package :resolve/software/auto-mergeable)
 (in-readtable :curry-compose-reader-macros)
 
@@ -331,6 +332,7 @@ of conflict ASTs."
 
 
 ;;; Auto-merge mutations
+
 (defmethod pick-mutation-type ((obj auto-mergeable))
   'new-conflict-resolution)
 
@@ -340,9 +342,26 @@ of conflict ASTs."
   (:documentation "Replace a conflict AST resolution with an alternative
 option."))
 
-(defmethod apply-mutation ((software auto-mergeable-parseable)
+(defmethod apply-mutation ((software auto-mergeable)
                            (mutation new-conflict-resolution))
+  (multiple-value-call #'apply-new-conflict-resolution
+    software
+    (targets mutation)
+    (if-let (strategy (strategy mutation))
+      (values :strategy strategy)
+      (values))))
+
+(defun random-strategy (conflict-ast)
+  (random-elt (get-conflict-strategies conflict-ast)))
+
+(defgeneric apply-new-conflict-resolution (software conflict-ast &key strategy))
+
+(defmethod apply-new-conflict-resolution
+    ((software auto-mergeable-parseable)
+     conflict-ast
+     &key (strategy (random-strategy conflict-ast)))
   "Replace an existing conflict AST resolution with an alternative option."
+  (declare (keyword strategy))
   (labels ((new-slot-value (parent slot arity index new-resolution prior-resolution)
              (if (eql arity 1)
                  (car new-resolution)
@@ -374,10 +393,10 @@ option."))
                    ((rule-matching-error
                      (nest
                       (lambda (e) (declare (ignore e)))
-                       (when (and (member (strategy mutation) '(:c1 :c2))
+                      (when (and (member strategy '(:c1 :c2))
                                   (or (rest new-slot-value))
                                   (not (typep parent 'root-ast))))
-                       (return-from apply-mutation)
+                      (return-from apply-new-conflict-resolution)
                        (insert-normalizing-path
                         (ast-path software parent)
                         (get-parent-ast software parent)
@@ -429,10 +448,7 @@ option."))
                   (insert-into-parent-slot
                    parent :children 0 lccp
                    new-resolution prior-resolution))))))
-    (let* ((conflict-ast (targets mutation))
-           (strategy (or (strategy mutation)
-                         (random-elt (get-conflict-strategies conflict-ast))))
-           (prior-resolution (or (remove-if-not [{eq conflict-ast}
+    (let* ((prior-resolution (or (remove-if-not [{eq conflict-ast}
                                                  {aget :conflict-ast}
                                                  #'ast-annotations]
                                                 (get-resolved-conflicts software))
@@ -454,15 +470,14 @@ option."))
       ;; Replace the prior resolution children with the new resolution
       (insert-normalizing-path conflict-path parent new-resolution prior-resolution))))
 
-(defmethod apply-mutation ((software auto-mergeable-simple)
-                           (mutation new-conflict-resolution))
+(defmethod apply-new-conflict-resolution
+    ((software auto-mergeable-simple) conflict-ast
+     &key (strategy (random-strategy conflict-ast)))
   "Apply the NEW-CONFLICT-RESOLUTION mutation to SOFTWARE."
   ;; Simple software objects are a more primitive representation and therefore,
   ;; we need to override `apply-mutation` instead of `build-op`.
-  (let* ((conflict-ast (targets mutation))
-         (strategy (or (strategy mutation)
-                       (random-elt (get-conflict-strategies conflict-ast))))
-         (prior-resolution (or (remove-if-not «and [{typep _ 'ast} {aget :code}]
+  (declare (keyword strategy))
+  (let* ((prior-resolution (or (remove-if-not «and [{typep _ 'ast} {aget :code}]
                                                    [{eq conflict-ast}
                                                     {aget :conflict-ast}
                                                     #'ast-annotations
