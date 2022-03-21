@@ -1497,6 +1497,8 @@
             (remove-if-not {typep _ 'conflict-ast}
                            (child-asts (genome conflicted) :recursive t))))
           ;; There should not be any (unresolved) mutation errors.
+          ;; This is effectively a regression for handling
+          ;; concatenative mutations.
           (*debug-auto-merge-mutation-errors* t)
           (*population* (populate conflicted)))
      ;; TODO: is this still the expected size?
