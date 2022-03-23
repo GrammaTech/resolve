@@ -21,6 +21,7 @@
         :resolve/software/parseable
         :resolve/software/lisp)
   #+gt (:shadowing-import-from :testbot :batch-test)
+  (:local-nicknames (:diff :resolve/ast-diff))
   (:shadow :function-body)
   (:import-from :uiop/stream :read-file-forms)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*
@@ -836,45 +837,43 @@
               (source-text ast3) (ast-to-list-form ast3)))
     (is (equal? ast2 ast3))))
 
+(defun %f (s) (from-string (make-instance 'c) s))
+
 (deftest print-diff.1 ()
-  (is (equalp (flet ((%f (s)
-                       (pack-intertext! (from-string (make-instance 'c) s))))
-                (print-diff (ast-diff (%f "int a; int c;")
+  (is (equalp (let ((v1 (%f "int a; int c;")))
+                (print-diff (ast-diff v1
                                       (%f "int a; int b; int c;"))
+                            :original v1
                             :no-color t
                             :stream nil))
-              "int a;{+ int b;+} int c;")))
+              "int a;{+int b;+} int c;")))
 
 (deftest print-diff.1a ()
   "Like print-diff.1, but a deletion instead of an insertion."
-  (is (equalp (flet ((%f (s)
-                       (pack-intertext! (from-string (make-instance 'c) s))))
-                (print-diff (ast-diff (%f "int a; int b; int c;")
+  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
+                (print-diff (ast-diff v1
                                       (%f "int a; int c;"))
+                            :original v1
                             :no-color t
                             :stream nil))
-              "int a;[- int b;-] int c;")))
+              "int a;[-int b;-] int c;")))
 
 (deftest print-diff.2 ()
   "Print diff of a deletion"
-  (is (equalp (flet ((%f (s)
-                       (pack-intertext! (from-string (make-instance 'c) s))))
-                (print-diff (ast-diff (%f "int a; int b; int c;")
+  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
+                (print-diff (ast-diff v1
                                       (%f "int a; int c;"))
+                            :original v1
                             :no-color t
                             :stream nil))
-	      "int a;[- int b;-] int c;")))
+	      "int a;[-int b;-] int c;")))
 
-(deftest print-diff.3 ()
+#+(or) (deftest print-diff.3 ()
   "Print diff of a replacement"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s)
-                         (pack-intertext! (from-string (make-instance 'c) s))))
-		  (print-diff (ast-diff (%f "int a; int b; int c;")
-                                        (%f "int a; int d; int c;")
-                                        :base-cost 0)
-                              :no-color t
-			      :stream s)))
+         (is (equalp (let ((v1 (%f "int a; int b; int c;")))
+                       (ast-patch v1 (ast-diff v1
+                                               (%f "int a; int d; int c;")
+                                               :base-cost 0)))
 	      "int a; int {+d+}[-b-]; int c;")))
 
 ;; Increasing the base cost makes larger scale replacements
@@ -882,74 +881,68 @@
 ;;; TODO: FIXME:
 (deftest print-diff.3a ()
   "Print diff of a replacement"
-  (is (equalp (flet ((%f (s)
-                       (pack-intertext! (from-string (make-instance 'c) s))))
-                (print-diff (ast-diff (%f "int a; int b; int c;")
+  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
+                (print-diff (ast-diff v1
                                       (%f "int a; int d; int c;")
                                       :base-cost 1)
+                            :original v1
                             :no-color t
                             :stream nil))
               "int a; int {+d+}[-b-]; int c;")))
 
 (deftest print-diff.4 ()
   "Print diff of deletion of a character in a string"
-  (is (equalp (flet ((%f (s)
-                       (pack-intertext!
-                        (from-string (make-instance 'c) s))))
-                (print-diff (ast-diff (%f "char *s = \"abcd\";")
+  (is (equalp (let ((v1 (%f "char *s = \"abcd\";")))
+                (print-diff (ast-diff v1
                                       (%f "char *s = \"acd\";")
                                       :base-cost 2)
+                            :original v1
                             :no-color t
                             :stream nil))
 	      "char *s = \"a[-b-]cd\";")))
 
 (deftest print-diff.4a ()
   "Print diff of deletion of a character in a string"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s)
-                         (lret ((software (from-string (make-instance 'c) s)))
-                           (pack-intertext! (genome software)))))
-		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-                                        (%f "char *s = \"acd\";")
-                                        :base-cost 3)
-                              :no-color t
-			      :stream s)))
+  (is (equalp (let ((v1 (%f "char *s = \"abcd\";")))
+                (print-diff (ast-diff v1
+                                      (%f "char *s = \"acd\";")
+                                      :base-cost 3)
+                            :original v1
+                            :no-color t
+                            :stream nil))
               "char *s = \"a[-b-]cd\";")))
 
 (deftest print-diff.5 ()
   "Print diff of deletion of substring in a string"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s)
-                         (pack-intertext! (from-string (make-instance 'c) s))))
-		  (print-diff (ast-diff (%f "char *s = \"abcd\";")
-                                        (%f "char *s = \"ad\";")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
+  (is (equalp (let ((v1 (%f "char *s = \"abcd\";")))
+                (print-diff (ast-diff v1
+                                      (%f "char *s = \"ad\";")
+                                      :base-cost 1)
+                            :original v1
+                            :no-color t
+                            :stream nil))
 	      "char *s = \"a[-bc-]d\";")))
 
 (deftest print-diff.6 ()
   "Print diff of insertion of a substring in a string"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s)
-                         (pack-intertext! (from-string (make-instance 'c) s))))
-		  (print-diff (ast-diff (%f "char *s = \"ad\";")
-                                        (%f "char *s = \"abcd\";")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
+  (is (equalp (let ((v1 (%f "char *s = \"ad\";")))
+                (print-diff (ast-diff v1
+                                      (%f "char *s = \"abcd\";")
+                                      :base-cost 1)
+                            :original v1
+                            :no-color t
+                            :stream nil))
 	      "char *s = \"a{+bc+}d\";")))
 
 (deftest print-diff.7 ()
   "Print diff of insertion of a character in a string"
-  (is (equalp (with-output-to-string (s)
-                (flet ((%f (s)
-                         (pack-intertext! (from-string (make-instance 'c) s))))
-		  (print-diff (ast-diff (%f "char *s = \"ad\";")
-                                        (%f "char *s = \"abd\";")
-                                        :base-cost 1)
-                              :no-color t
-			      :stream s)))
+  (is (equalp (let ((v1 (%f "char *s = \"ad\";")))
+                (print-diff (ast-diff v1
+                                      (%f "char *s = \"abd\";")
+                                      :base-cost 1)
+                            :original v1
+                            :no-color t
+                            :stream nil))
 	      "char *s = \"a{+b+}d\";")))
 
 ;;;; Simple object ast-diff tests
