@@ -2696,203 +2696,103 @@ and replicating the others."
 FILE-DIFFS is an alist mapping strings (?) to diffs, which are as
 in AST-PATCH.  Returns a new SOFT with the patched files."))
 
-(defun pack-intertext-1! (ast)
-  (let* ((ot
-           (nest
-            (remove nil)
-            (append (list (aget 'packed-before-text (ast-annotations ast)))
-                    (remove-if (conjoin #'stringp #'emptyp)
-                               ;; The output transformation begins and ends
-                               ;; with the before and after text of AST itself.
-                               (slice (output-transformation ast) 1 -1))
-                    (list (aget 'packed-after-text (ast-annotations ast))))))
-         (runs (runs ot :key (of-type 'ast))))
-    (nlet rec ((runs runs))
-      (ematch runs
-        ((list))
-        ((list _))
-        ((list* (cl:last (list (and ast (type ast))) 1)
-                (and right (list* (type string) _))
-                rest)
-         (let ((right-text (apply #'string+ right)))
-           (with-accessors ((after-text ts:after-text)) ast
-             (setf after-text (string+ after-text right-text)))
-           (with-slots (annotations) ast
-             (push (cons 'packed-after-text right-text)
-                   annotations)))
-         (rec rest))
-        ((list* (and left (list* (type string) _))
-                (list* (and ast (type ast)) _)
-                rest)
-         (let ((left-text (apply #'string+ left)))
-           (with-accessors ((before-text ts:before-text)) ast
-             (setf before-text (string+ left-text before-text)))
-           (with-slots (annotations) ast
-             (push (cons 'packed-before-text left-text)
-                   annotations)))
-         (rec rest))))
-    ast))
-
-(defun unpack-intertext-1! (ast)
-  (let ((packed-before-text (aget 'packed-before-text (ast-annotations ast)))
-        (packed-after-text (aget 'packed-after-text (ast-annotations ast))))
-    (with-accessors ((before-text ts:before-text)
-                     (after-text ts:after-text))
-        ast
-      (setf before-text (drop-prefix packed-before-text before-text)
-            after-text (drop-suffix packed-after-text after-text))))
-  ast)
-
-(defun pack-intertext! (ast)
-  (typecase ast
-    (software
-     (copy ast :genome (pack-intertext! (genome ast))))
-    (ast
-     (pack-intertext-1! ast)
-     (mapc #'pack-intertext! (children ast))
-     ast)))
-
-(defun unpack-intertext! (ast)
-  (typecase ast
-    (software
-     (copy ast :genome (unpack-intertext! (genome ast))))
-    (ast
-     (unpack-intertext-1! ast)
-     (mapc #'unpack-intertext! (children ast))
-     ast)))
-
 (defun print-diff
     (diff &key
             (stream *standard-output*)
             (no-color nil)
-            (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
-            (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
-            (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
-            (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
-            (sort-insert-delete t))
+            (original (required-argument :original)))
   "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
-  (nest
-   (let ((*print-escape* nil)
-         ;; These are used to track what color we should be printing
-         ;; in.
-         (*deletep* nil)
-         (*insertp* nil)
-         (insert-buffer nil)
-         (delete-buffer nil))
-     (declare (special *insertp* *deletep*)))
-   (with-string (stream stream))
-   (labels ((%p (c) "Print."
-              (write-string
-               (typecase c
-                 (null "()")
-                 (structured-text
-                  (continue-color
-                   (let ((c (unpack-intertext! c)))
-                     (string+
-                      (ts:before-text c)
-                      (source-text c)
-                      (ts:after-text c)))))
-                 (slot-specifier "")
-                 (t (continue-color (source-text c))))
-               stream))
-            (continue-color (text)
-              (cond
-                (no-color text)
-                (*deletep*
-                 (string-replace-all (string #\Newline) text
-                                     (format nil "~%~a" +color-RED+)))
-                (*insertp*
-                 (string-replace-all (string #\Newline) text
-                                     (format nil "~%~a" +color-GRN+)))
-                (t text)))
-            (purge-insert ()
-              (setf *insertp* t)
-              (when insert-buffer
-                (mapc #'%p (reverse insert-buffer))
-                (write insert-end :stream stream)
-                (setf insert-buffer nil))
-              (setf *insertp* nil))
-            (purge-delete ()
-              (setf *deletep* t)
-              (when delete-buffer
-                (mapc #'%p (reverse delete-buffer))
-                (write delete-end :stream stream)
-                (setf delete-buffer nil))
-              (setf *deletep* nil))
-            (push-insert (c)
-              (unless (equal c "")
-                (purge-delete)
-                (unless insert-buffer
-                  (write insert-start :stream stream))
-                (push c insert-buffer)))
-            (push-inserts (l) (mapc #'push-insert l))
-            (push-delete (c)
-              (unless (equal c "")
-                (purge-insert)
-                (unless delete-buffer
-                  (write delete-start :stream stream))
-                (push c delete-buffer)))
-            (push-deletes (l) (mapc #'push-delete l))
-            (purge ()
-              (purge-insert)
-              (purge-delete))
-            (pr (c) (purge) (%p c))
-            (%print-wrap (content)
-              (destructuring-bind (sub-diff path left-wrap
-                                   right-wrap . rest)
-                  content
-                (declare (ignore path rest))
-                (mapc #'push-inserts left-wrap)
-                (%print-diff sub-diff)
-                (mapc #'push-inserts (reverse right-wrap))))
-            (%print-unwrap (content)
-              (destructuring-bind (sub-diff path left-wrap right-wrap)
-                  content
-                (declare (ignore path))
-                (mapc #'push-deletes left-wrap)
-                (%print-diff sub-diff)
-                (mapc #'push-deletes (reverse right-wrap))))
-            (%print-diff (diff)
-              (case (car diff)
-                ((:wrap) (%print-wrap (cdr diff)))
-                ((:unwrap) (%print-unwrap (cdr diff)))
-                (t
-                 (assert (every #'consp diff))
-                 (when sort-insert-delete
-                   (setf diff (simplify-diff-for-printing diff)))
-                 (mapc (lambda-bind ((type . content))
-                         (ecase type
-                           (:same (pr content))
-                           (:delete (push-delete content))
-                           (:insert (push-insert content))
-                           ;; The :replace case is used only when
-                           ;; sort-insert-delete is NIL.  Otherwise,
-                           ;; these have been broken up into :insert
-                           ;; and :delete already
-                           (:replace
-                            (push-insert (cadr content))
-                            (push-delete (car content)))
-                           (:recurse (%print-diff content))
-                           (:same-sequence (map nil #'pr content))
-                           (:insert-sequence
-                            (map nil #'push-insert content))
-                           (:delete-sequence
-                            (map nil #'push-delete content))
-                           (:same-tail (map nil #'pr content))
-                           (:wrap-sequence (%print-wrap (cdr content)))
-                           (:unwrap-sequence (%print-unwrap content))
-                           (:recurse-tail
-                            (%print-diff
-                             (remove-if
-                              (lambda (e)
-                                (or (equal e '(:delete))
-                                    (equal e '(:insert))))
-                              content)))))
-                       diff)))))
-     (%print-diff diff)
-     (purge)
-     (values))))
+  (with-string (stream stream)
+    (source-text (ast-patch original (rewrite-script diff :no-color no-color))
+                 :stream stream)))
+
+(define-node-class diff-wrapper-ast (alternative-ast)
+  ((printee :initarg :printee :accessor printee :type ast)
+   (no-color :initarg :no-color :type boolean)
+   (child-slots :initform '((printee . 1))
+                :allocation :class))
+  (:default-initargs :no-color nil))
+
+(defmethod initialize-instance :after ((self diff-wrapper-ast) &key)
+  (callf #'tree-copy (printee self)))
+
+(defmethod ts:get-representative-ast ((child diff-wrapper-ast) parent)
+  (printee child))
+
+(define-node-class insertion (diff-wrapper-ast)
+  ())
+
+(defmethod source-text ((self insertion) &key stream)
+  (with-slots (no-color) self
+    (write-string (if no-color "{+" (format nil "~a{+" +color-GRN+)) stream)
+    (source-text (printee self) :stream stream)
+    (write-string (if no-color "+}" (format nil "+}~a" +color-RST+)) stream)))
+
+(define-node-class deletion (diff-wrapper-ast)
+  ())
+
+(defmethod source-text ((self deletion) &key stream)
+  (with-slots (no-color) self
+    (write-string (if no-color "[-" (format nil "~a[-" +color-RED+)) stream)
+    (source-text (printee self) :stream stream)
+    (write-string (if no-color "-]" (format nil "-]~a" +color-RST+)) stream)))
+
+(defun rewrite-script (script &key no-color)
+  (mappend (lambda (change)
+             (destructuring-bind (type . content) change
+               (ecase type
+                 (:insert
+                  (if (typep content 'ast)
+                      (list (cons :insert (make 'insertion
+                                                :printee content
+                                                :no-color no-color)))
+                      (list change)))
+                 (:delete
+                  (if (typep content 'ast)
+                      (list
+                       (cons :insert (make 'deletion
+                                           :printee content
+                                           :no-color no-color))
+                       (cons :delete content))
+                      (list change)))
+                 (:replace
+                  (if (some (of-type 'ast) content)
+                      (list
+                       (cons :insert (make 'insertion
+                                           :printee (cadr content)
+                                           :no-color no-color))
+                       (cons :insert (make 'deletion
+                                           :printee (car content)
+                                           :no-color no-color))
+                       (cons :delete (car content)))
+                      (list change)))
+                 (:recurse
+                  (list
+                   (cons :recurse
+                         (rewrite-script content :no-color no-color))))
+                 (:insert-sequence
+                  (if (listp content)
+                      (rewrite-script
+                       (mapcar (op `(:insert . ,_)) content)
+                       :no-color no-color)
+                      (list change)))
+                 (:delete-sequence
+                  (list change))
+                 (:same
+                  (list change)
+                  ;; (if (consp content)
+                  ;;     ;; TODO This branch shouldn't be necessary.
+                  ;;     (mapcar (op `(:same . ,_)) content)
+                  ;;     (list change))
+                  )
+                 ((:same-sequence
+                   :same-tail
+                   :wrap-sequence
+                   :unwrap-sequence
+                   :recurse-tail)
+                  (list change)))))
+           script))
 
 (defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the
