@@ -1336,6 +1336,30 @@ Prefix and postfix returned as additional values."
     (t
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
 
+(defun add-common (diff cost prefix postfix)
+  ;; Some special handling is required to interface
+  ;; between the list model of the common pre-/post-fixes
+  ;; and the cons-tree model of the calculated diff.
+  ;;
+  ;; This leads to unnecessary hair.  Fix!
+  #+ast-diff-debug (format t "add-common: ~a ~a~%" diff cost)
+  (values
+   (let ((diff (if (equal '(:same-tail) (lastcar diff))
+                   (butlast diff)
+                   diff)))
+     (let ((diff
+            (if prefix
+                (append (mapcar (lambda (it) (cons :same it))
+                                prefix)
+                        diff)
+                diff)))
+       (if postfix
+           (append diff
+                   (mapcar (lambda (it) (cons :same it))
+                           postfix))
+           diff)))
+   cost))
+
 (defun ast-diff-on-lists (ast-a ast-b parent-a parent-b)
   (assert (proper-list-p ast-a))
   (assert (proper-list-p ast-b))
@@ -1345,46 +1369,21 @@ Prefix and postfix returned as additional values."
     ;; NOTE: We assume that the top level is a list (not a cons tree).
     ;; This is true for any ASTs parsed from a source file as a
     ;; sequence of READs.
-    (labels ((add-common (diff cost)
-               ;; Some special handling is required to interface
-               ;; between the list model of the common pre-/post-fixes
-               ;; and the cons-tree model of the calculated diff.
-               ;;
-               ;; This leads to unnecessary hair.  Fix!
-               #+ast-diff-debug (format t "add-common: ~a ~a~%" diff cost)
-               (values
-                (let ((diff (if (equal '(:same-tail) (lastcar diff))
-                                (butlast diff)
-                                diff)))
-                  (let ((diff
-                         (if prefix
-                             (append (mapcar (lambda (it) (cons :same it))
-                                             prefix)
-                                     diff)
-                             diff)))
-                    (if postfix
-                        (append diff
-                                (mapcar (lambda (it) (cons :same it))
-                                        postfix))
-                        diff)))
-                cost)))
-      (unless (or unique-a unique-b)
-        (return-from ast-diff-on-lists
-          (multiple-value-call #'add-common
-            (values nil 0))))
-      (when (null unique-a)
-        (return-from ast-diff-on-lists
-          (multiple-value-call #'add-common
-            (values (mapcar (lambda (el) (cons :insert el)) unique-b)
-                    (1- (ccost unique-b)))))) ; 1- for trailing nil.
-      (when (null unique-b)
-        (return-from ast-diff-on-lists
-          (multiple-value-call #'add-common
-            (values (mapcar (lambda (el) (cons :delete el)) unique-a)
-                    (1- (ccost unique-a)))))) ; 1- for trailing nil.
-
-      (let ((rdiff (recursive-diff unique-a unique-b parent-a parent-b)))
-        (add-common rdiff (diff-cost rdiff))))))
+    (cond
+      ((not (or unique-a unique-b))
+       (add-common nil 0 prefix postfix))
+      ((null unique-a)
+       (add-common (mapcar (lambda (el) (cons :insert el)) unique-b)
+                   (1- (ccost unique-b)) ; 1- for trailing nil.
+                   prefix postfix))
+      ((null unique-b)
+       (add-common
+        (mapcar (lambda (el) (cons :delete el)) unique-a)
+        (1- (ccost unique-a))  ; 1- for trailing nil.
+        prefix postfix))
+      (t
+       (let ((rdiff (recursive-diff unique-a unique-b parent-a parent-b)))
+         (add-common rdiff (diff-cost rdiff) prefix postfix))))))
 
 (defun ast-hash-with-check (ast table)
   "Calls AST-HASH, but checks that if two ASTs have the same hash value,
