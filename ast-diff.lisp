@@ -1006,8 +1006,8 @@ Prefix and postfix returned as additional values."
 (defstruct rd-node
   "Node in the recursive-diff computation graph"
   ;; Coordinates of the node in the r-d graph
-  (a 0 :type (integer 0))
-  (b 0 :type (integer 0))
+  (a 0 :type (integer 0) :read-only t)
+  (b 0 :type (integer 0) :read-only t)
   (in-arcs nil :type list) ;; list of arcs into this node
   (out-arcs nil :type list) ;; list of arcs out of this node
   (open-pred-count 0 :type (integer 0)) ;; number of predecessors that are still open
@@ -1024,11 +1024,11 @@ Prefix and postfix returned as additional values."
 
 (defstruct rd-link
   "Link in the computation graph for edits on sequences"
-  (src (required-argument :src)) ;; a b ;; indices of source node
-  (dest (required-argument :dest)) ;; destination node
+  (src (required-argument :src) :read-only t) ;; a b ;; indices of source node
+  (dest (required-argument :dest) :read-only t) ;; destination node
   (cost nil) ;; Cost of this operation
   ;; The kind of edit operation to corresponding to the link
-  (kind (required-argument :kind))
+  (kind (required-argument :kind) :read-only t)
   ;; The actual edit operation on this arc
   (op nil))
 
