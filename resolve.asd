@@ -8,6 +8,8 @@
   :perform (test-op (o c) (symbol-call :resolve/test '#:run-batch)))
 
 (register-system-packages "resolve/core" '(:resolve))
+(register-system-packages "fare-quasiquote-extras" '(:fare-quasiquote))
+(register-system-packages "trivia" '(:trivia.fail))
 
 (defsystem "resolve/run-ast-diff"
   :author "GrammaTech"

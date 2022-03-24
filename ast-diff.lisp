@@ -26,12 +26,14 @@
 (defpackage :resolve/ast-diff
   (:use
    :gt/full
+   :resolve/core
    :software-evolution-library
    :software-evolution-library/software/parseable
    :software-evolution-library/software/simple
    :software-evolution-library/software/ir
    :resolve/string
    :metabang-bind)
+  (:import-from :fare-quasiquote)
   (:shadowing-import-from :software-evolution-library/terminal
                           :+color-RED+ :+color-GRN+ :+color-RST+)
   (:shadowing-import-from :functional-trees
@@ -87,7 +89,7 @@
    :pack-intertext-recursively!
    :pack-intertext!))
 (in-package :resolve/ast-diff)
-(in-readtable :curry-compose-reader-macros)
+(in-readtable resolve-readtable)
 ;;; Comments on further algorithm improvements
 ;;;
 ;;; The "good enough" algorithm could be made slightly better
