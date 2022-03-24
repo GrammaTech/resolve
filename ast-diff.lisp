@@ -1500,10 +1500,9 @@ value that is used instead."
 (defun simple-genome-unpack (g)
   "Converts pairs in a SIMPLE genome to lists"
   (mapcar (lambda (p)
-            (assert (and (eql (caar p) :code)
-                         (stringp (cdar p))
-                         (null (cdr p))))
-            (cdar p))
+            (ematch p
+              (`((:code . ,(and string (type string))))
+                string)))
           g))
 
 (defmethod ast-diff* ((soft1 simple) (soft2 simple))
@@ -1555,7 +1554,7 @@ root of the edit script (and implicitly also the program AST)."
               ((:same :same-sequence :same-tail) nil)
               (:recurse (follow (cdar edit-script) (cons :a path)))
               (t (list (cons (reverse path) (car edit-script)))))
-            (follow (cdr edit-script) (cons :d path))))))
+            (follow (rest edit-script) (cons :d path))))))
     (follow edit-script nil)))
 
 ;;; Construct the edit tree from an ast and an edit script
