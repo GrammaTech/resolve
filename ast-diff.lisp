@@ -3083,12 +3083,12 @@ a tail of diff-a, and a tail of diff-b.")
   (nconc (map 'list (lambda (x) (cons :same x)) (cdar o)) (cdr o)))
 
 (defun same-seq-to-list (o)
-  (assert (consp o))
-  (assert (consp (car o)))
-  (assert (eql (caar o) :same-sequence))
-  (if (listp (cdar o))
-      o
-      (cons (cons :same-sequence (map 'list #'identity (cdar o))) (cdr o))))
+  (ematch o
+    (`((:same-sequence . ,(type list)) ,_)
+      o)
+    (`((:same-sequence . ,seq) . ,cdr)
+      (cons (cons :same-sequence (map 'list #'identity seq))
+            cdr))))
 
 (defun merge-diffs2  (orig-a orig-b &aux (o-a orig-a) (o-b orig-b))
   ;; Derived from CHUNK, but a bit smarter, and
@@ -3123,12 +3123,11 @@ a tail of diff-a, and a tail of diff-b.")
            (cdr result))))
     (t
      (assert (eql (car orig-a) (car orig-b)))
-     (assert (symbolp (car orig-a)))
-     (ecase (car orig-a)
-       (:alist
-        (let ((diff (merge-diffs2 (list orig-a) (list orig-b))))
-          ;; (format t "~A~%" diff)
-          diff)))))) ; (car diff)
+     (ematch orig-a
+       (`(:alist . _)
+         (let ((diff (merge-diffs2 (list orig-a) (list orig-b))))
+           ;; (format t "~A~%" diff)
+           diff)))))) ; (car diff)
 
 (defun merge-diffs2-syms (o-a o-b)
   (merge-diffs-on-syms (caar o-a) (caar o-b) o-a o-b))
