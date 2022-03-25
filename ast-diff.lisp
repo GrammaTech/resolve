@@ -1635,11 +1635,11 @@ Returns a list of edit tree nodes for these nodes."
               (collected-recurse
                (assert (= changes 1))
                (push collected-recurse collected-nodes)))
-             (setf collected-recurse nil)
-             (setf collected-actions nil)
-             (setf changes 0)
-             (setf source-segment-start (incf source-position n))
-             (setf target-segment-start (incf target-position n))))
+             (setf collected-recurse nil
+                   collected-actions nil
+                   changes 0
+                   source-segment-start (incf source-position n)
+                   target-segment-start (incf target-position n))))
       (iter (for action in script)
             (ecase (car action)
               (:same (finish))
