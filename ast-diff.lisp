@@ -173,10 +173,12 @@ wrapping and unwrapping to be considered.")
   (iter (while (consp x)) (pop x) (summing 1)))
 
 (defgeneric ast-class (ast)
-  (:documentation "This was previously defined in sel/software/ast"))
+  (:documentation "Return the class of AST as a symbol.
 
-(defmethod ast-class ((x ast))
-  (type-of x))
+For a real AST, this is just its class name, but it can be other
+symbols for other types.")
+  (:method ((x ast))
+    (class-name-of x)))
 
 (defun ccost (x)
   (if (not (consp x)) 1
