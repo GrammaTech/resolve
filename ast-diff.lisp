@@ -189,8 +189,6 @@ wrapping and unwrapping to be considered.")
 
 ;; #+sbcl (declaim (optimize sb-cover:store-coverage-data))
 
-(defmethod clast (obj) (iter (while (consp obj)) (pop obj)))
-
 
 ;;; Interface functions.
 (defgeneric ast-cost (ast)
