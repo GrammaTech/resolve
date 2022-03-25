@@ -298,6 +298,7 @@ can be recursed on if STRINGS is true (defaults to true)")
 (defmethod copy :around ((obj simple-lisp-ast) &rest args
                          &key &allow-other-keys)
   (apply #'call-next-method obj
+         ;; Don't copy the cache slots.
          :cost-cache nil :size-cache nil :unastify-cache nil
          args))
 
