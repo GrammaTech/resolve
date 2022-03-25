@@ -192,38 +192,30 @@ wrapping and unwrapping to be considered.")
 
 ;;; Interface functions.
 (defgeneric ast-cost (ast)
-  (:documentation "Return cost of AST."))
-
-(defmethod ast-cost ((ast ast))
-  (cl:reduce #'+ (children ast) :key #'ast-cost :initial-value 1))
-
-(defmethod ast-cost ((ast tree-sitter-ast))
-  (cl:reduce #'+ (standardized-children ast) :key #'ast-cost :initial-value 1))
-
-;; Slot-specifiers are introduced as markers in the standardized-children
-;; lists of tree-sitter-ast nodes, and should not contribute the
-;; the cost.
-(defmethod ast-cost ((ss slot-specifier)) 0)
-
-(defmethod ast-cost ((ast t))
-  1)
-
-(defmethod ast-cost ((s string))
-  (if *ignore-whitespace*
-      (count-if-not #'whitespacep s)
-      (length s)))
-
-(defmethod ast-cost ((ast vector))
-  (length ast))
-
-(defmethod ast-cost ((ast null))
-  1)
-
-(defmethod ast-cost ((ast cons))
-  (+ (iter (sum (ast-cost (pop ast)))
-           (while (consp ast)))
-     ;; cost of terminal NIL is 0
-     (if ast (ast-cost ast) 0)))
+  (:documentation "Return cost of AST.")
+  (:method ((ast ast))
+    (cl:reduce #'+ (children ast) :key #'ast-cost :initial-value 1))
+  (:method ((ast tree-sitter-ast))
+    (cl:reduce #'+ (standardized-children ast) :key #'ast-cost :initial-value 1))
+  ;; Slot-specifiers are introduced as markers in the standardized-children
+  ;; lists of tree-sitter-ast nodes, and should not contribute the
+  ;; the cost.
+  (:method ((ss slot-specifier)) 0)
+  (:method ((ast t))
+    1)
+  (:method ((s string))
+    (if *ignore-whitespace*
+        (count-if-not #'whitespacep s)
+        (length s)))
+  (:method ((ast vector))
+    (length ast))
+  (:method ((ast null))
+    1)
+  (:method ((ast cons))
+    (+ (iter (sum (ast-cost (pop ast)))
+             (while (consp ast)))
+       ;; cost of terminal NIL is 0
+       (if ast (ast-cost ast) 0))))
 
 (defgeneric ast-can-recurse (ast-a ast-b)
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
