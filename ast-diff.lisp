@@ -181,6 +181,7 @@ symbols for other types.")
     (class-name-of x)))
 
 (defun ccost (x)
+  "Compute the cost of a tree of conses."
   (if (not (consp x)) 1
       (let ((conses nil))
         (let ((y x))
