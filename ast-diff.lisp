@@ -180,7 +180,7 @@ symbols for other types.")
   (:method ((x ast))
     (class-name-of x)))
 
-(defun ccost (x)
+(defun cons-cost (x)
   "Compute the cost of a tree of conses."
   (if (not (consp x)) 1
       (let ((conses nil))
@@ -190,7 +190,7 @@ symbols for other types.")
                 (pop y)))
         (let ((cost 1))
           (iter (while conses)
-                (incf cost (ccost (car (pop conses)))))
+                (incf cost (cons-cost (car (pop conses)))))
           cost))))
 
 ;; #+sbcl (declaim (optimize sb-cover:store-coverage-data))
@@ -1407,12 +1407,12 @@ Prefix and postfix returned as additional values."
        (add-common nil 0 prefix postfix))
       ((null unique-a)
        (add-common (mapcar (lambda (el) (cons :insert el)) unique-b)
-                   (1- (ccost unique-b)) ; 1- for trailing nil.
+                   (1- (cons-cost unique-b)) ; 1- for trailing nil.
                    prefix postfix))
       ((null unique-b)
        (add-common
         (mapcar (lambda (el) (cons :delete el)) unique-a)
-        (1- (ccost unique-a))  ; 1- for trailing nil.
+        (1- (cons-cost unique-a))  ; 1- for trailing nil.
         prefix postfix))
       (t
        (let ((rdiff (recursive-diff unique-a unique-b parent-a parent-b)))
