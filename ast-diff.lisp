@@ -168,7 +168,9 @@
   "When *wrap* is true, this is the maximum size difference for
 wrapping and unwrapping to be considered.")
 
-(defun clength (x) (iter (while (consp x)) (pop x) (summing 1)))
+(defun clength (x)
+  "Compute the length of X in conses."
+  (iter (while (consp x)) (pop x) (summing 1)))
 
 (defgeneric ast-class (ast)
   (:documentation "This was previously defined in sel/software/ast"))
