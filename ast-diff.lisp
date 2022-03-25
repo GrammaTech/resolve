@@ -127,6 +127,27 @@
 
 (declaim (special *cost-table*))
 
+(deftype edit-action ()
+  '(member
+    :bad
+    :conflict
+    :recurse :recurse-tail
+    :insert :insert-sequence
+    :delete :delete-sequence
+    :replace
+    :same :same-tail :same-sequence :same-or-recurse
+    :wrap :wrap-sequence
+    :unwrap :unwrap-sequence))
+
+(defcondition invalid-edit-action (error)
+  ((edit-action :initarg :edit-action :type edit-action)
+   (operation :initarg :operation :type symbol))
+  (:report (lambda (c s)
+             (with-slots (edit-action operation) c
+               (format s
+                       "Invalid edit action ~a for operation ~a"
+                       edit-action operation)))))
+
 (defparameter *base-cost* 2
   "Basic cost of a diff, before adding costs of components.")
 
@@ -1027,7 +1048,7 @@ Prefix and postfix returned as additional values."
   (dest (required-argument :dest) :read-only t) ;; destination node
   (cost nil) ;; Cost of this operation
   ;; The kind of edit operation to corresponding to the link
-  (kind (required-argument :kind) :read-only t)
+  (kind (required-argument :kind) :type edit-action :read-only t)
   ;; The actual edit operation on this arc
   (op nil))
 
@@ -1187,7 +1208,21 @@ Prefix and postfix returned as additional values."
          (a (when (> dest-a 0) (aref vec-a (1- dest-a))))
          (b (when (> dest-b 0) (aref vec-b (1- dest-b)))))
     (let ((op
-           (ecase (rd-link-kind arc)
+           (ecase-of edit-action (rd-link-kind arc)
+             ((:bad
+               :conflict
+               :recurse :recurse-tail
+               :insert-sequence
+               :delete-sequence
+               :replace
+               :same
+               :same-tail
+               :same-sequence
+               :wrap
+               :unwrap)
+              (error 'invalid-edit-action
+                     :edit-action (rd-link-kind arc)
+                     :operation 'compute-arc-cost))
              (:insert (assert b) (list (cons :insert b)))
              (:delete (assert a) (list (cons :delete a)))
              (:same-or-recurse
@@ -1307,7 +1342,11 @@ Prefix and postfix returned as additional values."
     ((eql diff :bad) most-positive-fixnum)
     ((not (consp diff)) 0)
     ((symbolp (car diff))
-     (ecase (car diff)
+     (ecase-of edit-action (car diff)
+       ((:conflict :same-or-recurse)
+        (error 'invalid-edit-action
+               :edit-action (car diff)
+               :operation 'diff-cost))
        (:bad most-positive-fixnum)
        (:insert (+ base-cost (ast-cost (cdr diff))))
        (:delete (+ base-cost (if (cdr diff) (ast-cost (cdr diff)) 1)))
@@ -1332,8 +1371,7 @@ Prefix and postfix returned as additional values."
             (+ base-cost
                (diff-cost (third diff))
                (cost-of-wrap (fifth diff))
-               (cost-of-wrap (sixth diff)))))
-       ))
+               (cost-of-wrap (sixth diff)))))))
     (t
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
 
@@ -1640,7 +1678,16 @@ Returns a list of edit tree nodes for these nodes."
                    source-segment-start (incf source-position n)
                    target-segment-start (incf target-position n))))
       (iter (for action in script)
-            (ecase (car action)
+            (ecase-of edit-action (car action)
+              ((:bad
+                :conflict
+                :recurse-tail
+                :same-tail :same-or-recurse
+                :wrap :wrap-sequence
+                :unwrap :unwrap-sequence)
+               (error 'invalid-edit-action
+                      :edit-action (car action)
+                      :operation 'change-segment-on-seqs))
               (:same (finish))
               (:same-sequence
                (finish (length (cdr action))))
@@ -1686,6 +1733,7 @@ Returns a list of edit tree nodes for these nodes."
                  (incf changes)
                  (incf source-position)
                  (incf target-position)))
+
               ;; :wrap and :unwrap should be changed into single edit tree nodes
               ))
       (finish 0))
@@ -2152,26 +2200,37 @@ process with the rest of the script."
         (let ((consume nil)) ;; If set to true, consume an element of ASTS
           (flet ((%process (action)
                    "Process an inner action.  Returns a list of asts"
-                   (ecase (car action)
-                     ((nil) nil)
-                     (:insert (list (cdr action)))
-                     (:replace
-                      (setf consume t)
-                      (list (caddr action)))
-                     (:delete
-                      (setf consume t)
-                      nil)
-                     (:same (setf consume t)
-                            (list (car asts)))
-                     (:recurse (setf consume t)
-                               ;; Don't process recursive conflicts
-                               ;; In particular, this means :delete actions in
-                               ;; the conflict branch do not cause recording
-                               ;; of the original version in conflict nodes.
-                               ;; This is arguably wrong, but for now we do it
-                               ;; this way.
-                               (list (ast-patch* (car asts) (cdr action)
-                                                 :conflict nil))))))
+                   (when (car action)
+                     (ecase-of edit-action (car action)
+                       ((:bad
+                         :conflict
+                         :same-or-recurse
+                         :recurse-tail :same-tail
+                         :wrap :wrap-sequence
+                         :unwrap :unwrap-sequence)
+                        (error 'invalid-edit-action
+                               :edit-action (car action)
+                               :operation 'ast-patch-conflict-action))
+                       (:insert (list (cdr action)))
+                       (:replace
+                        (setf consume t)
+                        (list (caddr action)))
+                       (:delete
+                        (setf consume t)
+                        nil)
+                       (:same (setf consume t)
+                              (list (car asts)))
+                       (:recurse (setf consume t)
+                                 ;; Don't process recursive conflicts
+                                 ;; In particular, this means :delete actions in
+                                 ;; the conflict branch do not cause recording
+                                 ;; of the original version in conflict nodes.
+                                 ;; This is arguably wrong, but for now we do it
+                                 ;; this way.
+                                 (list (ast-patch* (car asts) (cdr action)
+                                                   :conflict nil)))
+                       ((:insert-sequence :delete-sequence :same-sequence)
+                        (error "Not handled"))))))
             (let ((child-alist
                    (iter (for script in args)
                          (for i in '(:my :your))
@@ -2352,7 +2411,11 @@ process with the rest of the script."
          ;; lists of the conflict versions (this will be three values).
          (when script
            (destructuring-bind (action . args) (car script)
-             (ecase action
+             (ecase-of edit-action action
+               ((:bad :unwrap :same-sequence :same-or-recurse)
+                (error 'invalid-edit-action
+                       :edit-action action
+                       :operation 'ast-patch*))
                (:conflict
                 (cond
                   (meld? ;; was handled by around method in false case
@@ -2623,7 +2686,15 @@ and replicating the others."
     (loop
        (unless script (return))
        (destructuring-bind (action . args) (pop script)
-         (ecase action
+         (ecase-of edit-action action
+           ((:bad
+             :same-or-recurse
+             :recurse-tail :same-tail
+             :wrap :wrap-sequence
+             :unwrap :unwrap-sequence)
+            (error 'invalid-edit-action
+                   :edit-action action
+                   :operation 'ast-patch*))
            (:conflict
             (setf script (append (meld-scripts (first args) (second args))
                                  script)))
