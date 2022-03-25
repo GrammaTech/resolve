@@ -292,11 +292,9 @@ can be recursed on if STRINGS is true (defaults to true)")
   (equalp (unastify a) (unastify b)))
 
 (defmethod ast-cost :around ((ast simple-lisp-ast))
-  (or (cost-cache ast)
-      (setf (cost-cache ast) (call-next-method))))
+  (ensure (cost-cache ast) (call-next-method)))
 (defmethod ast-size :around ((ast simple-lisp-ast))
-  (or (size-cache ast)
-      (setf (size-cache ast) (call-next-method))))
+  (ensure (size-cache ast) (call-next-method)))
 (defmethod copy :around ((obj simple-lisp-ast) &rest args
                          &key &allow-other-keys)
   (apply #'call-next-method obj
