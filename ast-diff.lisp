@@ -349,7 +349,7 @@ can be recursed on if STRINGS is true (defaults to true)")
 
 (defun unastify-lisp-diff (d)
   (typecase d
-    (resolve/ast-diff::simple-lisp-ast (resolve/ast-diff::unastify d))
+    (simple-lisp-ast (unastify d))
     (cons
      (cons (unastify-lisp-diff (car d))
            (unastify-lisp-diff (cdr d))))
