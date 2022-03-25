@@ -219,14 +219,13 @@ wrapping and unwrapping to be considered.")
 
 (defgeneric ast-can-recurse (ast-a ast-b)
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
-can be recursed on if STRINGS is true (defaults to true)"))
-
-(defmethod ast-can-recurse ((ast-a string) (ast-b string))
-  *strings*)
-(defmethod ast-can-recurse ((ast-a t) (ast-b t))
-  nil)
-(defmethod ast-can-recurse ((ast-a ast) (ast-b ast))
-  t)
+can be recursed on if STRINGS is true (defaults to true)")
+  (:method ast-can-recurse ((ast-a string) (ast-b string))
+    *strings*)
+  (:method ast-can-recurse ((ast-a t) (ast-b t))
+    nil)
+  (:method ast-can-recurse ((ast-a ast) (ast-b ast))
+    t))
 
 (defmethod source-text ((ast cons) &rest args &key stream)
   (iter (while (consp ast)) (apply #'source-text (pop ast) args))
