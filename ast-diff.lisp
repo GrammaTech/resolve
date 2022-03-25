@@ -60,7 +60,6 @@
    :diff3
    :merge3
    :converge
-   :show-chunks
    :merge-diffs-on-syms
    ;; Functions needed by alist.lisp
    :record-unstable
@@ -3141,16 +3140,6 @@ a tail of diff-a, and a tail of diff-b.")
 
 (defun merge-diffs2-syms (o-a o-b)
   (merge-diffs-on-syms (caar o-a) (caar o-b) o-a o-b))
-
-;;; TODO: printing clang-ast-node should use a safer printer ~s.
-(defun show-chunks (chunks &optional (stream t))
-  (mapc (lambda (chunk)
-          (if (keywordp (car chunk))
-              (ecase (car chunk)
-                (:stable (format stream "~a" (cdr chunk)))
-                (:unstable (format stream "+{UNSTABLE}+")))
-              (show-chunks chunk)))
-        chunks))
 
 ;;; Another algorithm for good common subsequences, more robust in the
 ;;; face of elements that occur with high frequency.  Instead, focus
