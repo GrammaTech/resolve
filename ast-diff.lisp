@@ -83,7 +83,7 @@
    :*max-wrap-diff*
    :*wrap*
    :*wrap-sequences*
-   :*strings*
+   :*diff-strings-p*
    ;; :*ignore-whitespace*
    :pack-intertext-recursively!
    :pack-intertext!))
@@ -154,7 +154,8 @@
 (defvar *ignore-whitespace* nil
   "If true, inserting or removing whitespace in a string has zero cost")
 
-(defvar *strings* t
+(declaim (boolean *diff-strings-p*))
+(defvar *diff-strings-p* t
   "If true, descend into strings when computing diffs.")
 
 (defvar *wrap* nil
@@ -221,7 +222,7 @@ wrapping and unwrapping to be considered.")
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
 can be recursed on if STRINGS is true (defaults to true)")
   (:method ast-can-recurse ((ast-a string) (ast-b string))
-    *strings*)
+    *diff-strings-p*)
   (:method ast-can-recurse ((ast-a t) (ast-b t))
     nil)
   (:method ast-can-recurse ((ast-a ast) (ast-b ast))
@@ -644,7 +645,7 @@ differencing of specialized AST structures.; `equal?',
                    &key
                      ((:ignore-whitespace *ignore-whitespace*)
                       *ignore-whitespace*)
-                     ((:strings *strings*) *strings*)
+                     ((:strings *diff-strings-p*) *diff-strings-p*)
                      ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
                      ((:wrap *wrap*) (or *wrap* *wrap-sequences*))
                      ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
@@ -1482,7 +1483,7 @@ value that is used instead."
                       &aux (ignore-whitespace *ignore-whitespace*))
   "special diff method for strings"
   #+debug (format t "ast-diff[STRING]~%")
-  (if *strings*
+  (if *diff-strings-p*
     ;; if STRINGS is true, descend into the strings for a fine-grained diff
       (string-diff s1 s2 :ignore-whitespace ignore-whitespace)
       ;; Otherwise, treat the strings as single objects and replace

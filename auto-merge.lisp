@@ -438,7 +438,7 @@ Extra keys are passed through to EVOLVE.")
   (:method ((my software) (old software) (your software) test
             &key (evolve? nil) (max-evals nil) (max-time nil)
               (target nil target-supplied-p) (num-threads 1)
-              ((:strings *strings*) *strings*)
+              ((:strings *diff-strings-p*) *diff-strings-p*)
               ((:base-cost *base-cost*) *base-cost*)
               ((:wrap *wrap*) *wrap*)
               ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
