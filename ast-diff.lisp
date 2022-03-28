@@ -572,9 +572,8 @@ differencing of specialized AST structures.; `equal?',
            (setf +ast-diff-counter+
                  (thin-ast-diff-table +ast-diff-cache+ +ast-diff-counter+)))
          (assert (< +ast-diff-counter+ +hash-upper-limit+))
-         (setf (gethash hash +ast-diff-cache+)
-               (cons (list* key (cons diff cost) +ast-diff-counter+)
-                     (gethash key +ast-diff-cache+)))
+         (push (list* key (cons diff cost) +ast-diff-counter+)
+               (gethash hash +ast-diff-cache+))
          (incf +ast-diff-counter+)
          (values diff cost))))))
 
