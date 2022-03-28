@@ -389,7 +389,7 @@ the AST-SIZE value"))
          :accessor edit-segment-node
          :documentation "The tree node for which a subset
 of the children (possibly empty) form this edit segment")
-   (start :type integer
+   (start :type (integer 0)
           :initarg :start
           :accessor edit-segment-start
           :documentation "The index (starting at 0) of the first
@@ -397,12 +397,12 @@ child in the edit segment"))
   (:documentation "Common slots of edit-segment classes"))
 
 (defclass edit-segment (edit-segment-common)
-  ((length :type integer
+  ((length :type (integer 0)
            :initarg :length
            :accessor edit-segment-length
            :documentation "The number of children (possibly zero)
 in the edit segment"))
-  (:documentation "An edit-segment represents a subset of the children
+  (:documentation "An edit-segment points to a subset of the children
 of a tree node"))
 
 (defclass string-edit-segment (edit-segment-common)
@@ -423,9 +423,10 @@ of the leaf in the children of its parent in the tree, and the position
 of the substring inside the string."))
 
 (defmethod source-text ((segment edit-segment) &rest args &key)
-  (let ((start (edit-segment-start segment))
-        (len (edit-segment-length segment))
-        (ast-node (edit-segment-node segment)))
+  (with-accessors ((start edit-segment-start)
+                   (len edit-segment-length)
+                   (ast-node edit-segment-node))
+      segment
     (mapc (lambda (ast)
             (apply #'source-text ast args))
           (subseq (children ast-node) start (+ start len)))))
@@ -441,18 +442,21 @@ of the substring inside the string."))
 (defmethod ast-to-list-form ((segment string-edit-segment))
   (source-text segment))
 
+(def +list-ellipsis+ '(|...|))
+
 (defmethod ast-to-list-form ((segment edit-segment))
-  (let ((start (edit-segment-start segment))
-        (len (edit-segment-length segment))
-        (ast-node (edit-segment-node segment)))
+  (with-accessors ((start edit-segment-start)
+                   (len edit-segment-length)
+                   (ast-node edit-segment-node))
+      segment
     `(,(ast-class ast-node)
-       ,@(unless (eql start 0) '(|...|))
-       ,@(mapcar #'ast-to-list-form
-                 (subseq (children ast-node)
-                         start (+ start len)))
-       ,@(unless (eql (+ start len)
-                      (length (children ast-node)))
-           '(|...|)))))
+      ,@(unless (eql start 0) +list-ellipsis+)
+      ,@(mapcar #'ast-to-list-form
+                (subseq (children ast-node)
+                        start (+ start len)))
+      ,@(unless (eql (+ start len)
+                     (length (children ast-node)))
+          +list-ellipsis+))))
 
 (defclass edit-tree-node-base (size-mixin)
   ((script :type list
@@ -482,30 +486,29 @@ rewritten TO by part of the edit script"))
   (:documentation " "))
 
 (defmethod print-object ((node edit-tree-node) stream)
-  (let ((s (source-text (edit-tree-node-source node)))
-        (bound 30))
-    (when (> (length s) bound)
-      (setf s (concatenate 'string (subseq s 0 (- bound 3)) "...")))
-    (format stream "#<EDIT-TREE-NODE ~s>" s)))
+  (print-unreadable-object (node stream :type t :identity nil)
+    (format stream "~s"
+            (ellipsize (source-text (edit-tree-node-source node)) 30))))
 
 (defmethod slot-unbound (class (node edit-tree-node) (slot (eql 'size)))
   (declare (ignorable class))
-  (let ((value (reduce #'+ (edit-tree-node-children node)
-                       :key #'ast-size :initial-value 1)))
-    (setf (slot-value node slot) value)
-    value))
+  (setf (slot-value node slot)
+        (reduce #'+ (edit-tree-node-children node)
+                :key #'ast-size :initial-value 1)))
 
 (defmethod ast-size ((segment string-edit-segment)) 1)
 
 ;; Cache for SIZE slot, accessed by ast-size
 (defmethod slot-unbound (c (segment edit-segment) (slot (eql 'size)))
   (declare (ignorable c))
-  (let* ((node (edit-segment-node segment))
-         (length (edit-segment-length segment))
-         (start (edit-segment-start segment))
-         (children (subseq (children node) start (+ start length)))
-         (value (reduce #'+ children :key #'ast-size :initial-value 1)))
-    (setf (slot-value segment slot) value)))
+  (nest
+   (with-accessors ((node edit-segment-node)
+                    (length edit-segment-length)
+                    (start edit-segment-start))
+       segment)
+   (let* ((children (subseq (children node) start (+ start length)))
+          (value (reduce #'+ children :key #'ast-size :initial-value 1)))
+     (setf (slot-value segment slot) value))))
 
 
 ;;; Main interface to calculating ast differences.
