@@ -513,57 +513,6 @@ rewritten TO by part of the edit script"))
 
 ;;; Main interface to calculating ast differences.
 
-;;; Macro for memoizing ast-diff-like methods
-
-#+(or)
-(defmacro defmethod-cached (name args &body body)
-  (let* ((args args)
-         (primary-args
-          (iter (while args)
-                (nest
-                 (if (not (consp args))
-                     (error "Args not a proper list"))
-                 (if (symbolp (car args))
-                     (if (member (car args) lambda-list-keywords)
-                         (finish)
-                         (collecting (pop args))))
-                 (if (consp (car args))
-                     (progn
-                       (assert (symbolp (caar args)))
-                       (collecting (car (pop args))))
-                     (error "Bad argument: ~s" (car args))))))
-         (cache (gensym "CACHE"))
-         (counter (gensym "COUNTER"))
-         (hash-upper-limit 50000000)
-         (key (gensym "KEY"))
-         (h (gensym "H"))
-         (val-alist (gensym "VAL-ALIST"))
-         (vals (gensym "VALS"))
-         (p (gensym "P"))
-         )
-    `(let ((,cache (make-hash-table))
-           (,counter 0))
-       (declare (type 0 1000000000) ,counter)
-       (defmethod ,name :around ,args
-          (let* ((,key (list ,@primary-args))
-                 (,h (ast-hash ,key)))
-            (let* ((,val-alist (gethash ,h ,cache))
-                   (,p (assoc ,key ,val-alist :test #'equal)))
-              (nest
-               (if p (let ((,vals (cadr ,p)))
-                       (values (car ,vals) (cdr ,vals))))
-               (if (>= (length ,val-alist) 10)
-                   (call-next-method))
-               (let ((return-values (multiple-value-list (call-next-method))))
-                 (when (> ,counter ,hash-upper-limit)
-                   (setf ,counter (thin-ast-diff-table ,cache ,counter)))
-                 (push (cons (list* ,key return-values ,counter)
-                             (gethash ,key ,cache)))
-                 (incf ,counter)
-                 (apply #'values return-values)))))))))
-
-
-
 (defgeneric ast-diff* (ast-a ast-b)
   (:documentation
    "Return a least-cost edit script which transforms AST-A into AST-B.
