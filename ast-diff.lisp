@@ -690,22 +690,21 @@ of children leading down to the node."
 
 (defgeneric ast-diff-wrap (ast-a ast-b &key skip-root first-ast-child)
   (:documentation
-   "Find a minimum cost 'wrap' edit, which wraps an AST in a larger ast"))
+   "Find a minimum cost 'wrap' edit, which wraps an AST in a larger AST."))
 
 (defmethod ast-diff-wrap ((ast-a ast) (ast-b ast)
-                          &key (skip-root t) first-ast-child)
+                          &key (skip-root t) first-ast-child
+                          &aux (max-wrap-diff *max-wrap-diff*))
   ;; search over the ASTs under ast-b that are the same class as ast-a,
   ;; and for which the size difference is not too large
   (let* ((ast-a-cost (ast-cost ast-a))
          (a-class (ast-class ast-a))
-         (max-wrap-diff *max-wrap-diff*)
          (max-cost (+ ast-a-cost max-wrap-diff))
          (min-cost (- ast-a-cost max-wrap-diff))
          (best-candidate nil)
          (best-cost most-positive-fixnum)
          ;; Do not also search for wraps in the recursive calls
-         ; (*wrap* nil)
-         )
+         #+(or) (*wrap* nil))
     (when (integerp first-ast-child)
       (setf first-ast-child (elt (children ast-a) first-ast-child)))
     #+ast-diff-wrap-debug (format t "(ast-class ast-a) = ~S~%" a-class)
@@ -763,12 +762,12 @@ of children leading down to the node."
 out of one tree and turns it into another."))
 
 (defmethod ast-diff-unwrap ((ast-a ast) (ast-b ast)
-                            &key (skip-root t) first-ast-child)
+                            &key (skip-root t) first-ast-child
+                            &aux (max-wrap-diff *max-wrap-diff*))
   ;; search over the ASTs under ast-a that are the same class as ast-b,
   ;; and for which the size difference is not too large
   (let* ((ast-b-cost (ast-cost ast-b))
          (b-class (ast-class ast-b))
-         (max-wrap-diff *max-wrap-diff*)
          (max-cost (+ ast-b-cost max-wrap-diff))
          (min-cost (- ast-b-cost max-wrap-diff))
          (best-candidate nil)
