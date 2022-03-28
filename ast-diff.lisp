@@ -584,6 +584,8 @@ differencing of specialized AST structures.; `equal?',
            (values diff cost)))))))
 
 (defun thin-ast-diff-table (cache counter)
+  "Thin out the AST diff cache when it gets too big by dropping the
+oldest half of the entries."
   (assert (>= counter +hash-upper-limit+))
   (let* ((h2 (ash +hash-upper-limit+ -1))
          (d (- counter h2)))
@@ -593,15 +595,24 @@ differencing of specialized AST structures.; `equal?',
                       (n (cdr p)))
                  (loop
                    (unless n (return))
-                   (if (< (cddar n) d)
-                       (setf (cdr p) (cdr n))
-                       (progn
-                         (decf (cddar n) d)
-                         (setf p n n (cdr n)))))
+                   ;; The entries are lists of the form (KEY (DIFF .
+                   ;; COST) . SAVED_COUNTER), where SAVED_COUNTER is
+                   ;; the value of `ast-diff-counter' when the diff
+                   ;; and cost were cached. If the saved counter is
+                   ;; less than H2, we drop the entry; otherwise we
+                   ;; decrement the saved counter so the entry will be
+                   ;; in the older half the next time we thin the
+                   ;; table.
+                   (symbol-macrolet ((saved-counter (cddar n)))
+                     (if (< saved-counter d)
+                         (setf (cdr p) (cdr n))
+                         (progn
+                           (decf saved-counter d)
+                           (shiftf p n (cdr n))))))
                  (unless (eql (cdr head) v)
                    (setf (gethash k cache) (cdr head)))))
              cache)
-    (setf counter h2)))
+    h2))
 
 (defun clear-ast-diff-table ()
   (setf +ast-diff-counter+ 0)
