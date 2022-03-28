@@ -533,13 +533,14 @@ differencing of specialized AST structures.; `equal?',
 
 (defmethod ast-diff* :around (ast-a ast-b)
   (let* ((key (cons ast-a ast-b))
-         (h (ast-hash key))
+         (hash (ast-hash key))
          ;; val-alist maps keys to (val . count) pairs
-         (val-alist (gethash h +ast-diff-cache+))
-         (p (assoc key val-alist :test #'equal)))
+         (val-alist (gethash hash +ast-diff-cache+))
+         (pair (assoc key val-alist :test #'equal)))
     (cond
-      (p
-       (let ((vals (cadr p)))
+      ;; There is already a cached value.
+      (pair
+       (let ((vals (cadr pair)))
          (values (car vals) (cdr vals))))
       ((>= (length val-alist) 10)
        ;; If a bucket gets too big, just stop caching
@@ -571,7 +572,7 @@ differencing of specialized AST structures.; `equal?',
            (setf +ast-diff-counter+
                  (thin-ast-diff-table +ast-diff-cache+ +ast-diff-counter+)))
          (assert (< +ast-diff-counter+ +hash-upper-limit+))
-         (setf (gethash h +ast-diff-cache+)
+         (setf (gethash hash +ast-diff-cache+)
                (cons (list* key (cons diff cost) +ast-diff-counter+)
                      (gethash key +ast-diff-cache+)))
          (incf +ast-diff-counter+)
