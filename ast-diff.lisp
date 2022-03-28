@@ -549,35 +549,39 @@ differencing of specialized AST structures.; `equal?',
        ;; things that map there
        (call-next-method))
       (t
-       (multiple-value-bind (diff cost)
-           (call-next-method)
-         ;; Check for insert, delete pairs
-         ;; When we find one, replace with a :REPLACE edit
-         (let* ((changed nil)
-                (e diff)
-                (new-diff
-                 (iter (while e)
-                       (cond
-                         ((and (consp (car e))
-                               (consp (cadr e))
-                               (eql (caar e) :insert)
-                               (eql (caadr e) :delete))
-                          (setf changed t)
-                          (collecting
-                           `(:replace ,(cdr (cadr e)) ,(cdr (car e))))
-                          (pop e) (pop e))
-                         (t (collecting (pop e)))))))
-           (when changed
-             (setf diff new-diff
-                   cost (diff-cost new-diff))))
-         (when (>= +ast-diff-counter+ +hash-upper-limit+)
-           (setf +ast-diff-counter+
-                 (thin-ast-diff-table +ast-diff-cache+ +ast-diff-counter+)))
-         (assert (< +ast-diff-counter+ +hash-upper-limit+))
-         (push (list* key (cons diff cost) +ast-diff-counter+)
-               (gethash hash +ast-diff-cache+))
-         (incf +ast-diff-counter+)
-         (values diff cost))))))
+       (flet ((consolidate-insert-delete-pairs (diff)
+                ;; Check for insert, delete pairs
+                ;; When we find one, replace with a :REPLACE edit
+                (let* ((changed nil)
+                       (e diff)
+                       (new-diff
+                        (iter (while e)
+                              (cond
+                                ((and (consp (car e))
+                                      (consp (cadr e))
+                                      (eql (caar e) :insert)
+                                      (eql (caadr e) :delete))
+                                 (setf changed t)
+                                 (collecting
+                                    `(:replace ,(cdr (cadr e)) ,(cdr (car e))))
+                                 (pop e) (pop e))
+                                (t (collecting (pop e)))))))
+                  (if changed new-diff diff))))
+         (mvlet* ((diff cost (call-next-method))
+                  (new-diff (consolidate-insert-delete-pairs diff))
+                  (cost (if (eq new-diff diff) cost
+                            (diff-cost new-diff)))
+                  (diff new-diff))
+           ;; Thin the cache if necessary.
+           (when (>= +ast-diff-counter+ +hash-upper-limit+)
+             (setf +ast-diff-counter+
+                   (thin-ast-diff-table +ast-diff-cache+ +ast-diff-counter+)))
+           (assert (< +ast-diff-counter+ +hash-upper-limit+))
+           ;; Push the diff and cost to a hash bucket.
+           (push (list* key (cons diff cost) +ast-diff-counter+)
+                 (gethash hash +ast-diff-cache+))
+           (incf +ast-diff-counter+)
+           (values diff cost)))))))
 
 (defun thin-ast-diff-table (cache counter)
   (assert (>= counter +hash-upper-limit+))
