@@ -531,6 +531,8 @@ differencing of specialized AST structures.; `equal?',
 (declaim (type (integer 0 2000000000) +ast-diff-counter+))
 (def +hash-upper-limit+ 100000000)
 
+(defparameter *bucket-size* 20)
+
 (defmethod ast-diff* :around (ast-a ast-b)
   (let* ((key (cons ast-a ast-b))
          (hash (ast-hash key))
@@ -542,7 +544,7 @@ differencing of specialized AST structures.; `equal?',
       (pair
        (let ((vals (cadr pair)))
          (values (car vals) (cdr vals))))
-      ((>= (length val-alist) 10)
+      ((>= (length val-alist) *bucket-size*)
        ;; If a bucket gets too big, just stop caching
        ;; things that map there
        (call-next-method))
