@@ -678,7 +678,7 @@ oldest half of the entries."
         (values diff cost)
         (call-next-method))))
 
-(defun map-ast-while-path (ast fn &optional path)
+(defun map-ast-while/path (ast fn &optional path)
   "Apply FN to the nodes of AST A, stopping
 the descent when FN returns NIL.  FN is also passed a PATH
 argument, which is a list (in reverse order) of the indices
@@ -686,7 +686,7 @@ of children leading down to the node."
   (when (funcall fn ast path)
     (iter (for c in (children ast))
           (for i from 0)
-          (when (typep c 'ast) (map-ast-while-path c fn (cons i path))))))
+          (when (typep c 'ast) (map-ast-while/path c fn (cons i path))))))
 
 (defgeneric ast-diff-wrap (ast-a ast-b &key skip-root first-ast-child)
   (:documentation
@@ -710,7 +710,7 @@ of children leading down to the node."
       (setf first-ast-child (elt (children ast-a) first-ast-child)))
     #+ast-diff-wrap-debug (format t "(ast-class ast-a) = ~S~%" a-class)
     (nest
-     (map-ast-while-path ast-b)
+     (map-ast-while/path ast-b)
      (lambda (x path) #+ast-diff-wrap-debug (format t "Path = ~A~%" path))
      (if (and (null path) skip-root) t)
      (let ((x-cost (ast-cost x))))
@@ -779,7 +779,7 @@ out of one tree and turns it into another."))
       (setf first-ast-child (elt (children ast-b) first-ast-child)))
     #+ast-diff-unwrap-debug (format t "(ast-class ast-b) = ~S~%" b-class)
     (nest
-     (map-ast-while-path ast-a)
+     (map-ast-while/path ast-a)
      (lambda (x path) #+ast-diff-unwrap-debug (format t "Path = ~A~%" path))
      (if (and (null path) skip-root) t)
      (let ((x-cost (ast-cost x))))
@@ -916,7 +916,7 @@ AST-B.  If none are acceptable, return :BAD"
            (limit (- (reduce #'+ sub-a :key #'ast-cost) *max-wrap-diff*))
            (*wrap-sequence* nil)
            (sub-ast-a (copy ast-a :children (coerce sub-a 'list)))))
-     (map-ast-while-path ast-b)
+(map-ast-while/path ast-b)
      (lambda (x path)  #+ast-diff-debug (format t "Path = ~A~%" path))
      ;; Abort descent if the subtree is too small
      (if (and (> limit 0) (< (ast-cost x) limit)) nil)
