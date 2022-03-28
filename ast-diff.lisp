@@ -533,49 +533,49 @@ differencing of specialized AST structures.; `equal?',
 
 (defmethod ast-diff* :around (ast-a ast-b)
   (let* ((key (cons ast-a ast-b))
-         (h (ast-hash key)))
-    ;; val-alist maps keys to (val . count) pairs
-    (let ((val-alist (gethash h +ast-diff-cache+)))
-      (let ((p (assoc key val-alist :test #'equal)))
-        (cond
-          (p
-           (let ((vals (cadr p)))
-             (values (car vals) (cdr vals))))
-          ((>= (length val-alist) 10)
-           ;; If a bucket gets too big, just stop caching
-           ;; things that map there
-           (call-next-method))
-          (t
-           (multiple-value-bind (diff cost)
-               (call-next-method)
-             ;; Check for insert, delete pairs
-             ;; When we find one, replace with a :REPLACE edit
-             (let* ((changed nil)
-                    (e diff)
-                    (new-diff
-                     (iter (while e)
-                           (cond
-                             ((and (consp (car e))
-                                   (consp (cadr e))
-                                   (eql (caar e) :insert)
-                                   (eql (caadr e) :delete))
-                              (setf changed t)
-                              (collecting
-                               `(:replace ,(cdr (cadr e)) ,(cdr (car e))))
-                              (pop e) (pop e))
-                             (t (collecting (pop e)))))))
-               (when changed
-                 (setf diff new-diff
-                       cost (diff-cost new-diff))))
-             (when (>= +ast-diff-counter+ +hash-upper-limit+)
-               (setf +ast-diff-counter+
-                     (thin-ast-diff-table +ast-diff-cache+ +ast-diff-counter+)))
-             (assert (< +ast-diff-counter+ +hash-upper-limit+))
-             (setf (gethash h +ast-diff-cache+)
-                   (cons (list* key (cons diff cost) +ast-diff-counter+)
-                         (gethash key +ast-diff-cache+)))
-             (incf +ast-diff-counter+)
-             (values diff cost))))))))
+         (h (ast-hash key))
+         ;; val-alist maps keys to (val . count) pairs
+         (val-alist (gethash h +ast-diff-cache+))
+         (p (assoc key val-alist :test #'equal)))
+    (cond
+      (p
+       (let ((vals (cadr p)))
+         (values (car vals) (cdr vals))))
+      ((>= (length val-alist) 10)
+       ;; If a bucket gets too big, just stop caching
+       ;; things that map there
+       (call-next-method))
+      (t
+       (multiple-value-bind (diff cost)
+           (call-next-method)
+         ;; Check for insert, delete pairs
+         ;; When we find one, replace with a :REPLACE edit
+         (let* ((changed nil)
+                (e diff)
+                (new-diff
+                 (iter (while e)
+                       (cond
+                         ((and (consp (car e))
+                               (consp (cadr e))
+                               (eql (caar e) :insert)
+                               (eql (caadr e) :delete))
+                          (setf changed t)
+                          (collecting
+                           `(:replace ,(cdr (cadr e)) ,(cdr (car e))))
+                          (pop e) (pop e))
+                         (t (collecting (pop e)))))))
+           (when changed
+             (setf diff new-diff
+                   cost (diff-cost new-diff))))
+         (when (>= +ast-diff-counter+ +hash-upper-limit+)
+           (setf +ast-diff-counter+
+                 (thin-ast-diff-table +ast-diff-cache+ +ast-diff-counter+)))
+         (assert (< +ast-diff-counter+ +hash-upper-limit+))
+         (setf (gethash h +ast-diff-cache+)
+               (cons (list* key (cons diff cost) +ast-diff-counter+)
+                     (gethash key +ast-diff-cache+)))
+         (incf +ast-diff-counter+)
+         (values diff cost))))))
 
 (defun thin-ast-diff-table (cache counter)
   (assert (>= counter +hash-upper-limit+))
