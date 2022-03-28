@@ -653,23 +653,27 @@ oldest half of the entries."
 (defmethod ast-diff* ((ast-a ast) (ast-b ast))
   #+debug (format t "ast-diff[AST] AST-CAN-RECURSE: ~S~%"
                   (ast-can-recurse ast-a ast-b))
-  (let (diff cost)
-    (when (same-class-p ast-a ast-b)
-      (setf (values diff cost)
-            (ast-diff*-lists (standardized-children ast-a)
-                             (standardized-children ast-b)
-                             ast-a ast-b)))
+  (multiple-value-bind (diff cost)
+      ;; Initial result from diffing the standardized children.
+      (when (same-class-p ast-a ast-b)
+        (ast-diff*-lists (standardized-children ast-a)
+                         (standardized-children ast-b)
+                         ast-a ast-b))
     (when *wrap*
+      ;; If wrapping makes the diff cheaper, use it.
       (multiple-value-bind (wrap-diff wrap-cost)
           (ast-diff-wrap ast-a ast-b)
         (when (and wrap-cost (or (null cost) (< wrap-cost cost)))
           (setf diff wrap-diff
                 cost wrap-cost)))
+      ;; If unwrapping makes the diff (even?) cheaper, use it.
       (multiple-value-bind (unwrap-diff unwrap-cost)
           (ast-diff-unwrap ast-a ast-b)
         (when (and unwrap-cost (or (null cost) (< unwrap-cost cost)))
           (setf diff unwrap-diff
                 cost unwrap-cost))))
+    ;; At this point we have the cheapest of three possible diffs, or
+    ;; none.
     (if diff
         (values diff cost)
         (call-next-method))))
