@@ -524,100 +524,100 @@ The following generic functions may be specialized to configure
 differencing of specialized AST structures.; `equal?',
 `ast-cost' and `ast-can-recurse'."))
 
-(let ((ast-diff-cache (make-hash-table :size 1021))
-      (ast-diff-counter 0)
-      (hash-upper-limit 100000000))
-  (declare (type (integer 0 2000000000) ast-diff-counter))
-  ;; The cache maps key pairs to values and counts
-  ;; The counter is incremented to find the most recent
-  ;; cached entries.
-  (defmethod ast-diff* :around (ast-a ast-b)
-    (let* ((key (cons ast-a ast-b))
-           (h (ast-hash key)))
-      ;; val-alist maps keys to (val . count) pairs
-      (let ((val-alist (gethash h ast-diff-cache)))
-        (let ((p (assoc key val-alist :test #'equal)))
-          (cond
-            (p
-             (let ((vals (cadr p)))
-               (values (car vals) (cdr vals))))
-            ((>= (length val-alist) 10)
-             ;; If a bucket gets too big, just stop caching
-             ;; things that map there
-             (call-next-method))
-            (t
-             (multiple-value-bind (diff cost)
-                 (call-next-method)
-               ;; Check for insert, delete pairs
-               ;; When we find one, replace with a :REPLACE edit
-               (let* ((changed nil)
-                      (e diff)
-                      (new-diff
-                        (iter (while e)
-                              (cond
-                                ((and (consp (car e))
-                                      (consp (cadr e))
-                                      (eql (caar e) :insert)
-                                      (eql (caadr e) :delete))
-                                 (setf changed t)
-                                 (collecting
-                                   `(:replace ,(cdr (cadr e)) ,(cdr (car e))))
-                                 (pop e) (pop e))
-                                (t (collecting (pop e)))))))
-                 (when changed
-                   (setf diff new-diff
-                         cost (diff-cost new-diff))))
-               (when (>= ast-diff-counter hash-upper-limit)
-                 (setf ast-diff-counter
-                       (thin-ast-diff-table ast-diff-cache ast-diff-counter)))
-               (assert (< ast-diff-counter hash-upper-limit))
-               (setf (gethash h ast-diff-cache)
-                     (cons (list* key (cons diff cost) ast-diff-counter)
-                           (gethash key ast-diff-cache)))
-               (incf ast-diff-counter)
-               (values diff cost))))))))
+;; The cache maps key pairs to values and counts
 
-  (defun thin-ast-diff-table (cache counter)
-    (assert (>= counter hash-upper-limit))
-    (let* ((h2 (ash hash-upper-limit -1))
-           (d (- counter h2)))
-      (maphash (lambda (k v)
-                 (let* ((head (cons nil v))
-                        (p head)
-                        (n (cdr p)))
-                   (loop
-                      (unless n (return))
-                      (if (< (cddar n) d)
-                          (setf (cdr p) (cdr n))
-                          (progn
-                            (decf (cddar n) d)
-                            (setf p n n (cdr n)))))
-                   (unless (eql (cdr head) v)
-                     (setf (gethash k cache) (cdr head)))))
-               cache)
-      (setf counter h2)))
+(def +ast-diff-cache+ (make-hash-table :size 1021))
+(def +ast-diff-counter+ 0)
+(declaim (type (integer 0 2000000000) +ast-diff-counter+))
+(def +hash-upper-limit+ 100000000)
 
-  (defun clear-ast-diff-table ()
-    (setf ast-diff-counter 0)
-    (clrhash ast-diff-cache))
+(defmethod ast-diff* :around (ast-a ast-b)
+  (let* ((key (cons ast-a ast-b))
+         (h (ast-hash key)))
+    ;; val-alist maps keys to (val . count) pairs
+    (let ((val-alist (gethash h +ast-diff-cache+)))
+      (let ((p (assoc key val-alist :test #'equal)))
+        (cond
+          (p
+           (let ((vals (cadr p)))
+             (values (car vals) (cdr vals))))
+          ((>= (length val-alist) 10)
+           ;; If a bucket gets too big, just stop caching
+           ;; things that map there
+           (call-next-method))
+          (t
+           (multiple-value-bind (diff cost)
+               (call-next-method)
+             ;; Check for insert, delete pairs
+             ;; When we find one, replace with a :REPLACE edit
+             (let* ((changed nil)
+                    (e diff)
+                    (new-diff
+                     (iter (while e)
+                           (cond
+                             ((and (consp (car e))
+                                   (consp (cadr e))
+                                   (eql (caar e) :insert)
+                                   (eql (caadr e) :delete))
+                              (setf changed t)
+                              (collecting
+                               `(:replace ,(cdr (cadr e)) ,(cdr (car e))))
+                              (pop e) (pop e))
+                             (t (collecting (pop e)))))))
+               (when changed
+                 (setf diff new-diff
+                       cost (diff-cost new-diff))))
+             (when (>= +ast-diff-counter+ +hash-upper-limit+)
+               (setf +ast-diff-counter+
+                     (thin-ast-diff-table +ast-diff-cache+ +ast-diff-counter+)))
+             (assert (< +ast-diff-counter+ +hash-upper-limit+))
+             (setf (gethash h +ast-diff-cache+)
+                   (cons (list* key (cons diff cost) +ast-diff-counter+)
+                         (gethash key +ast-diff-cache+)))
+             (incf +ast-diff-counter+)
+             (values diff cost))))))))
 
-  (defun ast-diff (ast-a ast-b
-                   &key
-                     ((:ignore-whitespace *ignore-whitespace*)
-                      *ignore-whitespace*)
-                     ((:strings *diff-strings-p*) *diff-strings-p*)
-                     ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
-                     ((:wrap *wrap*) (or *wrap* *wrap-sequences*))
-                     ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
-                     ((:base-cost *base-cost*) *base-cost*)
-                     &allow-other-keys)
-    ;; Convert raw lisp data to asts
-    (let ((ast-a (astify ast-a))
-          (ast-b (astify ast-b)))
-      ;; Bag computation to accelerate wrapping/unwrapping will go here
-      (unwind-protect
-           (ast-diff* ast-a ast-b)
-        (clear-ast-diff-table)))))
+(defun thin-ast-diff-table (cache counter)
+  (assert (>= counter +hash-upper-limit+))
+  (let* ((h2 (ash +hash-upper-limit+ -1))
+         (d (- counter h2)))
+    (maphash (lambda (k v)
+               (let* ((head (cons nil v))
+                      (p head)
+                      (n (cdr p)))
+                 (loop
+                   (unless n (return))
+                   (if (< (cddar n) d)
+                       (setf (cdr p) (cdr n))
+                       (progn
+                         (decf (cddar n) d)
+                         (setf p n n (cdr n)))))
+                 (unless (eql (cdr head) v)
+                   (setf (gethash k cache) (cdr head)))))
+             cache)
+    (setf counter h2)))
+
+(defun clear-ast-diff-table ()
+  (setf +ast-diff-counter+ 0)
+  (clrhash +ast-diff-cache+))
+
+(defun ast-diff (ast-a ast-b
+                 &key
+                   ((:ignore-whitespace *ignore-whitespace*)
+                    *ignore-whitespace*)
+                   ((:strings *diff-strings-p*) *diff-strings-p*)
+                   ((:wrap-sequences *wrap-sequences*) *wrap-sequences*)
+                   ((:wrap *wrap*) (or *wrap* *wrap-sequences*))
+                   ((:max-wrap-diff *max-wrap-diff*) *max-wrap-diff*)
+                   ((:base-cost *base-cost*) *base-cost*)
+                 &allow-other-keys)
+  ;; Convert raw lisp data to asts
+  (let ((ast-a (astify ast-a))
+        (ast-b (astify ast-b)))
+    ;; Bag computation to accelerate wrapping/unwrapping will go here
+    (unwind-protect
+         (ast-diff* ast-a ast-b)
+      (clear-ast-diff-table))))
 
 (defgeneric same-class-p (object-a object-b)
   (:documentation "Return T if OBJECT-1 and OBJECT-2 are of the same class.")
