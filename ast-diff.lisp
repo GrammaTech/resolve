@@ -307,45 +307,48 @@ can be recursed on if STRINGS is true (defaults to true)")
 (defgeneric unastify (x)
   (:documentation "Convert a SIMPLE-LISP-AST to a Lisp data structure"))
 
-(let ((end-marker :nil))
-  (defmethod source-text ((x (eql end-marker)) &rest args &key)
-    (apply #'source-text "" args))
-  (defmethod astify ((x list))
-    (if (proper-list-p x)
-        ;; Add an end marker to represent the NIL
-        ;; (because AST-DIFF treats NIL as a list)
-        (make-instance 'simple-lisp-ast
-         :children (nconc (mapcar #'astify x) (list end-marker))
-         :unastify-cache x)
-        ;; Properize the list
-        (let ((original-x x)
-              (properized-x
-               (iter (collecting
+(def +end-marker+ :nil
+  "Value used to mark the end of a proper list, as AST-DIFF treats NIL
+  as a list.")
+
+(defmethod source-text ((x (eql +end-marker+)) &rest args &key)
+  (apply #'source-text "" args))
+(defmethod astify ((x list))
+  (if (proper-list-p x)
+      ;; Add an end marker to represent the NIL
+      ;; (because AST-DIFF treats NIL as a list)
+      (make-instance 'simple-lisp-ast
+                     :children (nconc (mapcar #'astify x) (list +end-marker+))
+                     :unastify-cache x)
+      ;; Properize the list
+      (let ((original-x x)
+            (properized-x
+             (iter (collecting
                       (if (consp x)
                           (car x)
                           (progn
-                            (assert (not (eql x end-marker)) ()
+                            (assert (not (eql x +end-marker+)) ()
                                     "End marker ~s found"
                                     x)
                             x)))
-                     (while (consp x))
-                     (pop x))))
-          (make-instance 'simple-lisp-ast
-           :children (mapcar #'astify properized-x)
-           :unastify-cache original-x))))
-  (defmethod astify (x) x)
-  (defmethod unastify ((ast simple-lisp-ast))
-    (or (unastify-cache ast)
-        (unastify-list (children ast))))
-  (defmethod unastify (val) val)
+                   (while (consp x))
+                   (pop x))))
+        (make-instance 'simple-lisp-ast
+                       :children (mapcar #'astify properized-x)
+                       :unastify-cache original-x))))
+(defmethod astify (x) x)
+(defmethod unastify ((ast simple-lisp-ast))
+  (or (unastify-cache ast)
+      (unastify-list (children ast))))
+(defmethod unastify (val) val)
 
-  (defun unastify-list (c)
-    (and c
-         (let ((last-c (lastcar c)))
-           (if (eql last-c end-marker)
-               (mapcar #'unastify (butlast c))
-               (nconc (mapcar #'unastify (butlast c))
-                      last-c))))))
+(defun unastify-list (c)
+  (and c
+       (let ((last-c (lastcar c)))
+         (if (eql last-c +end-marker+)
+             (mapcar #'unastify (butlast c))
+             (nconc (mapcar #'unastify (butlast c))
+                    last-c)))))
 
 (defun unastify-lisp-diff (d)
   (typecase d
@@ -368,10 +371,11 @@ can be recursed on if STRINGS is true (defaults to true)")
 ;;; The edit tree is a tree representation of the parts of the
 ;;; diff that group the edit, hierarchically, into subedits.
 ;;;
-;;; Each node is a mapping from one edit segment in the original
-;;; tree to another edit segment in the target tree.  An edit segment
-;;; represents a piece of the tree that is being changed by the
-;;; a part of the edit script.
+;;; Each node is a mapping from one edit segment in the original tree
+;;; to another edit segment in the target tree. An edit segment
+;;; represents a piece of the tree that is being changed by the a part
+;;; of the edit script; it is essentially a pointer into the tree with
+;;; a target node, an offset, and a length.
 
 (defclass size-mixin ()
   ((size :reader ast-size
