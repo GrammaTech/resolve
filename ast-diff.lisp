@@ -3328,7 +3328,7 @@ and convert it back to whatever internal form this kind of AST uses."))
                 `(,text-slot-specifier
                   ,(text ast)
                   ,@standardized-children)
-                `(,(ldiff standardized-children insert-point)
+                `(,@(ldiff standardized-children insert-point)
                   ,text-slot-specifier ,(text ast)
                   ,@insert-point)))))))
 
