@@ -3471,6 +3471,7 @@ each slot. ."
   ;; level when that happens.
   (let ((child-alist nil)
         (current-slot nil)
+        (slot-pair nil)
         ;; Capture the current order of the first occurrence of each
         ;; of the slot specifiers.
         (ordering (ordering (filter (of-type 'slot-specifier) children)))
@@ -3481,18 +3482,22 @@ each slot. ."
         (typecase c
           (slot-specifier
            (setf current-slot c)
-           (unless (assoc c child-alist)
-             (push (list c) child-alist)))
+           ;; TODO Is it actually possible for a specifier to occur
+           ;; more than once?
+           (if-let (pair (assoc c child-alist))
+             (setf slot-pair pair)
+             (progn
+               (setf slot-pair (list c))
+               (push slot-pair child-alist))))
           (otherwise
            (unless current-slot
              (error "Child ~a occurs before any slot-specifier" c))
-           (let ((slot-pair (assoc current-slot child-alist)))
-             (push c (cdr slot-pair))
-             ;; The extra layer here (a cons in a list) is to mimic
-             ;; the format of `ft:position'.
-             (let ((slot (slot-specifier-slot current-slot)))
-               (push (list (cons slot (1- (length (cdr slot-pair)))))
-                     order)))))))
+           (push c (cdr slot-pair))
+           ;; The extra layer here (a cons in a list) is to mimic
+           ;; the format of `ft:position'.
+           (let ((slot (slot-specifier-slot current-slot)))
+             (push (list (cons slot (1- (length (cdr slot-pair)))))
+                   order))))))
     (dolist (p child-alist)
       (setf (cdr p) (nreverse (cdr p))))
     (values (sort child-alist ordering :key #'car)
