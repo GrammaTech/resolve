@@ -1379,12 +1379,14 @@ Prefix and postfix returned as additional values."
   "Calls AST-HASH, but checks that if two ASTs have the same hash value,
 they are actually equal.  If not, the second one gets a new, fresh hash
 value that is used instead."
-  (let* ((hash (ast-hash ast))
-         (old-ast (gethash hash table)))
-    (when (and old-ast (not (equal? ast old-ast)))
-      (iter (incf hash) ; may be >= sel/sw/parseable::+ast-hash-base+, but that's ok
-            (while (gethash hash table)))
-      (setf (gethash hash table) ast))
+  (mvlet* ((hash (ast-hash ast))
+           (old-ast present? (gethash hash table)))
+    (if (not present?)
+        (setf (gethash hash table) ast)
+        (when (and old-ast (not (equal? ast old-ast)))
+          (iter (incf hash) ; may be >= sel/sw/parseable::+ast-hash-base+, but that's ok
+                (while (gethash hash table)))
+          (setf (gethash hash table) ast)))
     hash))
 
 (defmethod ast-diff* (ast-a ast-b)
