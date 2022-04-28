@@ -1515,7 +1515,7 @@ value that is used instead."
 
 (defmethod ast-diff* ((soft parseable) (simple simple))
   #+debug (format t "ast-diff[PARSEABLE,SIMPLE]~%")
-  (ast-diff* (split-sequence #\Newline (genome-string soft))
+  (ast-diff* (lines (genome-string soft))
              (simple-genome-unpack (genome simple))))
 
 (defun split-into-subsequences (seq subseq-indices &aux (n (length seq)))
@@ -1557,40 +1557,37 @@ root of the edit script (and implicitly also the program AST)."
 ;;; Construct the edit tree from an ast and an edit script
 
 (defgeneric create-edit-tree (source target script &key &allow-other-keys)
-  (:documentation "Given a source that is the source of the
-edit script SCRIPT, a target objec that is the result of the script on the
-source, build the edit tree corresponding to the script."))
+  (:documentation "Given a source that is the source of the edit
+script SCRIPT, and a target object that is the result of the script on
+the source, build the edit tree corresponding to the script."))
 
-(defmethod create-edit-tree (source target (script cons)
+(defmethod create-edit-tree ((source ast) (target ast) (script cons)
                              &key &allow-other-keys)
   ;; The script is a list of actions on the AST's children
-  (if (and (typep source 'ast)
-           (typep target 'ast))
-      (change-segments-on-seqs
-       (standardized-children source)
-       (standardized-children target)
-       script
-       (lambda (source-segment-start source-segment-length
-                target-segment-start target-segment-length
-                children actions)
-         (let ((source-segment (make-instance 'edit-segment
-                                              :node source
-                                              :start source-segment-start
-                                              :length source-segment-length))
-               (target-segment (make-instance 'edit-segment
-                                              :node target
-                                              :start target-segment-start
-                                              :length target-segment-length)))
-           (make-instance 'edit-tree-node
-                          :source source-segment
-                          :target target-segment
-                          :children children
-                          :script actions)))
-       (lambda (source-child target-child action-cdr &rest args &key &allow-other-keys)
-         ;; Need to include source, target in case children are strings
-         (apply #'create-edit-tree source-child target-child action-cdr args))
-       source target)
-      (call-next-method)))
+  (change-segments-on-seqs
+   (standardized-children source)
+   (standardized-children target)
+   script
+   (lambda (source-segment-start source-segment-length
+            target-segment-start target-segment-length
+            children actions)
+     (let ((source-segment (make-instance 'edit-segment
+                                          :node source
+                                          :start source-segment-start
+                                          :length source-segment-length))
+           (target-segment (make-instance 'edit-segment
+                                          :node target
+                                          :start target-segment-start
+                                          :length target-segment-length)))
+       (make-instance 'edit-tree-node
+                      :source source-segment
+                      :target target-segment
+                      :children children
+                      :script actions)))
+   (lambda (source-child target-child action-cdr &rest args &key &allow-other-keys)
+     ;; Need to include source, target in case children are strings
+     (apply #'create-edit-tree source-child target-child action-cdr args))
+   source target))
 
 (defun change-segments-on-seqs (source target script segment-fn recurse-fn
                                 source-node target-node)
