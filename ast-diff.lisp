@@ -225,7 +225,7 @@ symbols for other types.")
 
 (defgeneric ast-can-recurse (ast-a ast-b)
   (:documentation "Check if recursion is possible on AST-A and AST-B.  Strings
-can be recursed on if STRINGS is true (defaults to true)")
+can be recursed on if `*diff-strings-p*' is true (defaults to true)")
   (:method ((ast-a string) (ast-b string))
     *diff-strings-p*)
   (:method ((ast-a t) (ast-b t))
