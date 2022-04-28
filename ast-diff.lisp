@@ -1420,13 +1420,13 @@ value that is used instead."
            (diff-a common-a
             (split-into-subsequences
              ast-a
-             (mapcar (lambda (x) (list (car x) (caddr x)))
-                     subseq-triples)))
+             (map 'list (lambda (x) (list (car x) (caddr x)))
+                  subseq-triples)))
            (diff-b common-b
             (split-into-subsequences
              ast-b
-             (mapcar (lambda (x) (list (cadr x) (caddr x)))
-                     subseq-triples))))
+             (map 'list (lambda (x) (list (cadr x) (caddr x)))
+                  subseq-triples))))
     (assert (length= diff-a diff-b))
     (assert (length= common-a common-b))
     ;; (assert (= (length diff-a) (1+ (length common-a))))
@@ -3207,7 +3207,7 @@ a tail of diff-a, and a tail of diff-b.")
       ;; subsequence around each of the two points.  These may
       ;; end up being out of order, and perhaps overlapping, so
       ;; we'll select the ones to actually use by a greedy algorithm.
-      (let ((candidates nil)
+      (let ((candidates (vect))
             (i 0))
         (iter (while (< i l1))
               #+gcs2-debug (format t "i = ~A~%" i)
@@ -3241,8 +3241,8 @@ a tail of diff-a, and a tail of diff-b.")
                         ;; from start1 to end1-1 and start2 to end2-1 are
                         ;; maximal contiguous subsequences containing
                         ;; v1[i] and v2[j]. Record them.
-                        (push (list start1 start2 (- end1 start1))
-                              candidates)
+                        (vector-push-extend (list start1 start2 (- end1 start1))
+                                            candidates)
                         (setf i end1)))
                     (incf i))))
         (setf candidates (nreverse candidates))
@@ -3252,7 +3252,7 @@ a tail of diff-a, and a tail of diff-b.")
         #+gcs2-debug (format t "candidates = ~A~%" candidates)
         ;; All candidates should be disjoint
         (let ((selected-triples nil))
-          (iter (for triple in candidates)
+          (iter (for triple in-vector candidates)
                 (for (s21 s22 l2) = triple)
                 (when
                     ;; Reject triples when they break ordering with
@@ -3266,7 +3266,7 @@ a tail of diff-a, and a tail of diff-b.")
                                       (and (>= s21 (+ s11 l1))
                                            (>= s22 (+ s12 l1))))))
                   (push triple selected-triples)))
-          (sort selected-triples #'< :key #'car))))))
+          (sort-new selected-triples #'< :key #'car))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
