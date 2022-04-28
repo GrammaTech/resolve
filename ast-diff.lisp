@@ -1018,6 +1018,7 @@ Prefix and postfix returned as additional values."
                 (rd-link-kind arc)
                 (rd-link-cost arc)))))
 
+(declaim (inline rd-link-a rd-link-b))
 (defun rd-link-a (e) (rd-node-a (rd-link-src e)))
 (defun rd-link-b (e) (rd-node-b (rd-link-src e)))
 
