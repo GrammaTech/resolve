@@ -888,6 +888,9 @@ down from AST, as well as the classes of the nodes along the path."
             (values new-diff (diff-cost new-diff)))
           (values :bad most-positive-fixnum)))))
 
+(-> ast-diff-unwrap-sequence ((or ast fixnum) ast sequence)
+    (values (or list (eql :bad))
+            fixnum))
 (defun ast-diff-unwrap-sequence (a ast-b sub-b)
   (let ((len (length sub-b)))
     (assert (>= len 2))
