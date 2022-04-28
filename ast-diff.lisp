@@ -1405,6 +1405,10 @@ value that is used instead."
   #+ast-diff-debug (format t "ast-diff LIST LIST~%")
   (iter (for a in (list ast-a ast-b))
         (assert (proper-list-p a) () "Not a proper list: ~a" a))
+  (ast-diff*-lists (coerce ast-a 'vector) (coerce ast-b 'vector)
+                   parent-a parent-b))
+
+(defmethod ast-diff*-lists ((ast-a vector) (ast-b vector) parent-a parent-b)
   #+ast-diff-debug (format t "ast-a = ~a~%ast-b = ~a~%" ast-a ast-b)
   (mvlet* ((table (make-hash-table :size (+ (length ast-a) (length ast-b))))
            (hashes-a (map '(simple-array fixnum (*))
@@ -1432,8 +1436,8 @@ value that is used instead."
     ;; (assert (= (length diff-a) (1+ (length common-a))))
     (let ((overall-diff nil)
           (overall-cost 0))
-      (iter (for da in (reverse diff-a))
-            (for db in (reverse diff-b))
+      (iter (for da in (mapcar (op (coerce _ 'list)) (reverse diff-a)))
+            (for db in (mapcar (op (coerce _ 'list)) (reverse diff-b)))
             (for ca in (reverse (cons nil common-a)))
             ;; Add the differences.
             (multiple-value-bind (diff cost)
@@ -1442,7 +1446,7 @@ value that is used instead."
               (incf overall-cost cost))
             ;; Add the common segments.
             (setf overall-diff
-                  (append (mapcar (lambda (it) (cons :same it)) ca)
+                  (append (map 'list (lambda (it) (cons :same it)) ca)
                           overall-diff)))
       (values overall-diff overall-cost))))
 
