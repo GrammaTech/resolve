@@ -872,6 +872,9 @@ down from AST, as well as the classes of the nodes along the path."
   (declare (ignore skip-root first-ast-child))
   nil)
 
+(-> ast-diff-wrap-sequence (ast sequence ast)
+    (values (or list (eql :bad))
+            fixnum))
 (defun ast-diff-wrap-sequence (ast-a sub-a ast-b &aux (len (length sub-a)))
   (assert (>= len 2))
   (let ((sub-ast (copy ast-a :children (coerce sub-a 'list)))
