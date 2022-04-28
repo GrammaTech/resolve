@@ -1036,44 +1036,48 @@ Prefix and postfix returned as additional values."
     (iter (for a from 0 to len-a)
           (iter (for b from 0 to len-b)
                 (let ((node (make-rd-node :a a :b b)))
-                  (when (> b 0)
+                  (cond-every
+                   ((> b 0)
                     (push (make-rd-link ;; :a a :b (1- b)
                            :src (aref nodes a (1- b))
                            :dest node
                            :kind :insert)
                           (rd-node-in-arcs node)))
-                  (when (> a 0)
+                   ((> a 0)
                     (push (make-rd-link
                            ;; :a (1- a) :b b
-                             :src (aref nodes (1- a) b)
-                             :dest node :kind :delete)
+                           :src (aref nodes (1- a) b)
+                           :dest node
+                           :kind :delete)
                           (rd-node-in-arcs node))
                     (when (> b 0 ) ;; (and (> b 0) (ast-can-recurse (aref vec-a (1- a))
-                                   ;;                     (aref vec-b (1- b))))
+                      ;;                     (aref vec-b (1- b))))
                       (push (make-rd-link
                              ;; :a (1- a) :b (1- b)
                              :src (aref nodes (1- a) (1- b))
                              :dest node
                              :kind :same-or-recurse)
                             (rd-node-in-arcs node))))
-                  (when wrap-sequences
-                    (when (and (> b 0) (> a 1))
-                      (iter (for x from 0 to (- a 2))
-                            (push (make-rd-link
-                                   ;; :a x :b b
-                                   :src (aref nodes x (1- b))
-                                   :dest node
-                                   :kind :wrap-sequence)
-                                  (rd-node-in-arcs node)))))
-                  (when unwrap-sequences
-                    (when (and (> a 0) (> b 1))
-                      (iter (for x from 0 to (- b 2))
-                            (push (make-rd-link
-                                   ;; :a a :b x
-                                   :src (aref nodes (1- a) x)
-                                   :dest node
-                                   :kind :unwrap-sequence)
-                                  (rd-node-in-arcs node)))))
+                   ((and wrap-sequences
+                         (> b 0)
+                         (> a 1))
+                    (iter (for x from 0 to (- a 2))
+                          (push (make-rd-link
+                                 ;; :a x :b b
+                                 :src (aref nodes x (1- b))
+                                 :dest node
+                                 :kind :wrap-sequence)
+                                (rd-node-in-arcs node))))
+                   ((and unwrap-sequences
+                         (> a 0)
+                         (> b 1))
+                    (iter (for x from 0 to (- b 2))
+                          (push (make-rd-link
+                                 ;; :a a :b x
+                                 :src (aref nodes (1- a) x)
+                                 :dest node
+                                 :kind :unwrap-sequence)
+                                (rd-node-in-arcs node)))))
                   (setf (rd-node-open-pred-count node)
                         (length (rd-node-in-arcs node)))
                   (setf (aref nodes a b) node))))
