@@ -1407,10 +1407,12 @@ value that is used instead."
         (assert (proper-list-p a) () "Not a proper list: ~a" a))
   #+ast-diff-debug (format t "ast-a = ~a~%ast-b = ~a~%" ast-a ast-b)
   (mvlet* ((table (make-hash-table :size (+ (length ast-a) (length ast-b))))
-           (hashes-a (mapcar (lambda (ast) (ast-hash-with-check ast table))
-                             ast-a))
-           (hashes-b (mapcar (lambda (ast) (ast-hash-with-check ast table))
-                             ast-b))
+           (hashes-a (map '(simple-array fixnum (*))
+                          (lambda (ast) (ast-hash-with-check ast table))
+                          ast-a))
+           (hashes-b (map '(simple-array fixnum (*))
+                          (lambda (ast) (ast-hash-with-check ast table))
+                          ast-b))
            (subseq-triples (good-common-subsequences2 hashes-a hashes-b))
            ;; split ast-a and ast-b into subsequences
            ;; Get lists of subsequences on which they differ, and subsequences on
@@ -3176,21 +3178,21 @@ a tail of diff-a, and a tail of diff-b.")
   (positions-1 nil :type list)
   (positions-2 nil :type list))
 
-(defun good-common-subsequences2 (s1 s2 &key (test #'eql))
+(defun good-common-subsequences2 (v1 v2 &key (test #'eql))
+  (declare ((simple-array fixnum (*)) v1 v2)
+           (function test))
   (let* ((table (make-hash-table :test test))
-         (v1 (map 'vector #'identity s1))
-         (v2 (map 'vector #'identity s2))
          (l1 (length v1))
          (l2 (length v2)))
-    (macrolet ((init-table (v fn)
+    (macrolet ((init-table (v place)
                  `(iter (for x in-vector ,v)
                         (for i from 0)
                         (let ((g (gethash x table)))
                           (unless g
                             (setf (gethash x table)
-                            (setf g (make-good-common-subsequences))))
+                                  (setf g (make-good-common-subsequences))))
                           (incf (good-common-subsequences-count g))
-                          (push i (,fn g))))))
+                          (push i (,place g))))))
       (init-table v1 good-common-subsequences-positions-1)
       (init-table v2 good-common-subsequences-positions-2))
     #+gcs2-debug
@@ -3208,40 +3210,40 @@ a tail of diff-a, and a tail of diff-b.")
           (i 0))
       (iter (while (< i l1))
             #+gcs2-debug (format t "i = ~A~%" i)
-            (let* ((x (svref v1 i))
+            (let* ((x (aref v1 i))
                    (g (gethash x table)))
               #+gcs2-debug (format t "x = ~A, g = ~A~%" x g)
               (if (and (= (good-common-subsequences-count g) 2)
                        (good-common-subsequences-positions-1 g)
                        (good-common-subsequences-positions-2 g))
-                ;; x occurs precisely once in each sequence
-                (let ((j (car (good-common-subsequences-positions-2 g))))
-                  (assert (= (car (good-common-subsequences-positions-1 g)) i))
-                  (let ((start1 i)
-                        (start2 j)
-                        (end1 (1+ i))
-                        (end2 (1+ j)))
-                    (iter (while (> start1 0))
-                          (while (> start2 0))
-                          (while (funcall test
-                                          (svref v1 (1- start1))
-                                          (svref v2 (1- start2))))
-                          (decf start1)
-                          (decf start2))
-                    (iter (while (< end1 l1))
-                          (while (< end2 l2))
-                          (while (funcall test (svref v1 end1)
-                                          (svref v2 end2)))
-                          (incf end1)
-                          (incf end2))
-                    ;; At this point, the subsequences of v1 and v2
-                    ;; from start1 to end1-1 and start2 to end2-1 are
-                    ;; maximal contiguous subsequences containing
-                    ;; v1[i] and v2[j]. Record them.
-                    (push (list start1 start2 (- end1 start1))
-                          candidates)
-                    (setf i end1)))
-                (incf i))))
+                  ;; x occurs precisely once in each sequence
+                  (let ((j (car (good-common-subsequences-positions-2 g))))
+                    (assert (= (car (good-common-subsequences-positions-1 g)) i))
+                    (let ((start1 i)
+                          (start2 j)
+                          (end1 (1+ i))
+                          (end2 (1+ j)))
+                      (iter (while (> start1 0))
+                            (while (> start2 0))
+                            (while (test
+                                    (aref v1 (1- start1))
+                                    (aref v2 (1- start2))))
+                            (decf start1)
+                            (decf start2))
+                      (iter (while (< end1 l1))
+                            (while (< end2 l2))
+                            (while (funcall test (aref v1 end1)
+                                            (aref v2 end2)))
+                            (incf end1)
+                            (incf end2))
+                      ;; At this point, the subsequences of v1 and v2
+                      ;; from start1 to end1-1 and start2 to end2-1 are
+                      ;; maximal contiguous subsequences containing
+                      ;; v1[i] and v2[j]. Record them.
+                      (push (list start1 start2 (- end1 start1))
+                            candidates)
+                      (setf i end1)))
+                  (incf i))))
       (setf candidates (nreverse candidates))
       #+gcs2-debug (format t "candidates = ~A~%" candidates)
       ;; sort subsequences into decreasing order by length
@@ -3253,7 +3255,7 @@ a tail of diff-a, and a tail of diff-b.")
               (for (s21 s22 l2) = triple)
               (when
                   ;; Reject triples when they break ordering with
-                  ;; previous triples The triples should never
+                  ;; previous triples. The triples should never
                   ;; overlap.
                   (iter (for (s11 s12 l1) in selected-triples)
                         (assert (/= s11 s21))
