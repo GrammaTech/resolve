@@ -858,10 +858,11 @@ down from AST, as well as the classes of the nodes along the path."
          #+ast-diff-debug (format t "Result: ~s ~s ~s~%" left right classes)
          (return (values left right classes)))))
 
-(defun cost-of-wrap (wrap)
+(defun cost-of-wrap (wrap &aux (base-cost *base-cost*))
   "Computes the sum of the costs of the objects in a wrap"
-  (reduce #'+ wrap :initial-value 0
-          :key (lambda (w) (reduce #'+ w :key #'ast-cost :initial-value *base-cost*))))
+  (reduce #'+ wrap
+          :initial-value 0
+          :key (lambda (w) (reduce #'+ w :key #'ast-cost :initial-value base-cost))))
 
 (defmethod ast-diff-wrap ((ast-a t) (ast-b t) &key skip-root first-ast-child)
   (declare (ignore skip-root first-ast-child))
