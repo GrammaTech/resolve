@@ -1406,38 +1406,39 @@ value that is used instead."
   (iter (for a in (list ast-a ast-b))
         (assert (proper-list-p a) () "Not a proper list: ~a" a))
   #+ast-diff-debug (format t "ast-a = ~a~%ast-b = ~a~%" ast-a ast-b)
-  (let* ((table (make-hash-table))
-         (hashes-a (mapcar (lambda (ast) (ast-hash-with-check ast table))
-                           ast-a))
-         (hashes-b (mapcar (lambda (ast) (ast-hash-with-check ast table))
-                           ast-b))
-         (subseq-triples (good-common-subsequences2 hashes-a hashes-b))
-         diff-a common-a diff-b common-b)
-    ;; split ast-a and ast-b into subsequences
-    ;; Get lists of subsequences on which they differ, and subsequences on
-    ;; which they are equal.  Some of the former may be empty.
-    (setf (values diff-a common-a)
-          (split-into-subsequences
-           ast-a
-           (mapcar (lambda (x) (list (car x) (caddr x)))
-                   subseq-triples)))
-    (setf (values diff-b common-b)
-          (split-into-subsequences
-           ast-b
-           (mapcar (lambda (x) (list (cadr x) (caddr x)))
-                   subseq-triples)))
-    (assert (= (length diff-a) (length diff-b)))
-    (assert (= (length common-a) (length common-b)))
+  (mvlet* ((table (make-hash-table :size (+ (length ast-a) (length ast-b))))
+           (hashes-a (mapcar (lambda (ast) (ast-hash-with-check ast table))
+                             ast-a))
+           (hashes-b (mapcar (lambda (ast) (ast-hash-with-check ast table))
+                             ast-b))
+           (subseq-triples (good-common-subsequences2 hashes-a hashes-b))
+           ;; split ast-a and ast-b into subsequences
+           ;; Get lists of subsequences on which they differ, and subsequences on
+           ;; which they are equal.  Some of the former may be empty.
+           (diff-a common-a
+            (split-into-subsequences
+             ast-a
+             (mapcar (lambda (x) (list (car x) (caddr x)))
+                     subseq-triples)))
+           (diff-b common-b
+            (split-into-subsequences
+             ast-b
+             (mapcar (lambda (x) (list (cadr x) (caddr x)))
+                     subseq-triples))))
+    (assert (length= diff-a diff-b))
+    (assert (length= common-a common-b))
     ;; (assert (= (length diff-a) (1+ (length common-a))))
     (let ((overall-diff nil)
           (overall-cost 0))
       (iter (for da in (reverse diff-a))
             (for db in (reverse diff-b))
             (for ca in (reverse (cons nil common-a)))
+            ;; Add the differences.
             (multiple-value-bind (diff cost)
                 (ast-diff-on-lists da db parent-a parent-b)
               (setf overall-diff (append diff overall-diff))
               (incf overall-cost cost))
+            ;; Add the common segments.
             (setf overall-diff
                   (append (mapcar (lambda (it) (cons :same it)) ca)
                           overall-diff)))
