@@ -1338,28 +1338,17 @@ Prefix and postfix returned as additional values."
      (reduce #'+ diff :key #'diff-cost :initial-value 0))))
 
 (defun add-common (diff cost prefix postfix)
-  ;; Some special handling is required to interface
-  ;; between the list model of the common pre-/post-fixes
-  ;; and the cons-tree model of the calculated diff.
-  ;;
-  ;; This leads to unnecessary hair.  Fix!
   #+ast-diff-debug (format t "add-common: ~a ~a~%" diff cost)
-  (values
-   (let ((diff (if (equal '(:same-tail) (lastcar diff))
-                   (butlast diff)
-                   diff)))
-     (let ((diff
-            (if prefix
-                (append (mapcar (lambda (it) (cons :same it))
-                                prefix)
-                        diff)
-                diff)))
-       (if postfix
-           (append diff
-                   (mapcar (lambda (it) (cons :same it))
-                           postfix))
-           diff)))
-   cost))
+  (flet ((mark-same (list)
+           (mapcar (op (cons :same _)) list)))
+    (values
+     (append
+      (mark-same prefix)
+      (if (equal '(:same-tail) (lastcar diff))
+          (butlast diff)
+          diff)
+      (mark-same postfix))
+     cost)))
 
 (defun ast-diff-on-lists (ast-a ast-b parent-a parent-b)
   (assert (proper-list-p ast-a))
