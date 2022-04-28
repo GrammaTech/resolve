@@ -1120,9 +1120,8 @@ Prefix and postfix returned as additional values."
     (let ((start (aref nodes 0 0)))
       (setf (rd-node-cost start) 0)
       (enq start fringe))
-    (do ((node (deq fringe)
-               (deq fringe)))
-        ((zerop total-open) nil)
+    (iter (for node = (deq fringe))
+          (until (zerop total-open))
       (decf total-open)
       ;; Compute the costs of all arcs into this node
       (dolist (in-arc (rd-node-in-arcs node))
