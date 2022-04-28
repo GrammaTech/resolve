@@ -979,24 +979,6 @@ Prefix and postfix returned as additional values."
   (make-array (list (1+ (clength total-a)) (1+ (clength total-b)))
               :initial-element nil))
 
-;;; Simple queue.  This must be implemented in a library somewhere
-;;; in Quicklisp.
-(defun make-simple-queue ()
-  (cons nil nil))
-
-(defun simple-queue-dequeue (sq)
-  (cond
-    ((car sq) (pop (car sq)))
-    ((cdr sq)
-     (let ((r (nreverse (cdr sq))))
-       (setf (car sq) (cdr r)
-             (cdr sq) nil)
-       (car r)))
-    (t nil)))
-
-(defun simple-queue-enqueue (sq val)
-  (push val (cdr sq)))
-
 (defstruct rd-node
   "Node in the recursive-diff computation graph"
   ;; Coordinates of the node in the r-d graph
@@ -1123,15 +1105,16 @@ Prefix and postfix returned as additional values."
     ops))
 
 (defun compute-best-paths (nodes vec-a vec-b parent-a parent-b)
-  (let ((fringe (make-simple-queue))
+  (let ((fringe (queue))
         (total-open 1))
+    (declare (dynamic-extent fringe))
     ;; Start at the (0,0) node, which is the () -> ()
     ;; diff and has zero cost
     (let ((start (aref nodes 0 0)))
       (setf (rd-node-cost start) 0)
-      (simple-queue-enqueue fringe start))
-    (do ((node (simple-queue-dequeue fringe)
-               (simple-queue-dequeue fringe)))
+      (enq start fringe))
+    (do ((node (deq fringe)
+               (deq fringe)))
         ((zerop total-open) nil)
       (decf total-open)
       ;; Compute the costs of all arcs into this node
@@ -1168,7 +1151,7 @@ Prefix and postfix returned as additional values."
         (let ((dest (rd-link-dest out-arc)))
           (when (zerop (decf (rd-node-open-pred-count dest)))
             ;; All predecessors have been computed, queue this node
-            (simple-queue-enqueue fringe dest)
+            (enq dest fringe)
             (incf total-open))))
       )))
 
