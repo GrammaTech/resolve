@@ -429,7 +429,7 @@ of the substring inside the string."))
       segment
     (mapc (lambda (ast)
             (apply #'source-text ast args))
-          (subseq (children ast-node) start (+ start len)))))
+          (subseq (standardized-children ast-node) start (+ start len)))))
 
 (defmethod source-text ((segment string-edit-segment) &key stream)
   (with-slots (node start string-start string-length)
@@ -449,14 +449,15 @@ of the substring inside the string."))
                    (len edit-segment-length)
                    (ast-node edit-segment-node))
       segment
-    `(,(ast-class ast-node)
-      ,@(unless (eql start 0) +list-ellipsis+)
-      ,@(mapcar #'ast-to-list-form
-                (subseq (children ast-node)
-                        start (+ start len)))
-      ,@(unless (eql (+ start len)
-                     (length (children ast-node)))
-          +list-ellipsis+))))
+    (let ((children (standardized-children ast-node)))
+      `(,(ast-class ast-node)
+        ,@(unless (eql start 0) +list-ellipsis+)
+        ,@(mapcar #'ast-to-list-form
+                  (subseq children
+                          start (+ start len)))
+        ,@(unless (eql (+ start len)
+                       (length children))
+            +list-ellipsis+)))))
 
 (defclass edit-tree-node-base (size-mixin)
   ((script :type list
@@ -506,7 +507,7 @@ rewritten TO by part of the edit script"))
                     (length edit-segment-length)
                     (start edit-segment-start))
        segment)
-   (let* ((children (subseq (children node) start (+ start length)))
+   (let* ((children (subseq (standardized-children node) start (+ start length)))
           (value (reduce #'+ children :key #'ast-size :initial-value 1)))
      (setf (slot-value segment slot) value))))
 
@@ -1760,12 +1761,14 @@ during calls to MAP-EDIT-TREE.")
                      :print-asts print-asts
                      :coherence coherence)))
 
-(defun print-edit-tree (edit-tree &key print-asts coherence)
+(defun print-edit-tree (edit-tree &key print-asts coherence stream)
   (let ((*map-edit-tree-ancestors* nil))
     (map-edit-tree edit-tree
                    (lambda (node) (print-edit-tree-node
-                                   node :print-asts print-asts
-                                   :coherence coherence)))))
+                                   node
+                                   :print-asts print-asts
+                                   :coherence coherence
+                                   :stream stream)))))
 
 (defgeneric print-edit-tree-node (node &key &allow-other-keys)
   (:documentation "Print fragment of an edit tree, properly indented"))
@@ -1776,12 +1779,14 @@ during calls to MAP-EDIT-TREE.")
     (/ (float c2) (float c1))))
 
 (defmethod print-edit-tree-node
-    ((node edit-tree-node) &key print-asts coherence)
+    ((node edit-tree-node) &key print-asts coherence
+                             stream)
   (assert (typep node 'edit-tree-node))
   ;; If COHERENCE is specified, print only the highest edit tree
   ;; nodes whose coherence is >= this limit
   (let ((node-coherence (coherence node))
-        (parent (car *map-edit-tree-ancestors*)))
+        (parent (car *map-edit-tree-ancestors*))
+        (*standard-output* (or stream *standard-output*)))
     (when (or (not coherence)
               (and (>= node-coherence coherence)
                    (or (null parent)

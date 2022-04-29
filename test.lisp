@@ -1006,7 +1006,10 @@
       (map-edit-tree edit-tree (lambda (x) (declare (ignore x)) (incf count)))
       (is (= 2 count)
           "Edit tree with two differences expect 2 nodes. (~a) (~a)"
-          count edit-tree))))
+          count edit-tree)
+      (finishes
+       (print-edit-tree edit-tree
+                        :stream (make-broadcast-stream))))))
 
 (deftest edit-tree.2 ()
   (let* ((obj1 (from-string (make-instance 'c) "int a;"))
@@ -1026,7 +1029,10 @@
       (map-edit-tree edit-tree (lambda (x) (declare (ignore x)) (incf count)))
       (is (= 1 count)
           "Edit tree with two differences expect 1 node. (~a)"
-          count))))
+          count)
+      (finishes
+       (print-edit-tree edit-tree
+                        :stream (make-broadcast-stream))))))
 
 
 ;;;; AST merge3 tests
