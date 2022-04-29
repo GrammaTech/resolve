@@ -2082,6 +2082,8 @@ be applied in that context."))
 
 (defun actual-ast-patch (ast script &rest keys
                         &key delete? (meld? (ast-meld-p ast)) &allow-other-keys)
+  "Patch AST using SCRIPT, potentially returning multiple versions (as
+multiple values) in case of conflict."
   (declare (ignorable delete? meld?))
   (assert (typep ast 'ast))
   (assert (not (typep ast 'tree-sitter-ast)))
@@ -2098,6 +2100,7 @@ be applied in that context."))
 (defun actual-tree-sitter-ast-patch (ast script &rest keys
                                         &key delete? (meld? (ast-meld-p ast))
                                         &allow-other-keys)
+  "Like `actual-ast-patch' for tree-sitter ASTs."
   ;; Outline of approach:
   ;;  Build a "fake children" list which contains slot specifiers for the named children
   ;;  slots, and also the non-empty interleaved text
