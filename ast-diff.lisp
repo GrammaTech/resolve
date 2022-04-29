@@ -2802,7 +2802,8 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
   "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
   (with-string (stream stream)
-    (source-text (ast-patch original (rewrite-script diff :no-color no-color))
+    (source-text (ast-patch original
+                            (rewrite-script-for-printing diff :no-color no-color))
                  :stream stream)))
 
 (define-node-class diff-wrapper-ast (alternative-ast)
@@ -2836,7 +2837,7 @@ Numerous options are provided to control presentation."
     (source-text (printee self) :stream stream)
     (write-string (if no-color "-]" (format nil "-]~a" +color-RST+)) stream)))
 
-(defun rewrite-script (script &key no-color)
+(defun rewrite-script-for-printing (script &key no-color)
   (mappend (lambda (change)
              (destructuring-bind (type . content) change
                (ecase type
@@ -2868,10 +2869,10 @@ Numerous options are provided to control presentation."
                  (:recurse
                   (list
                    (cons :recurse
-                         (rewrite-script content :no-color no-color))))
+                         (rewrite-script-for-printing content :no-color no-color))))
                  (:insert-sequence
                   (if (listp content)
-                      (rewrite-script
+                      (rewrite-script-for-printing
                        (mapcar (op `(:insert . ,_)) content)
                        :no-color no-color)
                       (list change)))
