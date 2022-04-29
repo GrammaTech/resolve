@@ -1967,7 +1967,7 @@ Given MELD, try to merge the previous versions."
        (apply-values-meld #'append ,@args)
        (apply-values-extend #'append ,@args)))
 
-(defun ast-patch (original diff &rest keys)
+(defun ast-patch (original diff &rest keys &key &allow-other-keys)
   (if (consp original)
       (unastify (apply #'ast-patch* (astify original) diff keys))
       (apply #'ast-patch* original diff keys)))
