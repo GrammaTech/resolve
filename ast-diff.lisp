@@ -2777,7 +2777,9 @@ and replicating the others."
   (:documentation
    "Returns true if the children of AST are to be combined on merge conflict.")
   (:method ((ast ast))
-    (ast-class-meld? (ast-class ast) ast)))
+    (ast-class-meld? (ast-class ast) ast))
+  (:method ((ast ts:root-ast))
+    t))
 
 (defgeneric ast-class-meld? (ast-class ast)
   (:documentation
