@@ -1968,6 +1968,8 @@ Given MELD, try to merge the previous versions."
        (apply-values-extend #'append ,@args)))
 
 (defun ast-patch (original diff &rest keys &key &allow-other-keys)
+  "Convert ORIGINAL into an AST, then apply `ast-patch*' to the AST,
+DIFF, and KEYS."
   (if (consp original)
       (unastify (apply #'ast-patch* (astify original) diff keys))
       (apply #'ast-patch* original diff keys)))
