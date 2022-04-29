@@ -1608,7 +1608,9 @@ Returns a list of edit tree nodes for these nodes."
         (collected-nodes nil)
         (collected-recurse nil)
         (collected-actions nil)
-        (changes 0))
+        (changes 0)
+        (segment-fn (ensure-function segment-fn))
+        (recurse-fn (ensure-function recurse-fn)))
     (flet ((finish (&optional (n 1))
              ;; (format t "FINISH: CHANGES = ~A, N = ~A~%" changes n)
              (cond
