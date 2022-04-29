@@ -1592,7 +1592,7 @@ the source, build the edit tree corresponding to the script."))
 (defun change-segments-on-seqs (source target script segment-fn recurse-fn
                                 source-node target-node)
   "Traverses two sequences and finds the change segments.
-source -- AST being editted
+source -- AST being edited
 target -- AST that it is being turned into
 script -- the edit script that changes source to target
 segment-fn -- A function that is called on six arguments to construct
