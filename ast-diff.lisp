@@ -2021,10 +2021,16 @@ DIFF, and KEYS."
                   :named)
   sub path left right classes new)
 
+(defpattern :wrap (sub path left right classes new)
+  `(list :wrap ,sub ,path ,left ,right ,classes ,new))
+
 (defstruct (:unwrap (:type list) (:conc-name unwrap-)
                     (:predicate unwrap-p)
                     :named)
   sub path left right)
+
+(defpattern :unwrap (sub path left right)
+  `(list :unwrap ,sub ,path ,left ,right))
 
 (defstruct (:wrap-sequence (:type list) (:conc-name wrap-sequence-)
                            (:predicate wrap-sequence-p)
@@ -2032,11 +2038,17 @@ DIFF, and KEYS."
                            :named)
   length sub path left right classes)
 
+(defpattern :wrap-sequence (length sub path left right classes)
+  `(list :wrap-sequence ,length ,sub ,path ,left ,right ,classes))
+
 (defstruct (:unwrap-sequence (:type list) (:conc-name unwrap-sequence-)
-                           (:predicate unwrap-sequence-p)
-                           (:copier copy-unwrap-sequence)
-                           :named)
+                             (:predicate unwrap-sequence-p)
+                             (:copier copy-unwrap-sequence)
+                             :named)
   sub path left right)
+
+(defpattern :unwrap-sequence (sub path left right)
+  `(list :unwrap-sequence ,sub ,path ,left ,right))
 
 
 (defgeneric ast-patch* (original diff &rest keys &key conflict &allow-other-keys)
