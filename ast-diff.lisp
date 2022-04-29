@@ -2075,7 +2075,11 @@ A diff is a sequence of actions as returned by `ast-diff' including:
 
 If diff is a list of these operations, it is interpreted as applying
 to the list of children of ORIGINAL.   The sequence operations can only
-be applied in that context."))
+be applied in that context.
+
+Note that this method is responsible for both applying a script to an
+AST's children and for applying a step edit action from the script to
+a single AST."))
 
 (defmethod ast-patch* ((original null) (script null) &key &allow-other-keys)
   nil)
@@ -2116,83 +2120,86 @@ multiple values) in case of conflict."
            (iter (for new-schildren in new-schild-lists)
                  (collect (copy-with-standardized-children ast new-schildren))))))
 
-(defmethod ast-patch* ((ast ast) (script list) &rest keys
-                       &key &allow-other-keys)
+(defmethod ast-patch* :around ((ast ast) (script list) &rest keys
+                               &key &allow-other-keys)
   (if (listp (car script))
       (apply #'actual-ast-patch ast script keys)
       (call-next-method)))
 
-(defmethod ast-patch* ((ast tree-sitter-ast) (script list) &rest keys
-                        &key &allow-other-keys)
+(defmethod ast-patch* :around ((ast tree-sitter-ast) (script list) &rest keys
+                               &key &allow-other-keys)
   (if (listp (car script))
       (apply #'actual-tree-sitter-ast-patch ast script keys)
       (call-next-method)))
 
+(defmethod ast-patch* ((original ast) (script cons)
+                       &rest keys &key &allow-other-keys)
+  "Perform a single step of the SCRIPT on ORIGINAL."
+  (case (car script)
+    (:wrap
+     (apply #'ast-patch-wrap original (cdr script) keys))
+    (:unwrap
+     (apply #'ast-patch-unwrap original (cdr script) keys))
+    (t
+     (apply #'actual-ast-patch original script keys))))
+
 (defmethod ast-patch* ((original t) (script cons)
                        &rest keys &key (delete? t) &allow-other-keys)
   (declare (ignorable delete? keys))
-  (if (typep original 'ast)
-      (case (car script)
-        (:wrap
-         (apply #'ast-patch-wrap original (cdr script) keys))
-        (:unwrap
-         (apply #'ast-patch-unwrap original (cdr script) keys))
-        (t
-         (apply #'actual-ast-patch original script keys)))
-      (case (car script)
-        ;; The script is a single command
-        (:wrap
-         (apply #'ast-patch-wrap original (cdr script) keys))
-        (:unwrap
-         (apply #'ast-patch-unwrap original (cdr script) keys))
-        (:recurse-tail
-         (ast-patch* original (cdr script)))
-        (:same
-         (assert (equal? original (cdr script))
-                 ()
-                 "AST-PATCH*: :SAME not same as in script: ~a, ~a"
-                 original
-                 (cdr script))
-         (cdr script))
-        (t
-         ;; The script is a list of commands
-         ;; The case of applying a list of commands to
-         ;; a list of things is handled in another method
-         ;; This is just for one or two operations on an atom
-         (assert (proper-list-p script))
-         (let ((keys (mapcar #'car script)))
-           (cond
-             ((equal keys '(:same))
-              (assert (equal? original (cdar script))
-                      ()
-                      "AST-PATCH*: :SAME not same as in script(2): ~a, ~a"
-                      original
-                      (cdar script))
-              (cdar script))
-             ((equal keys '(:insert :delete))
-              (assert (equal? original (cdadr script))
-                      ()
-                      "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
-                      keys
-                      original (cdadr script))
-              (cdar script))
-             ((equal keys '(:delete :insert))
-              (assert (equal? original (cdar script))
-                      ()
-                      "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
-                      keys
-                      original (cdar script))
-              (cdadr script))
-             ((equal keys '(:replace))
-              (assert (equal? original (cadar script))
-                      ()
-                      "AST-PATCH*: ~a not the same as in script: ~a, ~a"
-                      keys original (cadar script))
-              (caddar script))
-             ((member :conflict keys)
-              (values-list (iter (for s in (cdr script))
-                                 (collect (ast-patch* original s)))))
-             (t (error "Invalid diff on atom: ~a" script))))))))
+  (case (car script)
+    ;; The script is a single command
+    (:wrap
+     (apply #'ast-patch-wrap original (cdr script) keys))
+    (:unwrap
+     (apply #'ast-patch-unwrap original (cdr script) keys))
+    (:recurse-tail
+     (ast-patch* original (cdr script)))
+    (:same
+     (assert (equal? original (cdr script))
+             ()
+             "AST-PATCH*: :SAME not same as in script: ~a, ~a"
+             original
+             (cdr script))
+     (cdr script))
+    (t
+     ;; The script is a list of commands
+     ;; The case of applying a list of commands to
+     ;; a list of things is handled in another method
+     ;; This is just for one or two operations on an atom
+     (assert (proper-list-p script))
+     (let ((keys (mapcar #'car script)))
+       (cond
+         ((equal keys '(:same))
+          (assert (equal? original (cdar script))
+                  ()
+                  "AST-PATCH*: :SAME not same as in script(2): ~a, ~a"
+                  original
+                  (cdar script))
+          (cdar script))
+         ((equal keys '(:insert :delete))
+          (assert (equal? original (cdadr script))
+                  ()
+                  "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
+                  keys
+                  original (cdadr script))
+          (cdar script))
+         ((equal keys '(:delete :insert))
+          (assert (equal? original (cdar script))
+                  ()
+                  "AST-PATCH*: ~a not same as in script(2): ~a, ~a"
+                  keys
+                  original (cdar script))
+          (cdadr script))
+         ((equal keys '(:replace))
+          (assert (equal? original (cadar script))
+                  ()
+                  "AST-PATCH*: ~a not the same as in script: ~a, ~a"
+                  keys original (cadar script))
+          (caddar script))
+         ((member :conflict keys)
+          (values-list (iter (for s in (cdr script))
+                             (collect (ast-patch* original s)))))
+         (t (error "Invalid diff on atom: ~a" script)))))))
 
 (defun ast-patch-conflict-action (asts args)
   "Perform a patch of the action (:conflict . args) on ASTS.
