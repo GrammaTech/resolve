@@ -1857,8 +1857,12 @@ object of type edit-tree-segment"))
 
 ;;; ast-patch and associated functions
 
+;;; The following control structures (`apply-values',
+;;; `apply-values-meld', and their supporting funtions) are used to
+;;; propagate multiple versions of an AST due to conflicts.
+
 (defmacro apply-values (fn &rest arg-exprs)
-  "Apply FN to the values returned by each arg-expr."
+  "Apply FN \(with `apply-values-fn') to the values returned by each arg-expr."
   (unless arg-exprs
     (error "Requires at least one argument: (APPLY-VALUES ~A)" fn))
   `(apply-values-fn ,fn (list ,@(iter (for e in arg-exprs)
@@ -1900,14 +1904,42 @@ is shorter, replicate the last value (or NIL if none)."
                     t))
 
 (defmacro apply-values-meld (fn form1 list-form)
+  "Use FN (with `apply-values-meld-fn') to combine the values returned
+by FORM and the values returned by LIST-FORM.
+
+FORM1 is a call (to `ast-patch*') that might return one value, if the
+patch is successful OR if we are using conflict nodes, or two values,
+if the patch fails and we are not using conflict nodes.
+
+This will return either one or three values.
+
+If there is no conflict, or the conflict is encapsulated, then we
+return one value combining the results of FORM1 with the results of
+LIST-FORM.
+
+If there is a conflict, we return three values: the common list formed
+by patching some tail of this list, and the partial lists of the
+conflict versions."
   `(apply-values-meld-fn ,fn
                          (multiple-value-list ,form1)
                          (multiple-value-list ,list-form)))
 
 (defun apply-values-meld-fn (fn vals list-vals)
+  "Auxiliary function for `apply-value-meld'.
+
+VALS must be a list of 1 or 2 elements; the length of LIST-VALS must
+be in the interval [1,3].
+
+If |VALS|=1, then we invoke FN on VALS and the appended LIST-VALS.
+
+If |VALS|=2, then we return (1) the first val in LIST-VALS, (2) the
+result of calling FN with the first val in VALS and the second val in
+LIST-VALS, and (3) the result of calling FN with first val in VALS and
+the third val in LIST-VALS."
   (let ((len1 (length vals))
-        (len2 (length list-vals)))
-    (assert (<= 1 len2 3))
+        (len2 (length list-vals))
+        (fn (ensure-function fn)))
+    (assert (member len2 '(1 3)))
     (ecase len1
       ;; If len1 is 1, we have a single value, so append the list-vals
       (1 (let ((tail (reduce #'append (cdr list-vals)
@@ -1922,11 +1954,15 @@ is shorter, replicate the last value (or NIL if none)."
         (funcall fn (car vals) (caddr list-vals)))))))
 
 (defmacro cons-values (meld? &rest args)
+  "Cons the results of a merge on the results of a previous merge.
+Given MELD, we may try to merge the previous versions."
   `(if ,meld?
        (apply-values-meld #'cons ,@args)
        (apply-values-extend #'cons ,@args)))
 
 (defmacro append-values (meld? &rest args)
+  "Prepend the results of a merge onto the results of a previous merge.
+Given MELD, try to merge the previous versions."
   `(if ,meld?
        (apply-values-meld #'append ,@args)
        (apply-values-extend #'append ,@args)))
@@ -2367,8 +2403,8 @@ process with the rest of the script."
        (edit (asts script)
          ;; Returns multiple values, depending on the value of MELD
          ;; When MELD is false, return a single value if there are no
-         ;; conflicts, otherwise if conflict is false, return the conflict
-         ;; versions.  If conflict is true, return a single version
+         ;; conflicts, otherwise if CONFLICT is false, return the conflict
+         ;; versions.  If CONFLICT is true, return a single version
          ;; with conflict nodes.
          ;; When MELD is true, returns three values: the common list
          ;; formed by patching some tail of this list, and the partial
