@@ -2208,18 +2208,18 @@ process with the rest of the script."
   ;; Special case: one conflict action is :SAME, the other is :RECURSE
   ;; In that case, we need to propagate the changes down the tree IFF there
   ;; is a nested conflict AST.
-  (let ((sc (cond ((and (eql (caaar args) :same)
-                        (eql (caaadr args) :recurse))
-                   (ast-patch-same-recurse (car asts) (cdaadr args)
-                                           :your))
-                  ((and (eql (caaar args) :recurse)
-                        (eql (caaadr args) :same))
-                   (ast-patch-same-recurse (car asts) (cdaar args)
-                                           :my)))))
-    (if (or (typep sc 'conflict-ast)
-            (and (listp sc) (some {typep _ 'conflict-ast} sc)))
+  (let ((special-case
+         (match args
+           (`(((:same . _) ((:recurse . ,cdaadr))) . _)
+             (ast-patch-same-recurse (car asts) cdaadr
+                                     :your))
+           (`(((:recurse . ,cdaar)) ((:same . _)) . _)
+             (ast-patch-same-recurse (car asts) cdaar
+                                     :my)))))
+    (if (or (typep special-case 'conflict-ast)
+            (and (listp special-case) (some {typep _ 'conflict-ast} special-case)))
         ;; Special case
-        (values sc (cdr asts))
+        (values special-case (cdr asts))
         ;; Base case
         (let ((consume nil)) ;; If set to true, consume an element of ASTS
           (flet ((%process (action)
