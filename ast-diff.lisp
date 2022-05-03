@@ -2225,36 +2225,28 @@ process with the rest of the script."
           (flet ((%process (action)
                    "Process an inner action.  Returns a list of asts"
                    (when (car action)
-                     (ecase-of edit-action (car action)
-                       ((:bad
-                         :conflict
-                         :same-or-recurse
-                         :recurse-tail :same-tail
-                         :wrap :wrap-sequence
-                         :unwrap :unwrap-sequence)
-                        (error 'invalid-edit-action
-                               :edit-action (car action)
-                               :operation 'ast-patch-conflict-action))
-                       (:insert (list (cdr action)))
-                       (:replace
+                     (ematch action
+                       ((cons :insert cdr)
+                        (list cdr))
+                       ((list* :replace _ caddr _)
                         (setf consume t)
-                        (list (caddr action)))
-                       (:delete
+                        (list caddr))
+                       ((cons :delete _)
                         (setf consume t)
                         nil)
-                       (:same (setf consume t)
-                              (list (car asts)))
-                       (:recurse (setf consume t)
-                                 ;; Don't process recursive conflicts
-                                 ;; In particular, this means :delete actions in
-                                 ;; the conflict branch do not cause recording
-                                 ;; of the original version in conflict nodes.
-                                 ;; This is arguably wrong, but for now we do it
-                                 ;; this way.
-                                 (list (ast-patch* (car asts) (cdr action)
-                                                   :conflict nil)))
-                       ((:insert-sequence :delete-sequence :same-sequence)
-                        (error "Not handled"))))))
+                       ((cons :same _)
+                        (setf consume t)
+                        (list (car asts)))
+                       ((cons :recurse cdr)
+                        (setf consume t)
+                        ;; Don't process recursive conflicts
+                        ;; In particular, this means :delete actions in
+                        ;; the conflict branch do not cause recording
+                        ;; of the original version in conflict nodes.
+                        ;; This is arguably wrong, but for now we do it
+                        ;; this way.
+                        (list (ast-patch* (car asts) cdr
+                                          :conflict nil)))))))
             (let ((child-alist
                    (iter (for script in args)
                          (for i in '(:my :your))
