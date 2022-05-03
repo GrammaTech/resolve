@@ -2276,7 +2276,7 @@ process with the rest of the script."
                            &key &allow-other-keys)
   (destructuring-bind (sub-action path left-wrap right-wrap classes base-ast)
       args
-    (assert (= (length path) (length left-wrap) (length right-wrap)))
+    (assert (length= path left-wrap right-wrap))
     (values-list
      (mapcar
       (lambda (a) (ast-wrap a left-wrap right-wrap classes base-ast))
@@ -2285,7 +2285,7 @@ process with the rest of the script."
 (defmethod ast-patch-wrap ((ast list) (args list) &rest keys &key &allow-other-keys)
   (destructuring-bind (sub-action path left-wrap right-wrap classes base-ast)
       args
-    (assert (= (length path) (length left-wrap) (length right-wrap)))
+    (assert (length= path left-wrap right-wrap))
     (values-list
      (mapcar
       (lambda (a) (ast-wrap (list a) left-wrap right-wrap classes base-ast))
@@ -2297,13 +2297,13 @@ process with the rest of the script."
                              &key &allow-other-keys)
   (destructuring-bind (sub-action path left-wrap right-wrap)
       args
-    (assert (= (length path) (length left-wrap) (length right-wrap)))
+    (assert (length= path left-wrap right-wrap))
     (iter (while path)
           (setf ast (nth (pop path) (children ast))))
     (apply #'ast-patch* ast sub-action keys)))
 
 (defun ast-wrap (ast left-wrap right-wrap classes base-ast)
-  (assert (= (length left-wrap) (length right-wrap) (length classes)))
+  (assert (length= left-wrap right-wrap classes))
   (assert left-wrap)
   (setf left-wrap (reverse left-wrap))
   (setf right-wrap (reverse right-wrap))
