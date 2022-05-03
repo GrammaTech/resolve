@@ -2302,9 +2302,14 @@ process with the rest of the script."
           (setf ast (nth (pop path) (children ast))))
     (apply #'ast-patch* ast sub-action keys)))
 
-(defun ast-wrap (ast left-wrap right-wrap classes base-ast)
-  (assert (length= left-wrap right-wrap classes))
-  (assert left-wrap)
+(defgeneric ast-wrap (ast left-wrap right-wrap classes base-ast)
+  (:documentation "Wrap AST with the first elements of LEFT-WRAP and
+  RIGHT-WRAP, recursively.")
+  (:method :before (ast left-wrap right-wrap classes base-ast)
+    (assert (length= left-wrap right-wrap classes))
+    (assert left-wrap)))
+
+(defmethod ast-wrap ((ast ast) left-wrap right-wrap classes base-ast)
   (setf left-wrap (reverse left-wrap)
         right-wrap (reverse right-wrap))
   (iter (while left-wrap)
@@ -2326,6 +2331,9 @@ process with the rest of the script."
                          (pop right-wrap))))))
   #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (source-text ast))
   ast)
+
+(defmethod ast-wrap ((ast structured-text) left-wrap right-wrap classes base-ast)
+  (error "Not yet implemented"))
 
 (defun ast-patch-same-wrap-sequence (ast args tag)
   (declare (ignore ast args tag))
