@@ -2371,8 +2371,11 @@ process with the rest of the script."
           (lambda (a) (ast-wrap-sequence a left-wrap right-wrap classes base-ast))
           (multiple-value-list (apply #'ast-patch* ast sub-action keys))))))))
 
-(defun ast-wrap-sequence (ast left-wrap right-wrap classes base-ast)
-  (assert (= (length left-wrap) (length right-wrap) (length classes)))
+(defgeneric ast-wrap-sequence (ast left-wrap right-wrap classes base-ast)
+  (:documentation "Like `ast-wrap', but wrap all children rather than just one."))
+
+(defmethod ast-wrap-sequence ((ast ast) left-wrap right-wrap classes base-ast)
+  (assert (length= left-wrap right-wrap classes))
   (setf left-wrap (reverse left-wrap))
   (setf right-wrap (reverse right-wrap))
   (let ((asts (children ast)))
@@ -2384,6 +2387,37 @@ process with the rest of the script."
                                    :children (append (pop left-wrap)
                                                      asts
                                                      (pop right-wrap)))))))
+    #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (source-text asts))
+    (car asts)))
+
+(defmethod ast-wrap-sequence ((ast structured-text) left-wrap right-wrap classes base-ast)
+  (assert (length= left-wrap right-wrap classes))
+  (setf left-wrap (reverse left-wrap))
+  (setf right-wrap (reverse right-wrap))
+  (let ((asts (children ast)))
+    (iter (while left-wrap)
+          (let ((class (pop classes)))
+            (assert class)
+            (setf asts
+                  (list
+                   (copy-with-standardized-children
+                    base-ast
+                    ;; Insert the new children at the correct place in
+                    ;; the list of standardized children.
+                    (iter (iter:with children = (children base-ast))
+                          (iter:with last-child = (lastcar children))
+                          (for child in (standardized-children base-ast))
+                          (when (eql child (first children))
+                            (appending (pop left-wrap) into new-children)
+                            (sum 1 into count))
+                          (collect child into new-children)
+                          (when (eql child last-child)
+                            (appending (pop right-wrap) into new-children)
+                            (sum 1 into count))
+                          (finally
+                           (assert (= count 2))
+                           (return new-children)))
+                    :class class)))))
     #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (source-text asts))
     (car asts)))
 
