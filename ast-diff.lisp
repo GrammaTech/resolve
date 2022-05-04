@@ -2316,9 +2316,6 @@ process with the rest of the script."
         (let ((class (pop classes)))
           (assert class)
           (setf ast
-                ;; TODO This doesn't do what it's supposed to do. It
-                ;; only writes to the children slot, not the actual
-                ;; slots used to store children.
                 (copy
                  ;; Use tree-copy to avoid possible interval
                  ;; collisions.
@@ -2338,7 +2335,6 @@ process with the rest of the script."
   (iter (while left-wrap)
         (let ((class (pop classes)))
           (assert class)
-          (children base-ast)
           (setf ast
                 (copy-with-standardized-children
                  ;; Use tree-copy to avoid possible interval

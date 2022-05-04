@@ -763,8 +763,6 @@
                                (copy-list (remove-duplicates (flatten d))))
                 #'string< :key #'symbol-name)))
 
-;;; TODO: FIXME:
-#+broken
 (deftest diff-wrap/unwrap.1 ()
   (flet ((keys (d) (keys-of-diff d)))
     (let* ((s1 "int f() { return 1; }")
@@ -773,7 +771,7 @@
            (obj2 (from-string (make-instance 'c) s2)))
       (multiple-value-bind (diff cost)
           (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000 :base-cost 0)
-        (is (equal (keys diff) '(:binaryoperator :recurse :same :wrap)))
+        (is (equal (keys diff) '(c-binary-expression :recurse :same :wrap)))
         (is (= cost 3))
         (print-diff diff :no-color t)
         (is (equal (with-output-to-string (*standard-output*)
@@ -795,8 +793,6 @@
         (is (equal (keys diff) '(:recurse :replace :same)))
         (is (= cost 8))))))
 
-;;; TODO: FIXME:
-#+broken
 (deftest diff-sequence-wrap/unwrap.1 ()
   (let* ((s1 "int f(int x, int y) { int c = 1; int z = x+y; return z+c; }")
          (s2 "int f(int x, int y, int p) { int c = 1; if (p == 0) { int z = x+y; return z+c; } return 0; }")
@@ -806,7 +802,7 @@
         (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000
                   :wrap-sequences t)
       (let ((k (keys-of-diff diff)))
-        (is (equal k '(:ifstmt :insert :recurse :same :wrap-sequence))))
+        (is (equal k '(c-if-statement :insert :recurse :same :wrap-sequence))))
       (is (= cost 58))
       (let ((s (with-output-to-string (*standard-output*)
                  (print-diff diff :no-color t))))
@@ -868,12 +864,12 @@
                             :stream nil))
 	      "int a;[-int b;-] int c;")))
 
-#+(or) (deftest print-diff.3 ()
+(deftest print-diff.3 ()
   "Print diff of a replacement"
-         (is (equalp (let ((v1 (%f "int a; int b; int c;")))
-                       (ast-patch v1 (ast-diff v1
-                                               (%f "int a; int d; int c;")
-                                               :base-cost 0)))
+  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
+                (ast-patch v1 (ast-diff v1
+                                        (%f "int a; int d; int c;")
+                                        :base-cost 0)))
 	      "int a; int {+d+}[-b-]; int c;")))
 
 ;; Increasing the base cost makes larger scale replacements
