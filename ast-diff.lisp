@@ -2333,7 +2333,31 @@ process with the rest of the script."
   ast)
 
 (defmethod ast-wrap ((ast structured-text) left-wrap right-wrap classes base-ast)
-  (error "Not yet implemented"))
+  (setf left-wrap (reverse left-wrap)
+        right-wrap (reverse right-wrap))
+  (iter (while left-wrap)
+        (let ((class (pop classes)))
+          (assert class)
+          (children base-ast)
+          (setf ast
+                (copy-with-standardized-children
+                 ;; Use tree-copy to avoid possible interval
+                 ;; collisions.
+                 (tree-copy base-ast)
+                 (let* ((children (standardized-children base-ast))
+                        (start (position ast children :test #'equal?)))
+                   (assert start)
+                   (splice-seq children
+                               :new
+                               (append (pop left-wrap)
+                                       (list ast)
+                                       (pop right-wrap))
+                               :start start
+                               :end (1+ start)))
+                 :serial-number nil
+                 :class class))))
+  #+ast-diff-debug (format t "AST-WRAP returned:~%~s~%" (source-text ast))
+  ast)
 
 (defun ast-patch-same-wrap-sequence (ast args tag)
   (declare (ignore ast args tag))
