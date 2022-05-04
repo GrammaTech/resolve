@@ -43,7 +43,9 @@
   (:import-from :software-evolution-library/software/tree-sitter
    :tree-sitter-ast :output-transformation
    :computed-text :structured-text :choice-superclass)
-  (:local-nicknames (:ts :software-evolution-library/software/tree-sitter))
+  (:local-nicknames
+   (:ts :software-evolution-library/software/tree-sitter)
+   (:iter :iterate))
   (:export
    :ast-cost
    :ast-size
@@ -2440,6 +2442,39 @@ process with the rest of the script."
              (right-len (length (car right-wrap))))
         (assert (>= total-len (+ left-len right-len)))
         (let ((new-ast (copy ast :children (subseq c left-len (- total-len right-len)))))
+          (children
+           (apply #'ast-patch* new-ast sub-action keys))))))
+  (:method ((ast structured-text) (args list) &rest keys &key &allow-other-keys)
+    (destructuring-bind (sub-action path left-wrap right-wrap)
+        args
+      (iter (while path)
+            (setf ast (nth (pop path) (children ast)))
+            (pop left-wrap)
+            (pop right-wrap))
+      (let* ((c (children ast))
+             (sc (standardized-children ast))
+             (total-len (length c))
+             (left-len (length (car left-wrap)))
+             (right-len (length (car right-wrap)))
+             (relevant-children
+              (subseq c left-len (- total-len right-len))))
+        (assert (>= total-len (+ left-len right-len)))
+        (let* ((start-pos (position (first relevant-children) sc))
+               (end-pos (position (lastcar relevant-children) sc))
+               (new-children
+                (splice-seq sc
+                            :new (car left-wrap)
+                            :start start-pos
+                            :end start-pos))
+               (new-children
+                (splice-seq new-children
+                            :new (car right-wrap)
+                            :start end-pos
+                            :end end-pos))
+               (new-ast
+                (copy-with-standardized-children
+                 ast
+                 new-children)))
           (children
            (apply #'ast-patch* new-ast sub-action keys)))))))
 
