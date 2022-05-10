@@ -2493,13 +2493,6 @@ process with the rest of the script."
   ;;
   ;; This desperately needs to be cleaned up.
   (declare (ignorable delete?))
-  (when (member (car script) '(:wrap :unwrap))
-    (return-from ast-patch* (call-next-method)))
-  ;; Avoid the problem that, since each `:same' results in non-tail
-  ;; recursion, comparing two large, identical files can overflow the
-  ;; stack.
-  (when (every {starts-with :same} script)
-    (return-from ast-patch* original))
   (labels
       ((merge-conflict-ast (conflict-node rest)
          (if (and (typep (car rest) 'conflict-ast)
@@ -2663,11 +2656,18 @@ process with the rest of the script."
                          (unless delete? (collect a)))
                        (pop args))
                  (edit asts (cdr script)))))))))
-    ;; cause various unmerged subsequences to be combined before
-    ;; returning, if meld? is true
-    (if (listp (car script))
-        (append-values meld? nil (edit original script))
-        (call-next-method))))
+    (cond ((member (car script) '(:wrap :unwrap))
+           (call-next-method))
+          ;; Avoid the problem that, since each `:same' results in non-tail
+          ;; recursion, comparing two large, identical files can overflow the
+          ;; stack.
+          ((every {starts-with :same} script)
+           original)
+          ;; cause various unmerged subsequences to be combined before
+          ;; returning, if meld? is true
+          ((listp (car script))
+           (append-values meld? nil (edit original script)))
+          (t (call-next-method)))))
 
 (defun meld-scripts (script1 script2)
   "Combine two edit scripts that process sequences of the same length.
