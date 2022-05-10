@@ -2493,6 +2493,7 @@ process with the rest of the script."
   ;;
   ;; This desperately needs to be cleaned up.
   (declare (ignorable delete?))
+  (check-type tag (member nil :my :old :your))
   (labels
       ((merge-conflict-ast (conflict-node rest)
          (if (and (typep (car rest) 'conflict-ast)
