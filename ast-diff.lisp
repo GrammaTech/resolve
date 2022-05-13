@@ -1129,6 +1129,7 @@ Return the 2d array of the nodes."
     ops))
 
 (defun compute-best-paths (nodes vec-a vec-b parent-a parent-b)
+  "Compute the best paths across NODES, a 2d graph, using fringe search."
   (declare ((simple-array t (* *)) nodes)
            ((simple-array t (*)) vec-a vec-b))
   (let ((fringe (queue))
