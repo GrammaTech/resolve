@@ -3309,11 +3309,12 @@ a tail of diff-a, and a tail of diff-b.")
             cdr))))
 
 (defun merge-diffs2  (orig-a orig-b &aux (o-a orig-a) (o-b orig-b))
-  ;; Derived from CHUNK, but a bit smarter, and
-  ;; produce an actual diff not a list of chunks
-  ;; The last call to merge-diffs2-syms may return
-  ;; an improper list.  Handle it specially (appending
-  ;; cannot be used even if it is the last thing
+  "Derived from CHUNK, but a bit smarter.
+
+Produces an actual diff and not a list of chunks.
+
+The last call to merge-diffs2-syms may return an improper list. Handle
+it specially (appending cannot be used even if it is the last thing)."
   (cond
     ((and (listp (car orig-a)) (listp (car orig-b)))
      ;; to be appended.)
