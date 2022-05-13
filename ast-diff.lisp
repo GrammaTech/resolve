@@ -3505,19 +3505,29 @@ and convert it back to whatever internal form this kind of AST uses."))
                   ,text-slot-specifier ,(text ast)
                   ,@insert-point)))))))
 
-(let ((before-text-slot-specifier
+(let ((before-asts-slot-specifier
         (make-instance 'slot-specifier
-                       :class t :slot 'sel/sw/ts::before-text :arity 1))
+                       :class t :slot 'ts::before-asts :arity 1))
+      (before-text-slot-specifier
+       (make-instance 'slot-specifier
+                      :class t :slot 'ts::before-text :arity 1))
       (after-text-slot-specifier
         (make-instance 'slot-specifier
-                       :class t :slot 'sel/sw/ts::after-text :arity 1)))
+                       :class t :slot 'ts::after-text :arity 1))
+      (after-asts-slot-specifier
+       (make-instance 'slot-specifier
+                      :class t :slot 'ts::after-asts :arity 1)))
   (defmethod standardized-children :around ((ast structured-text))
     ;; Add information in for the 'text slot.
-    `(,before-text-slot-specifier
-      ,(sel/sw/ts::before-text ast)
+    `(,before-asts-slot-specifier
+      ,@(ts::before-asts ast)
+      ,before-text-slot-specifier
+      ,(ts::before-text ast)
       ,@(call-next-method)
       ,after-text-slot-specifier
-      ,(sel/sw/ts::after-text ast))))
+      ,(ts::after-text ast)
+      ,after-asts-slot-specifier
+      ,@(ts::after-asts ast))))
 
 (defmethod standardized-children ((ast tree-sitter-ast))
   (check-child-lists ast)
@@ -3594,8 +3604,10 @@ as the ordinary children list."
               slots added and a text slot if the AST is a computed text node."
              `(,@(when (typep ast 'computed-text)
                    `((text ,(text ast))))
-               (sel/sw/ts::before-text ,(sel/sw/ts::before-text ast))
-               (sel/sw/ts::after-text ,(sel/sw/ts::after-text ast))
+               (ts::before-asts ,(ts::before-asts ast))
+               (ts::before-text ,(ts::before-text ast))
+               (ts::after-text ,(ts::after-text ast))
+               (ts::after-asts ,(ts::after-asts ast))
                ,@(children-alist ast)))
            (child-alist-equal? (child-alist)
              "Return T if CHILD-ALIST is #'equal? to children alist of the
