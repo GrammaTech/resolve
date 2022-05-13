@@ -1027,9 +1027,11 @@ Prefix and postfix returned as additional values."
 
 (defun build-rd-graph (total-a total-b &key (wrap-sequences *wrap-sequences*)
                                          (unwrap-sequences *wrap-sequences*))
-  ;; Construct the graph of a pair of lists.  The graph will have
-  ;; (* (1+ (length total-a)) (1+ (length total-b))) nodes
-  ;; Return the 2d array of the nodes
+  "Construct the graph of a pair of lists.
+The graph will have (* (1+ (length total-a)) (1+ (length total-b)))
+nodes.
+
+Return the 2d array of the nodes."
   (let* ((len-a (length total-a))
          (len-b (length total-b))
          (nodes (make-array (list (1+ len-a) (1+ len-b))))
