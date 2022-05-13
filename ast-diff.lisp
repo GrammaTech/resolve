@@ -1239,15 +1239,16 @@ Return the 2d array of the nodes."
                                :unwrap-sequences uw)
              (compute-best-paths nodes vec-a vec-b parent-a parent-b)
              (reconstruct-path-to-node nodes (aref nodes (length vec-a) (length vec-b))))))
-    (let ((without-ws-diff (%r nil nil)))
+    (let ((without-wrap-seq-diff (%r nil nil)))
       ;; Only try wrap-sequences if enabled and (un)wrapping actually helped
       (let ((w nil)
             (uw nil)
             (i 0) (j 0)
             #+ast-diff-wrap-sequence-debug
             (entered t))
+        (declare (boolean w uw))
         (when *wrap-sequences*
-          (iter (for d in without-ws-diff)
+          (iter (for d in without-wrap-seq-diff)
                 (while (or (not w) (not uw)))
                 (when (consp d)
                   (case (car d)
@@ -1301,7 +1302,7 @@ Return the 2d array of the nodes."
                      (incf i) (incf j))))))
         (if (or w uw)
             (%r w uw)
-            without-ws-diff)))))
+            without-wrap-seq-diff)))))
 
 (defun diff-cost (diff &aux (base-cost *base-cost*))
   "Computes the cost of a diff"
