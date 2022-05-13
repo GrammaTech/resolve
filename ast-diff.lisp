@@ -2783,24 +2783,20 @@ and replicating the others."
                                &key delete? meld? conflict &allow-other-keys)
   (declare (ignorable delete?))
   (if (and (listp (car script))
-           (find :conflict script :key #'car))
-      (if (or meld? conflict)
-          (let ((result (call-next-method)))
-            #+ast-diff-debug
-            (format t "AST-PATCH* returned:~%~a~%" (mapcar #'source-text result))
-            result)
-          (let ((script1 (iter (for action in script)
-                               (appending
-                                (if (eql (car action) :conflict)
-                                    (second action)
-                                    (list action)))))
-                (script2 (iter (for action in script)
-                               (appending
-                                (if (eql (car action) :conflict)
-                                    (third action)
-                                    (list action))))))
-            (values (ast-patch* original script1)
-                    (ast-patch* original script2))))
+           (find :conflict script :key #'car)
+           (not (or meld? conflict)))
+      (let ((script1 (iter (for action in script)
+                           (appending
+                            (if (eql (car action) :conflict)
+                                (second action)
+                                (list action)))))
+            (script2 (iter (for action in script)
+                           (appending
+                            (if (eql (car action) :conflict)
+                                (third action)
+                                (list action))))))
+        (values (ast-patch* original script1)
+                (ast-patch* original script2)))
       (let ((result (call-next-method)))
         #+ast-diff-debug
         (format t "AST-PATCH* returned:~%~a~%" (mapcar #'source-text result))
@@ -2812,78 +2808,82 @@ and replicating the others."
   ;; we require that the elements inserted must be compatible
   ;; with the element type of the original vector
   (declare (ignorable delete? meld?))
-  ;; Create a single result, with conflicts combined
-  (let* ((len (length original))
-         (etype (array-element-type original))
-         (result (make-array (list len)
-                             :element-type etype :adjustable t :fill-pointer 0))
-         (i 0))
-    (loop
-       (unless script (return))
-       (destructuring-bind (action . args) (pop script)
-         (ecase-of edit-action action
-           ((:bad
-             :same-or-recurse
-             :recurse-tail :same-tail
-             :wrap :wrap-sequence
-             :unwrap :unwrap-sequence)
-            (error 'invalid-edit-action
-                   :edit-action action
-                   :operation 'ast-patch*))
-           (:conflict
-            (setf script (append (meld-scripts (first args) (second args))
-                                 script)))
-           (:same
-            (assert (< i len))
-            (assert (equalp args (elt original i)))
-            (incf i)
-            (vector-push-extend args result))
-           (:insert
-            (assert (typep args etype))
-            (vector-push-extend args result))
-           (:delete
-            (assert (< i len))
-            (assert (equalp args (elt original i)))
-            (incf i))
-           (:replace
-            (assert (typep (cadr args) etype))
-            (assert (< i len))
-            (assert (equalp (car args) (elt original i)))
-            (incf i)
-            (vector-push-extend (cadr args) result))
-           (:recurse
-            (assert (< i len))
-            (let ((vals (multiple-value-list
-                         (apply #'ast-patch* (elt original i) args keys))))
-              (dolist (v vals) (vector-push-extend v result)))
-            (incf i))
-           (:insert-sequence
-            (assert (typep args 'sequence))
-            (map nil (lambda (e)
-                       (assert (typep e etype))
-                       (vector-push-extend e result))
-                 args))
-           (:delete-sequence
-            (assert (typep args 'sequence))
-            (let ((arg-len (length args)))
-              (assert (<= (+ i arg-len) len))
-              (assert (equalp args (subseq original i (+ i arg-len))))
-              (incf i arg-len)))
-           (:same-sequence
-            (assert (typep args 'sequence))
-            (let ((arg-len (length args)))
-              (assert (<= (+ i arg-len) len))
-              (map nil (lambda (e)
-                         (assert (typep e etype))
-                         (assert (equalp e (elt original i)))
-                         (incf i)
-                         (vector-push-extend e result))
-                   args))))))
-    (loop while (< i len)
-       do (vector-push-extend (elt original i) result)
-       do (incf i))
-    ;; Make the result simple again
-    (copy-seq result)))
+  ;; Specialize for different vector types (including strings).
+  (with-vector-dispatch ((simple-array character (*))
+                         (simple-array base-char (*)))
+    original
+    ;; Create a single result, with conflicts combined
+    (let* ((len (length original))
+           (etype (array-element-type original))
+           (result (make-array (list len)
+                               :element-type etype :adjustable t :fill-pointer 0))
+           (i 0))
+      (loop
+        (unless script (return))
+        (destructuring-bind (action . args) (pop script)
+          (ecase-of edit-action action
+            ((:bad
+              :same-or-recurse
+              :recurse-tail :same-tail
+              :wrap :wrap-sequence
+              :unwrap :unwrap-sequence)
+             (error 'invalid-edit-action
+                    :edit-action action
+                    :operation 'ast-patch*))
+            (:conflict
+             (setf script (append (meld-scripts (first args) (second args))
+                                  script)))
+            (:same
+             (assert (< i len))
+             (assert (equalp args (elt original i)))
+             (incf i)
+             (vector-push-extend args result))
+            (:insert
+             (assert (typep args etype))
+             (vector-push-extend args result))
+            (:delete
+             (assert (< i len))
+             (assert (equalp args (elt original i)))
+             (incf i))
+            (:replace
+             (assert (typep (cadr args) etype))
+             (assert (< i len))
+             (assert (equalp (car args) (elt original i)))
+             (incf i)
+             (vector-push-extend (cadr args) result))
+            (:recurse
+             (assert (< i len))
+             (let ((vals (multiple-value-list
+                          (apply #'ast-patch* (elt original i) args keys))))
+               (dolist (v vals) (vector-push-extend v result)))
+             (incf i))
+            (:insert-sequence
+             (assert (typep args 'sequence))
+             (map nil (lambda (e)
+                        (assert (typep e etype))
+                        (vector-push-extend e result))
+                  args))
+            (:delete-sequence
+             (assert (typep args 'sequence))
+             (let ((arg-len (length args)))
+               (assert (<= (+ i arg-len) len))
+               (assert (equalp args (subseq original i (+ i arg-len))))
+               (incf i arg-len)))
+            (:same-sequence
+             (assert (typep args 'sequence))
+             (let ((arg-len (length args)))
+               (assert (<= (+ i arg-len) len))
+               (map nil (lambda (e)
+                          (assert (typep e etype))
+                          (assert (equalp e (elt original i)))
+                          (incf i)
+                          (vector-push-extend e result))
+                    args))))))
+      (loop while (< i len)
+            do (vector-push-extend (elt original i) result)
+            do (incf i))
+      ;; Make the result simple again
+      (copy-seq result))))
 
 (defmethod ast-patch* ((original simple) script
                        &rest keys &key &allow-other-keys)
