@@ -1141,43 +1141,42 @@ Return the 2d array of the nodes."
       (enq start fringe))
     (iter (for node = (deq fringe))
           (until (zerop total-open))
-      (decf total-open)
-      ;; Compute the costs of all arcs into this node
-      (dolist (in-arc (rd-node-in-arcs node))
-        (assert (eql (rd-link-dest in-arc) node))
-        (compute-arc-cost in-arc nodes vec-a vec-b parent-a parent-b)
-        (let ((best (rd-node-best-in-arc node)))
-          #+ast-diff-debug (format t "best = ~a~%" best)
-          (let ((in-arc-cost
-                 (+ (rd-node-cost (rd-link-src in-arc))
-                    (rd-link-cost in-arc))))
-            (when (or (null best)
-                      (> (rd-node-cost node) in-arc-cost))
-              #+ast-diff-debug
-              (progn
-                (format t "a = ~a, b = ~a~%"
-                        (rd-link-a in-arc)
-                        (rd-link-b in-arc))
-                (format t "node cost = ~a~%" (rd-node-cost node))
-                (if best
-                    (format t "Replace~%~a (~a)(~a)~%with~%~a (~a)(~a)~%"
-                            (rd-link-op best) (rd-link-cost best)
-                            (+ (rd-node-cost (rd-link-src best))
-                               (rd-link-cost best))
-                            (rd-link-op in-arc) (rd-link-cost in-arc)
-                            (+ (rd-node-cost (rd-link-src in-arc))
-                               (rd-link-cost in-arc))
-                            )
-                    (format t "Best ~a (~a)~%" (rd-link-op in-arc) (rd-link-cost in-arc))))
-              (setf (rd-node-best-in-arc node) in-arc
-                    (rd-node-cost node) in-arc-cost)))))
-      ;; See if any successor are now ready to be handled
-      (dolist (out-arc (rd-node-out-arcs node))
-        (let ((dest (rd-link-dest out-arc)))
-          (when (zerop (decf (rd-node-open-pred-count dest)))
-            ;; All predecessors have been computed, queue this node
-            (enq dest fringe)
-            (incf total-open)))))))
+          (decf total-open)
+          ;; Compute the costs of all arcs into this node
+          (dolist (in-arc (rd-node-in-arcs node))
+            (assert (eql (rd-link-dest in-arc) node))
+            (compute-arc-cost in-arc nodes vec-a vec-b parent-a parent-b)
+            (let ((best (rd-node-best-in-arc node))
+                  (in-arc-cost
+                   (+ (rd-node-cost (rd-link-src in-arc))
+                      (rd-link-cost in-arc))))
+              #+ast-diff-debug (format t "best = ~a~%" best)
+              (when (or (null best)
+                        (> (rd-node-cost node) in-arc-cost))
+                #+ast-diff-debug
+                (progn
+                  (format t "a = ~a, b = ~a~%"
+                          (rd-link-a in-arc)
+                          (rd-link-b in-arc))
+                  (format t "node cost = ~a~%" (rd-node-cost node))
+                  (if best
+                      (format t "Replace~%~a (~a)(~a)~%with~%~a (~a)(~a)~%"
+                              (rd-link-op best) (rd-link-cost best)
+                              (+ (rd-node-cost (rd-link-src best))
+                                 (rd-link-cost best))
+                              (rd-link-op in-arc) (rd-link-cost in-arc)
+                              (+ (rd-node-cost (rd-link-src in-arc))
+                                 (rd-link-cost in-arc)))
+                      (format t "Best ~a (~a)~%" (rd-link-op in-arc) (rd-link-cost in-arc))))
+                (setf (rd-node-best-in-arc node) in-arc
+                      (rd-node-cost node) in-arc-cost))))
+          ;; See if any successor are now ready to be handled
+          (dolist (out-arc (rd-node-out-arcs node))
+            (let ((dest (rd-link-dest out-arc)))
+              (when (zerop (decf (rd-node-open-pred-count dest)))
+                ;; All predecessors have been computed, queue this node
+                (enq dest fringe)
+                (incf total-open)))))))
 
 (defun compute-arc-cost (arc nodes vec-a vec-b parent-a parent-b)
   "Compute the cost of an RD arc"
