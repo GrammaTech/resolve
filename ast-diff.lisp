@@ -1167,7 +1167,6 @@ Return the 2d array of the nodes."
 
 (defun compute-arc-cost (arc nodes vec-a vec-b parent-a parent-b)
   "Compute the cost of an RD arc"
-  (declare (ignorable nodes))
   (let* ((src (aref nodes (rd-link-a arc) (rd-link-b arc)))
          (dest (rd-link-dest arc))
          (dest-a (rd-node-a dest))
