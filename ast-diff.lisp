@@ -160,6 +160,8 @@
 (defvar *diff-strings-p* t
   "If true, descend into strings when computing diffs.")
 
+(declaim (boolean *wrap* *wrap-sequences*))
+
 (defvar *wrap* nil
   "If true, perform wrap/unwrap actions in diffs.")
 
@@ -985,13 +987,13 @@ Prefix and postfix returned as additional values."
 (defstruct rd-node
   "Node in the recursive-diff computation graph"
   ;; Coordinates of the node in the r-d graph
-  (a 0 :type (integer 0) :read-only t)
-  (b 0 :type (integer 0) :read-only t)
+  (a 0 :type array-index :read-only t)
+  (b 0 :type array-index :read-only t)
   (in-arcs nil :type list) ;; list of arcs into this node
   (out-arcs nil :type list) ;; list of arcs out of this node
   (open-pred-count 0 :type (integer 0)) ;; number of predecessors that are still open
   (best-in-arc nil) ;; The in arc that gave the lowest cost to this point
-  (cost 0) ;; total cost to reach this node along best path
+  (cost 0 :type (integer 0)) ;; total cost to reach this node along best path
   )
 
 (defmethod print-object ((node rd-node) stream)
@@ -1025,6 +1027,12 @@ Prefix and postfix returned as additional values."
 (defun rd-link-a (e) (rd-node-a (rd-link-src e)))
 (defun rd-link-b (e) (rd-node-b (rd-link-src e)))
 
+(-> build-rd-graph (list list
+                         &key (:wrap-sequences boolean)
+                         (:unwrap-sequences boolean))
+    (values (simple-array t (* *))
+            (simple-array t (*))
+            (simple-array t (*))))
 (defun build-rd-graph (total-a total-b &key (wrap-sequences *wrap-sequences*)
                                          (unwrap-sequences *wrap-sequences*))
   "Construct the graph of a pair of lists.
@@ -1040,8 +1048,10 @@ Return the 2d array of the nodes."
     ;; For now, we eagerly construct all possible wrap/unwrap edges
     ;; Prune these if they take too long
     (nest
-     (iter (for a from 0 to len-a))
-     (iter (for b from 0 to len-b))
+     ;; NB Using loop here because we can't declare the type of
+     ;; iterate index variables.
+     (loop for a of-type array-index from 0 to len-a do)
+     (loop for b of-type array-index from 0 to len-b do)
      (let ((node (make-rd-node :a a :b b)))
        (cond-every
         ((> b 0)
@@ -1090,8 +1100,10 @@ Return the 2d array of the nodes."
        (setf (aref nodes a b) node)))
     ;; Fill in out-arcs
     (nest
-     (iter (for a from 0 to len-a))
-     (iter (for b from 0 to len-b))
+     ;; NB Using loop here because we can't declare the type of
+     ;; iterate index variables.
+     (loop for a of-type array-index from 0 to len-a do)
+     (loop for b of-type array-index from 0 to len-b do)
      (let* ((node (aref nodes a b))
             (in-arcs (reverse (rd-node-in-arcs node))))
        (iter (for ia in in-arcs)
@@ -1102,8 +1114,8 @@ Return the 2d array of the nodes."
     (values nodes vec-a vec-b)))
 
 (defun reconstruct-path-to-node (nodes node)
-  (assert (rd-node-p node))
-  (assert (typep nodes '(array * (* *))))
+  (declare ((simple-array t (* *)) nodes)
+           (rd-node node))
   (let ((ops nil))
     (iter (for pred-arc = (rd-node-best-in-arc node))
           (while pred-arc)
@@ -1117,6 +1129,8 @@ Return the 2d array of the nodes."
     ops))
 
 (defun compute-best-paths (nodes vec-a vec-b parent-a parent-b)
+  (declare ((simple-array t (* *)) nodes)
+           ((simple-array t (*)) vec-a vec-b))
   (let ((fringe (queue))
         (total-open 1))
     (declare (dynamic-extent fringe))
@@ -1167,12 +1181,16 @@ Return the 2d array of the nodes."
 
 (defun compute-arc-cost (arc nodes vec-a vec-b parent-a parent-b)
   "Compute the cost of an RD arc"
+  (declare ((simple-array t (* *)) nodes)
+           ((simple-array t (*)) vec-a)
+           ((simple-array t (*)) vec-b))
   (let* ((src (aref nodes (rd-link-a arc) (rd-link-b arc)))
          (dest (rd-link-dest arc))
          (dest-a (rd-node-a dest))
          (dest-b (rd-node-b dest))
          (a (when (> dest-a 0) (aref vec-a (1- dest-a))))
          (b (when (> dest-b 0) (aref vec-b (1- dest-b)))))
+    (declare (array-index dest-a dest-b))
     (let ((op
            (ecase-of edit-action (rd-link-kind arc)
              ((:bad
