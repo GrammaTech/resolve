@@ -3064,7 +3064,7 @@ Numerous options are provided to control presentation."
                                (setf diff (append (cdr d) diff))
                                (%pop)))
                  (:replace (collecting `(:insert . ,(caddr d)))
-                  (push `(:delete ,(cadr d)) saved-deletes))
+                  (push `(:delete . ,(cadr d)) saved-deletes))
                  (t
                   (unless (equal d '(:same . ""))
                     (%pop)))))))
