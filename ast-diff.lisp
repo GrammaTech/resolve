@@ -86,9 +86,7 @@
    :*wrap*
    :*wrap-sequences*
    :*diff-strings-p*
-   ;; :*ignore-whitespace*
-   :pack-intertext-recursively!
-   :pack-intertext!))
+   #+(or) :*ignore-whitespace*))
 (in-package :resolve/ast-diff)
 (in-readtable resolve-readtable)
 ;;; Comments on further algorithm improvements
