@@ -6,6 +6,7 @@
         :software-evolution-library/utility/debug
         :stefil+
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/cl
         :software-evolution-library/software/project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/simple
@@ -566,26 +567,42 @@
              '((a . 3) (b . 2)))))
 
 (deftest print-lisp-diff.1 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '() '()) :no-color t :stream s))
+  (is (equalp (let ((v1 (from-string 'cl ""))
+                    (v2 (from-string 'cl "")))
+                (print-diff (ast-diff v1 v2)
+                            v1 v2
+                            :no-color t
+                            :stream nil))
               "")
       "Print diff of empty lists"))
 
 (deftest print-lisp-diff.2 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '(()) '(())) :no-color t :stream s))
+  (is (equalp (let ((v1 (from-string 'cl "()"))
+                    (v2 (from-string 'cl "()")))
+                (print-diff (ast-diff v1 v2)
+                            v1 v2
+                            :no-color t
+                            :stream nil))
               "()")
       "Print diff of list of empty list"))
 
 (deftest print-lisp-diff.3 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '() '(())) :no-color t :stream s))
+  (is (equalp (let ((v1 (from-string 'cl ""))
+                    (v2 (from-string 'cl "()")))
+                (print-diff (ast-diff v1 v2)
+                            v1 v2
+                            :no-color t
+                            :stream nil))
               "{+()+}")
       "Print diff of insertion of empty list"))
 
 (deftest print-lisp-diff.4 ()
-  (is (equalp (with-output-to-string (s)
-		(print-diff (ast-diff '(()) '()) :no-color t :stream s))
+  (is (equalp (let ((v1 (from-string 'cl "()"))
+                    (v2 (from-string 'cl "")))
+                (print-diff (ast-diff v1 v2)
+                            v1 v2
+                            :no-color t
+                            :stream nil))
               "[-()-]")
       "Print diff of deletion of empty list"))
 
@@ -848,107 +865,111 @@
 (defun %f (s) (from-string (make-instance 'c) s))
 
 (deftest print-diff.1 ()
-  (is (equalp (let ((v1 (%f "int a; int c;")))
-                (print-diff (ast-diff v1
-                                      (%f "int a; int b; int c;"))
-                            :original v1
+  (is (equalp (let ((v1 (%f "int a; int c;"))
+                    (v2 (%f "int a; int b; int c;")))
+                (print-diff (ast-diff v1 v2)
+                            v1 v2
                             :no-color t
                             :stream nil))
-              "int a;{+int b;+} int c;")))
+              "int a;{+ int b;+} int c;")))
 
 (deftest print-diff.1a ()
   "Like print-diff.1, but a deletion instead of an insertion."
-  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
-                (print-diff (ast-diff v1
-                                      (%f "int a; int c;"))
-                            :original v1
+  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
+                    (v2 (%f "int a; int c;")))
+                (print-diff (ast-diff v1 v2)
+                            v1 v2
                             :no-color t
                             :stream nil))
-              "int a;[-int b;-] int c;")))
+              "int a;[- int b;-] int c;")))
 
 (deftest print-diff.2 ()
   "Print diff of a deletion"
-  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
-                (print-diff (ast-diff v1
-                                      (%f "int a; int c;"))
-                            :original v1
+  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
+                    (v2 (%f "int a; int c;")))
+                (print-diff (ast-diff v1 v2)
+                            v1 v2
                             :no-color t
                             :stream nil))
-	      "int a;[-int b;-] int c;")))
+	      "int a;[- int b;-] int c;")))
 
 (deftest print-diff.3 ()
   "Print diff of a replacement"
-  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
-                (ast-patch v1 (ast-diff v1
-                                        (%f "int a; int d; int c;")
-                                        :base-cost 0)))
+  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
+                    (v2 (%f "int a; int d; int c;")))
+                (print-diff (ast-diff v1 v2
+                                      :base-cost 0)
+                            v1 v2
+                            :no-color t
+                            :stream nil))
 	      "int a; int {+d+}[-b-]; int c;")))
 
 ;; Increasing the base cost makes larger scale replacements
 ;; more prefered, vs. fine scaled replacement inside strings
 ;;; TODO: FIXME:
+#+(or)
 (deftest print-diff.3a ()
   "Print diff of a replacement"
-  (is (equalp (let ((v1 (%f "int a; int b; int c;")))
-                (print-diff (ast-diff v1
-                                      (%f "int a; int d; int c;")
+  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
+                    (v2 (%f "int a; int d; int c;")))
+                (print-diff (ast-diff v1 v2
                                       :base-cost 1)
-                            :original v1
+                            v1 v2
                             :no-color t
                             :stream nil))
               "int a; int {+d+}[-b-]; int c;")))
 
 (deftest print-diff.4 ()
   "Print diff of deletion of a character in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"abcd\";")))
-                (print-diff (ast-diff v1
-                                      (%f "char *s = \"acd\";")
+  (is (equalp (let ((v1 (%f "char *s = \"abcd\";"))
+                    (v2 (%f "char *s = \"acd\";")))
+                (print-diff (ast-diff v1 v2
                                       :base-cost 2)
-                            :original v1
+                            v1 v2
                             :no-color t
                             :stream nil))
 	      "char *s = \"a[-b-]cd\";")))
 
 (deftest print-diff.4a ()
   "Print diff of deletion of a character in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"abcd\";")))
-                (print-diff (ast-diff v1
-                                      (%f "char *s = \"acd\";")
+  (is (equalp (let ((v1 (%f "char *s = \"abcd\";"))
+                    (v2 (%f "char *s = \"acd\";")))
+                (print-diff (ast-diff v1 v2
                                       :base-cost 3)
-                            :original v1
+                            v1 v2
                             :no-color t
                             :stream nil))
               "char *s = \"a[-b-]cd\";")))
 
 (deftest print-diff.5 ()
   "Print diff of deletion of substring in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"abcd\";")))
-                (print-diff (ast-diff v1
-                                      (%f "char *s = \"ad\";")
+  (is (equalp (let ((v1 (%f "char *s = \"abcd\";"))
+                    (v2 (%f "char *s = \"ad\";")))
+                (print-diff (ast-diff v1 v2
                                       :base-cost 1)
-                            :original v1
+                            v1 v2
                             :no-color t
                             :stream nil))
 	      "char *s = \"a[-bc-]d\";")))
 
 (deftest print-diff.6 ()
   "Print diff of insertion of a substring in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"ad\";")))
-                (print-diff (ast-diff v1
-                                      (%f "char *s = \"abcd\";")
+  (is (equalp (let ((v1 (%f "char *s = \"ad\";"))
+                    (v2 (%f "char *s = \"abcd\";")))
+                (print-diff (ast-diff v1 v2
                                       :base-cost 1)
-                            :original v1
+                            v1 v2
                             :no-color t
                             :stream nil))
 	      "char *s = \"a{+bc+}d\";")))
 
 (deftest print-diff.7 ()
   "Print diff of insertion of a character in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"ad\";")))
-                (print-diff (ast-diff v1
-                                      (%f "char *s = \"abd\";")
+  (is (equalp (let ((v1 (%f "char *s = \"ad\";"))
+                    (v2 (%f "char *s = \"abd\";")))
+                (print-diff (ast-diff v1 v2
                                       :base-cost 1)
-                            :original v1
+                            v1 v2
                             :no-color t
                             :stream nil))
 	      "char *s = \"a{+b+}d\";")))

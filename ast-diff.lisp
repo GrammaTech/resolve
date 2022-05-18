@@ -44,6 +44,7 @@
    :tree-sitter-ast :output-transformation
    :computed-text :structured-text :choice-superclass)
   (:local-nicknames
+   (:range :software-evolution-library/utility/range)
    (:ts :software-evolution-library/software/tree-sitter)
    (:iter :iterate))
   (:export
@@ -2913,137 +2914,329 @@ and replicating the others."
 FILE-DIFFS is an alist mapping strings (?) to diffs, which are as
 in AST-PATCH.  Returns a new SOFT with the patched files."))
 
+(defun ast-concordance (diff my your)
+  (let ((asts ())))
+  )
+
+(defconstructor string-span
+  (source (member :my :your))
+  (start array-index)
+  (length array-length))
+
+(defun source-range->string-span (source string range &optional cache)
+  (let* ((begin (range:begin range))
+         (end (range:end range))
+         (start (range:source-location->position string begin cache))
+         (end (range:source-location->position string end cache))
+         (length (- end start)))
+    (string-span source start length)))
+
+(defun diff->spans (diff my your)
+  (let* ((my-text (source-text my))
+         (your-text (source-text your))
+         (my-newlines (range:precompute-newline-offsets my-text))
+         (your-newlines (range:precompute-newline-offsets your-text))
+         (my-ranges
+          (alist-hash-table (ast-source-ranges my)))
+         (your-ranges
+          (alist-hash-table (ast-source-ranges your))))
+    (map-tree (lambda (node)
+                (if (typep node 'ast)
+                    (econd-let range
+                      ((gethash node my-ranges)
+                       (source-range->string-span
+                        :my my-text range my-newlines))
+                      ((gethash node your-ranges)
+                       (source-range->string-span
+                        :your your-text range your-newlines)))
+                    node))
+              diff)))
+
+(defun span-diff->strings (diff my-text your-text)
+  (let ((strings (queue))
+        (my-pos 0)
+        (your-pos 0))
+    (labels ((handle-skip (start)
+               "Handle the case where MY-POS has fallen behind START.
+This means we have skipped over structured text, or into the children
+of a node."
+               (when (< my-pos start)
+                 (enq (cons :same (slice my-text my-pos start))
+                      strings)
+                 (let ((len (- start my-pos)))
+                   (incf my-pos len)
+                   (incf your-pos len))))
+             ;; (resync-your-pos-to (prefix)
+             ;;   (let ((your-pos-start your-pos))
+             ;;     (iter (until (string^= prefix your-text :start2 your-pos))
+             ;;           (incf your-pos))
+             ;;     (when (< your-pos-start your-pos)
+             ;;       (enq (subseq your-text your-pos-start your-pos) strings))))
+             (resync (start)
+               (handle-skip start)
+               ;; (match (qback strings)
+               ;;   ((cons :same (and prefix (type string)))
+               ;;    (resync-your-pos-to prefix)))
+               )
+             (flatten-diff (diff)
+               (when diff
+                 (iter (for run in (runs diff :key #'car))
+                       (ecase (caar run)
+                         (:same
+                          (appending run))
+                         (:delete
+                          (collecting
+                           (cons :delete
+                                 (apply #'string+ (mapcar #'cdr run)))))
+                         (:insert
+                          (collecting
+                           (cons :insert
+                                 (apply #'string+ (mapcar #'cdr run)))))))))
+             (handle-edit (edit)
+               (ematch edit
+                 ((or (cons _ (type slot-specifier))
+                      (cons :same "")
+                      ;; For Lisp ASTs.
+                      (cons :same :nil))
+                  (comment "Do nothing"))
+                 ((cons :same (and string (type string)))
+                  (assert (not (emptyp string)))
+                  ;; TODO This could be invalid if the substring
+                  ;; occurs in structured tet.
+                  (let ((start (or (search string my-text :start2 my-pos)
+                                   (error "Cannot resync"))))
+                    (handle-edit
+                     (cons :same (string-span :my start (length string))))))
+                 ((cons :same (and char (type character)))
+                  (handle-edit (cons :same (string char))))
+                 ((cons :same-sequence (and string (type string)))
+                  (handle-edit (cons :same string)))
+                 ((cons :same (string-span :my start length))
+                  (resync start)
+                  (enq (cons :same (slice my-text start (+ start length))) strings)
+                  (incf my-pos length)
+                  (incf your-pos length))
+                 ((cons :same (string-span :your start length))
+                  (resync start)
+                  (enq (cons :same (slice my-text start (+ start length))) strings)
+                  (incf my-pos length)
+                  (incf your-pos length))
+                 ((cons :insert (string-span :your start length))
+                  (resync start)
+                  ;; Take everything from the last marker to the beginning
+                  ;; of the insertion.
+                  (enq
+                   (cons :insert
+                         (string+
+                          (slice your-text your-pos (+ your-pos (- start your-pos)))
+                          (slice your-text start (+ start length))))
+                   strings)
+                  (setf your-pos (+ start length))
+                  ;; TODO At this point there could still be inserted text after!
+                  )
+                 ((cons :insert (and string (type string)))
+                  (let ((start (or (search string your-text :start2 your-pos)
+                                   (error "Not inserted: ~a" string))))
+                    (slice your-text start)
+                    (handle-edit
+                     (cons :insert (string-span :your start (length string))))))
+                 ((cons :insert (and char (type character)))
+                  (handle-edit (cons :insert (string char))))
+                 ((cons :insert-sequence (and string (type string)))
+                  (handle-edit
+                   (cons :insert string)))
+                 ((cons :delete (string-span :my start length))
+                  (resync start)
+                  (enq (cons :delete
+                             (string+ (slice my-text my-pos start)
+                                      (slice my-text start (+ start length))))
+                       strings)
+                  (setf my-pos (+ start length)))
+                 ((cons :delete (and char (type character)))
+                  (handle-edit (cons :delete (string char))))
+                 ((cons :delete (and string (type string)))
+                  (enq (cons :delete string) strings)
+                  (incf my-pos (length string))
+                  (incf your-pos (length string)))
+                 ((cons :delete-sequence (and string (type string)))
+                  (handle-edit (cons :delete string)))
+                 ((cons :recurse diff)
+                  (walk-diff diff))
+                 ((list :replace
+                        (and from (type character))
+                        (and to (type character)))
+                  (enq (cons :insert (string to)) strings)
+                  (enq (cons :delete (string from)) strings)
+                  (incf my-pos)
+                  (incf your-pos))))
+             (walk-diff (diff)
+               (dolist (edit diff)
+                 (handle-edit edit))))
+      (walk-diff diff)
+      (when (< my-pos (length my-text))
+        (enq (cons :same (slice my-text my-pos)) strings))
+      (flatten-diff (qlist strings)))))
+
 (defun print-diff
-    (diff &key
-            (stream *standard-output*)
-            (no-color nil)
-            (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
-            (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
-            (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
-            (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
-            (sort-insert-delete t))
+    (diff my your &key
+                    (stream *standard-output*)
+                    (no-color nil)
+                    (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
+                    (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
+                    (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
+                    (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
+                    (sort-insert-delete t))
   "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
   (nest
-   (let ((*print-escape* nil)
-         ;; These are used to track what color we should be printing
-         ;; in.
-         (*deletep* nil)
-         (*insertp* nil)
-         (insert-buffer nil)
-         (delete-buffer nil))
-     (declare (special *insertp* *deletep*)))
-   (with-string (stream stream))
-   (labels ((%p (c) "Print."
-              (write-string
-               (typecase c
-                 (null "()")
-                 (structured-text
-                  (continue-color
-                   (string+
-                    (ts:before-text c)
-                    (source-text c)
-                    (ts:after-text c))))
-                 (slot-specifier "")
-                 (t (continue-color (source-text c))))
-               stream))
-            (continue-color (text)
-              (cond
-                (no-color text)
-                (*deletep*
-                 (string-replace-all (string #\Newline) text
-                                     (format nil "~%~a" +color-RED+)))
-                (*insertp*
-                 (string-replace-all (string #\Newline) text
-                                     (format nil "~%~a" +color-GRN+)))
-                (t text)))
-            (purge-insert ()
-              (setf *insertp* t)
-              (when insert-buffer
-                (mapc #'%p (reverse insert-buffer))
-                (write insert-end :stream stream)
-                (setf insert-buffer nil))
-              (setf *insertp* nil))
-            (purge-delete ()
-              (setf *deletep* t)
-              (when delete-buffer
-                (mapc #'%p (reverse delete-buffer))
-                (write delete-end :stream stream)
-                (setf delete-buffer nil))
-              (setf *deletep* nil))
-            (push-insert (c)
-              (unless (equal c "")
-                (purge-delete)
-                (unless insert-buffer
-                  (write insert-start :stream stream))
-                (push c insert-buffer)))
-            (push-inserts (l) (mapc #'push-insert l))
-            (push-delete (c)
-              (unless (equal c "")
-                (purge-insert)
-                (unless delete-buffer
-                  (write delete-start :stream stream))
-                (push c delete-buffer)))
-            (push-deletes (l) (mapc #'push-delete l))
-            (purge ()
-              (purge-insert)
-              (purge-delete))
-            (pr (c) (purge) (%p c))
-            (%print-wrap (content)
-              (destructuring-bind (sub-diff path left-wrap
-                                   right-wrap . rest)
-                  content
-                (declare (ignore path rest))
-                (mapc #'push-inserts left-wrap)
-                (%print-diff sub-diff)
-                (mapc #'push-inserts (reverse right-wrap))))
-            (%print-unwrap (content)
-              (destructuring-bind (sub-diff path left-wrap right-wrap)
-                  content
-                (declare (ignore path))
-                (mapc #'push-deletes left-wrap)
-                (%print-diff sub-diff)
-                (mapc #'push-deletes (reverse right-wrap))))
-            (%print-diff (diff)
-              (case (car diff)
-                ((:wrap) (%print-wrap (cdr diff)))
-                ((:unwrap) (%print-unwrap (cdr diff)))
-                (t
-                 (assert (every #'consp diff))
-                 (when sort-insert-delete
-                   (setf diff (simplify-diff-for-printing diff)))
-                 (mapc (lambda-bind ((type . content))
-                                    (ecase type
-                                      (:same (pr content))
-                                      (:delete (push-delete content))
-                                      (:insert (push-insert content))
-                                      ;; The :replace case is used only when
-                                      ;; sort-insert-delete is NIL.  Otherwise,
-                                      ;; these have been broken up into :insert
-                                      ;; and :delete already
-                                      (:replace
-                                       (push-insert (cadr content))
-                                       (push-delete (car content)))
-                                      (:recurse (%print-diff content))
-                                      (:same-sequence (map nil #'pr content))
-                                      (:insert-sequence
-                                       (map nil #'push-insert content))
-                                      (:delete-sequence
-                                       (map nil #'push-delete content))
-                                      (:same-tail (map nil #'pr content))
-                                      (:wrap-sequence (%print-wrap (cdr content)))
-                                      (:unwrap-sequence (%print-unwrap content))
-                                      (:recurse-tail
-                                       (%print-diff
-                                        (remove-if
-                                         (lambda (e)
-                                           (or (equal e '(:delete))
-                                               (equal e '(:insert))))
-                                         content)))))
-                       diff)))))
-     (%print-diff diff)
-     (purge)
-     (values))))
+   (let* ((my (astify my))
+          (your (astify your))
+          (my-text (source-text my))
+          (your-text (source-text your))
+          (diff
+           (if sort-insert-delete
+               (simplify-diff-for-printing diff)
+               diff))
+          (print-script
+           (span-diff->strings (diff->spans diff my your)
+                               my-text your-text)))
+     (with-string (stream stream)
+       (dolist (edit print-script)
+         (ematch edit
+           ((cons :same (and string (type string)))
+            (write-string string stream))
+           ((cons :delete (and string (type string)))
+            (unless (emptyp string)
+              (format stream "~a~a~a"
+                      delete-start
+                      string
+                      delete-end)))
+           ((cons :insert (and string (type string)))
+            (unless (emptyp string)
+              (format stream "~a~a~a"
+                      insert-start
+                      string
+                      insert-end)))))))
+   ;; (let ((*print-escape* nil)
+   ;;       ;; These are used to track what color we should be printing
+   ;;       ;; in.
+   ;;       (*deletep* nil)
+   ;;       (*insertp* nil)
+   ;;       (insert-buffer nil)
+   ;;       (delete-buffer nil))
+   ;;   (declare (special *insertp* *deletep*)))
+   ;; (with-string (stream stream))
+   ;; (labels ((%p (c) "Print."
+   ;;            (write-string
+   ;;             (typecase c
+   ;;               (null "()")
+   ;;               (structured-text
+   ;;                (continue-color
+   ;;                 (string+
+   ;;                  (ts:before-text c)
+   ;;                  (source-text c)
+   ;;                  (ts:after-text c))))
+   ;;               (slot-specifier "")
+   ;;               (t (continue-color (source-text c))))
+   ;;             stream))
+   ;;          (continue-color (text)
+   ;;            (cond
+   ;;              (no-color text)
+   ;;              (*deletep*
+   ;;               (string-replace-all (string #\Newline) text
+   ;;                                   (format nil "~%~a" +color-RED+)))
+   ;;              (*insertp*
+   ;;               (string-replace-all (string #\Newline) text
+   ;;                                   (format nil "~%~a" +color-GRN+)))
+   ;;              (t text)))
+   ;;          (purge-insert ()
+   ;;            (setf *insertp* t)
+   ;;            (when insert-buffer
+   ;;              (mapc #'%p (reverse insert-buffer))
+   ;;              (write insert-end :stream stream)
+   ;;              (setf insert-buffer nil))
+   ;;            (setf *insertp* nil))
+   ;;          (purge-delete ()
+   ;;            (setf *deletep* t)
+   ;;            (when delete-buffer
+   ;;              (mapc #'%p (reverse delete-buffer))
+   ;;              (write delete-end :stream stream)
+   ;;              (setf delete-buffer nil))
+   ;;            (setf *deletep* nil))
+   ;;          (push-insert (c)
+   ;;            (unless (equal c "")
+   ;;              (purge-delete)
+   ;;              (unless insert-buffer
+   ;;                (write insert-start :stream stream))
+   ;;              (push c insert-buffer)))
+   ;;          (push-inserts (l) (mapc #'push-insert l))
+   ;;          (push-delete (c)
+   ;;            (unless (equal c "")
+   ;;              (purge-insert)
+   ;;              (unless delete-buffer
+   ;;                (write delete-start :stream stream))
+   ;;              (push c delete-buffer)))
+   ;;          (push-deletes (l) (mapc #'push-delete l))
+   ;;          (purge ()
+   ;;            (purge-insert)
+   ;;            (purge-delete))
+   ;;          (pr (c) (purge) (%p c))
+   ;;          (%print-wrap (content)
+   ;;            (destructuring-bind (sub-diff path left-wrap
+   ;;                                 right-wrap . rest)
+   ;;                content
+   ;;              (declare (ignore path rest))
+   ;;              (mapc #'push-inserts left-wrap)
+   ;;              (%print-diff sub-diff)
+   ;;              (mapc #'push-inserts (reverse right-wrap))))
+   ;;          (%print-unwrap (content)
+   ;;            (destructuring-bind (sub-diff path left-wrap right-wrap)
+   ;;                content
+   ;;              (declare (ignore path))
+   ;;              (mapc #'push-deletes left-wrap)
+   ;;              (%print-diff sub-diff)
+   ;;              (mapc #'push-deletes (reverse right-wrap))))
+   ;;          (%print-diff (diff)
+   ;;            (case (car diff)
+   ;;              ((:wrap) (%print-wrap (cdr diff)))
+   ;;              ((:unwrap) (%print-unwrap (cdr diff)))
+   ;;              (t
+   ;;               (assert (every #'consp diff))
+   ;;               (when sort-insert-delete
+   ;;                 (setf diff (simplify-diff-for-printing diff)))
+   ;;               (mapc (lambda-bind ((type . content))
+   ;;                       (ecase type
+   ;;                         (:same (pr content))
+   ;;                         (:delete (push-delete content))
+   ;;                         (:insert (push-insert content))
+   ;;                         ;; The :replace case is used only when
+   ;;                         ;; sort-insert-delete is NIL.  Otherwise,
+   ;;                         ;; these have been broken up into :insert
+   ;;                         ;; and :delete already
+   ;;                         (:replace
+   ;;                          (push-insert (cadr content))
+   ;;                          (push-delete (car content)))
+   ;;                         (:recurse (%print-diff content))
+   ;;                         (:same-sequence (map nil #'pr content))
+   ;;                         (:insert-sequence
+   ;;                          (map nil #'push-insert content))
+   ;;                         (:delete-sequence
+   ;;                          (map nil #'push-delete content))
+   ;;                         (:same-tail (map nil #'pr content))
+   ;;                         (:wrap-sequence (%print-wrap (cdr content)))
+   ;;                         (:unwrap-sequence (%print-unwrap content))
+   ;;                         (:recurse-tail
+   ;;                          (%print-diff
+   ;;                           (remove-if
+   ;;                            (lambda (e)
+   ;;                              (or (equal e '(:delete))
+   ;;                                  (equal e '(:insert))))
+   ;;                            content)))))
+   ;;                     diff)))))
+   ;;   (%print-diff diff)
+   ;;   (purge)
+   ;;   (values))
+   ))
 
 (defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the
