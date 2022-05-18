@@ -7,6 +7,8 @@
         :stefil+
         :software-evolution-library/software/parseable
         :software-evolution-library/software/cl
+        :software-evolution-library/software/c
+        :software-evolution-library/software/javascript
         :software-evolution-library/software/project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/simple
@@ -793,20 +795,17 @@
         ;; (print-diff diff :no-color t)
         (is (source-text= s2 (ast-patch obj1 diff)))
         ;; TODO
-        ;; (is (equal (with-output-to-string (*standard-output*)
-        ;;              (print-diff diff :no-color t))
-        ;;            "int f() { return 1{++2+}; }"))
-        )
+        (is (equal (with-output-to-string (*standard-output*)
+                     (print-diff diff obj1 obj2 :no-color t))
+                   "int f() { return 1{++2+}; }")))
       (multiple-value-bind (diff cost)
           (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000 :base-cost 0)
         (is (equal (keys diff) '(:insert :recurse :same :unwrap)))
         (is (= cost 6))
         (is (source-text= s1 (ast-patch obj2 diff)))
-        ;; TODO
-        ;; (is (equal (with-output-to-string (*standard-output*)
-        ;;              (print-diff diff :no-color t))
-        ;;            "int f() { return 1[-+2-]; }"))
-        )
+        (is (equal (with-output-to-string (*standard-output*)
+                     (print-diff diff :no-color t))
+                   "int f() { return 1[-+2-]; }")))
       (multiple-value-bind (diff cost)
           (ast-diff obj1 obj2 :wrap t :max-wrap-diff -100 :base-cost 0)
         (is (equal (keys diff) '(:recurse :replace :same)))
@@ -831,9 +830,9 @@
       (is (= cost 35))
       ;; TODO
       (is (source-text= s2 (ast-patch obj1 diff)))
-      #+(or) (let ((s (with-output-to-string (*standard-output*)
-                        (print-diff diff :no-color t))))
-               (is (equal s "int f(int x, int y{+, int p+}) { int c = 1; {+if (p == 0) { +}int z = x+y; return z+c;{+ } return 0;+} }"))))
+      (let ((s (with-output-to-string (*standard-output*)
+                 (print-diff diff :no-color t))))
+        (is (equal s "int f(int x, int y{+, int p+}) { int c = 1; {+if (p == 0) { +}int z = x+y; return z+c;{+ } return 0;+} }"))))
     (multiple-value-bind (diff cost)
         (ast-diff obj2 obj1 :wrap t :max-wrap-diff 1000
                             :wrap-sequences t)
@@ -841,8 +840,8 @@
         (is (equal k '(:delete :recurse :same :unwrap-sequence))))
       (is (= cost 35))
       (is (source-text= s1 (ast-patch obj2 diff)))
-      ;; (let ((s (with-output-to-string (*standard-output*) (print-diff diff :no-color t))))
-      ;;   (is (equal s "int f(int x, int y[-, int p-]) { int c = 1; [-if (p == 0) { -]int z = x+y; return z+c;[- } return 0;-] }")))
+      (let ((s (with-output-to-string (*standard-output*) (print-diff diff :no-color t))))
+        (is (equal s "int f(int x, int y[-, int p-]) { int c = 1; [-if (p == 0) { -]int z = x+y; return z+c;[- } return 0;-] }")))
       )))
 
 (deftest diff-wrap-patch.1 ()
@@ -906,8 +905,6 @@
 
 ;; Increasing the base cost makes larger scale replacements
 ;; more prefered, vs. fine scaled replacement inside strings
-;;; TODO: FIXME:
-#+(or)
 (deftest print-diff.3a ()
   "Print diff of a replacement"
   (is (equalp (let ((v1 (%f "int a; int b; int c;"))
@@ -973,6 +970,142 @@
                             :no-color t
                             :stream nil))
 	      "char *s = \"a{+b+}d\";")))
+
+;; See <https://difftastic.wilfred.me.uk/tricky_cases.html> for
+;; tricky-print-diff.
+
+(defun from-string* (class string)
+  (lret ((result (genome (from-string class string))))
+    (assert (notany (of-type '(or parse-error-ast
+                               source-text-fragment))
+                    result))))
+
+;;; Using Javascript for these since its parser is so robust.
+
+(deftest tricky-print-diff.1 ()
+  "Adding delimiters."
+  (is (equal (let ((v1 (from-string* 'javascript "x"))
+                   (v2 (from-string* 'javascript "(x)")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "{+(+}x{+)+}")))
+
+(deftest tricky-print-diff.2 ()
+  "Changing delimiters."
+  (is (equal (let ((v1 (from-string* 'javascript "(x)"))
+                   (v2 (from-string* 'javascript "[x]")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "{+[+}[-(-]x{+)+}[-]-]")))
+
+(deftest tricky-print-diff.3 ()
+  "Expanding delimiters."
+  (is (equal (let ((v1 (from-string* 'javascript "([x], y)"))
+                   (v2 (from-string* 'javascript "([x, y])")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "fn([x{+, y+}]{-, y-})")))
+
+(deftest tricky-print-diff.4 ()
+  "Contracting delimiters."
+  (is (equal (let ((v1 (from-string* 'javascript "fn([x, y]);"))
+                   (v2 (from-string* 'javascript "fn([x], y);")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "fn([x{+, y+}]{-, y-})")))
+
+(deftest tricky-print-diff.5 ()
+  "Disconnected delimiters."
+  (is (equal (let ((v1 (from-string* 'javascript "(foo, (bar))"))
+                   (v2 (from-string* 'javascript "(foo, (novel), (bar))")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "(foo {+(novel)+} (bar))")))
+
+(deftest tricky-print-diff.6 ()
+  "Rewrapping large nodes."
+  (is (equal (let ((v1 (from-string* 'javascript "[[foo]]; (x, y)"))
+                   (v2 (from-string* 'javascript "([[foo]], x, y)")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "")))
+
+(deftest tricky-print-diff.7 ()
+  "Reordering within a list."
+  (is (equal (let ((v1 (from-string* 'javascript "(x, y)"))
+                   (v2 (from-string* 'javascript "(y, x)")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "")))
+
+(deftest tricky-print-diff.8 ()
+  "Middle insertions."
+  (is (equal (let ((v1 (from-string* 'javascript "foo(bar(123))"))
+                   (v2 (from-string* 'javascript "foo(extra(bar(123)))")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "")))
+
+(deftest tricky-print-diff.9 ()
+  "Depth."
+  (is (equal (let ((v1 (from-string* 'javascript "if (true) { foo(123); }; foo(456);"))
+                   (v2 (from-string* 'javascript "foo(789);")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "")))
+
+(deftest tricky-print-diff.10 ()
+  "Minor similarities."
+  (is (equal (let ((v1 (from-string* 'javascript "function foo(x) { return x + 1; }"))
+                   (v2 (from-string* 'javascript "function bar(y) { baz(y); }")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "")))
+
+(deftest tricky-print-diff.11 ()
+  "Minor similarities."
+  (is (equal (let ((v1 (from-string* 'javascript "/* The quick brown fox. */ foobar();
+"))
+                   (v2 (from-string* 'javascript "/* The slow brown fox. */
+foobaz();")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "")))
+
+(deftest tricky-print-diff.12 ()
+  "Minor similarities."
+  (is (equal (let ((v1 (from-string* 'javascript "/* The quick brown fox. */ foobar();
+"))
+                   (v2 (from-string* 'javascript "/* The slow brown fox. */
+foobaz();")))
+               (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil))
+             "")))
+
 
 ;;;; Simple object ast-diff tests
 (deftest simple.ast-diff.1 ()
