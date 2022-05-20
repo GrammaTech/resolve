@@ -2950,7 +2950,7 @@ length), where source is one of `:my` or `:your`."
      (soft-alist-of (member :same :insert :delete :unknown) string)
      &optional))
 (defun flatten-span-diff (diff my-text your-text)
-  (let ((strings (queue))
+  (let ((strings (vect))
         (my-pos 0)
         (your-pos 0)
         ;; Track whether the last edit on my was same or delete.
@@ -2964,10 +2964,13 @@ of a node."
                  ((:same :delete)
                   (assert (<= my-pos start))
                   (when (< my-pos start)
-                    (enq
+                    (vector-push-extend
                      ;; If the last edit was a delete, this should be
                      ;; too.
-                     (cons my-state (slice my-text my-pos start))
+                     (cons (if (eql kind :delete)
+                               :delete
+                               my-state)
+                           (slice my-text my-pos start))
                      strings)
                     (let ((len (- start my-pos)))
                       (incf my-pos len)
@@ -2978,8 +2981,9 @@ of a node."
                  (:insert
                   (assert (<= your-pos start))
                   (when (< your-pos start)
-                    (enq (cons kind (slice your-text your-pos start))
-                         strings)
+                    (vector-push-extend
+                     (cons kind (slice your-text your-pos start))
+                     strings)
                     (let ((len (- start your-pos)))
                       (incf your-pos len)))
                   (assert (= your-pos start)))))
@@ -3016,19 +3020,21 @@ of a node."
                   (handle-edit (cons :same string)))
                  ((cons :same (vector :my start length))
                   (resync :same start)
-                  (enq (cons :same (slice my-text start (+ start length))) strings)
+                  (vector-push-extend
+                   (cons :same (slice my-text start (+ start length)))
+                   strings)
                   (incf my-pos length)
                   (incf your-pos length))
                  ((cons :same (vector :your start length))
                   (resync :same start)
-                  (enq (cons :same (slice my-text start (+ start length))) strings)
+                  (vector-push-extend (cons :same (slice my-text start (+ start length))) strings)
                   (incf my-pos length)
                   (incf your-pos length))
                  ((cons :insert (vector :your start length))
                   (resync :insert start)
                   ;; Take everything from the last marker to the beginning
                   ;; of the insertion.
-                  (enq
+                  (vector-push-extend
                    (cons :insert
                          (string+
                           (slice your-text your-pos (+ your-pos (- start your-pos)))
@@ -3050,14 +3056,14 @@ of a node."
                    (cons :insert string)))
                  ((cons :delete (vector :my start length))
                   (resync :delete start)
-                  (enq (cons :delete
-                             (slice my-text start (+ start length)))
-                       strings)
+                  (vector-push-extend (cons :delete
+                                            (slice my-text start (+ start length)))
+                                      strings)
                   (incf my-pos length))
                  ((cons :delete (and char (type character)))
                   (handle-edit (cons :delete (string char))))
                  ((cons :delete (and string (type string)))
-                  (enq (cons :delete string) strings)
+                  (vector-push-extend (cons :delete string) strings)
                   (incf my-pos (length string))
                   (incf your-pos (length string)))
                  ((cons :delete-sequence (and string (type string)))
@@ -3067,24 +3073,25 @@ of a node."
                  ((list :replace
                         (and from (type character))
                         (and to (type character)))
-                  (enq (cons :insert (string to)) strings)
-                  (enq (cons :delete (string from)) strings)
+                  (vector-push-extend (cons :insert (string to)) strings)
+                  (vector-push-extend (cons :delete (string from)) strings)
                   (incf my-pos)
                   (incf your-pos))
                  ((list :replace
                         (vector :my my-start my-length)
                         (vector :your your-start your-length))
                   (resync :replace my-start)
-                  (qappend strings
-                           `((:insert . ,(subseq your-text your-start your-length))
-                             (:delete . ,(subseq my-text my-start my-length)))))))
+                  (vector-conc-extend
+                   strings
+                   `((:insert . ,(subseq your-text your-start your-length))
+                     (:delete . ,(subseq my-text my-start my-length)))))))
              (walk-diff (diff)
                (dolist (edit diff)
                  (handle-edit edit))))
       (walk-diff diff)
       (when (< my-pos (length my-text))
-        (enq (cons :same (slice my-text my-pos)) strings))
-      (qlist strings))))
+        (vector-push-extend (cons :same (slice my-text my-pos)) strings))
+      (coerce strings 'list))))
 
 (defun merge-flat-span-diff (diff)
   (when diff
