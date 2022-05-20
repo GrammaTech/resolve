@@ -306,7 +306,9 @@ can be recursed on if `*diff-strings-p*' is true (defaults to true)")
          args))
 
 (defgeneric astify (x)
-  (:documentation "Convert a Lisp data structure to a SIMPLE-LISP-AST"))
+  (:documentation "Convert a Lisp data structure to a SIMPLE-LISP-AST")
+  (:method ((x software))
+    (genome x)))
 (defgeneric unastify (x)
   (:documentation "Convert a SIMPLE-LISP-AST to a Lisp data structure"))
 
@@ -2922,6 +2924,21 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
          (length (- end start)))
     (vector source start length)))
 
+(defun ast-range-table (root &aux (source (source-text root)))
+  (let ((newlines (range:precompute-newline-offsets source)))
+    (maphash-into
+     (make-hash-table)
+     (lambda (cons)
+       (destructuring-bind (ast . range) cons
+         (values ast
+                 (cons (range:source-location->position source
+                                                        (range:begin range)
+                                                        newlines)
+                       (range:source-location->position source
+                                                        (range:end range)
+                                                        newlines)))))
+     (ast-source-ranges root))))
+
 (defun diff->spans (diff my your)
   "Rewrite DIFF so ASTs are replaced by triples of (source, start,
 length), where source is one of `:my` or `:your`."
@@ -2944,6 +2961,56 @@ length), where source is one of `:my` or `:your`."
                         :your your-text range your-newlines)))
                     node))
               diff)))
+
+(defun ast-concordance (diff root1 root2
+                        &optional
+                          (forward-map (make-hash-table))
+                          (backward-map (make-hash-table)))
+  (let ((children1 (children (genome root1)))
+        (children2 (children (genome root2))))
+    (flet ((add-to-concordance (ast1 ast2)
+             (if (typep ast1 'slot-specifier)
+                 (assert (typep ast2 'slot-specifier))
+                 (progn
+                   (when (typep (list ast1 ast2)
+                                '(tuple tree-sitter-ast tree-sitter-ast))
+                     (assert (eql (ts:tree-sitter-class-name
+                                   (class-of ast1))
+                                  (ts:tree-sitter-class-name
+                                   (class-of ast2)))))
+                   (setf (gethash ast1 forward-map) ast2
+                         (gethash ast2 backward-map) ast1)))))
+      (iter (while (or children1 children2))
+            ;; If they get out of sync, there's a problem.
+            (assert (and children1 children2))
+            (while diff)
+            (ematch (pop diff)
+              ((cons :same (type slot-specifier)))
+              ((cons :same (equal "")))
+              ((cons :same ast)
+               (assert (eql ast (car children1)))
+               (add-to-concordance (car children1) (car children2))
+               (pop children1)
+               (pop children2))
+              ((cons :insert ast)
+               (assert (eql ast (car children2)))
+               (pop children2))
+              ((cons :delete ast)
+               (assert (eql ast (car children1)))
+               (pop children1))
+              ((cons :recurse diff)
+               (add-to-concordance (car children1) (car children2))
+               (setf (values forward-map backward-map)
+                     (ast-concordance diff
+                                      (car children1)
+                                      (car children2)
+                                      forward-map
+                                      backward-map))
+               (pop children1)
+               (pop children2))
+              ((list :replace _ _))
+              )))
+    (values forward-map backward-map)))
 
 (-> flatten-span-diff (list string string)
     (values
@@ -2979,14 +3046,13 @@ of a node."
                   (setf my-state kind)
                   (assert (= my-pos start)))
                  (:insert
-                  (assert (<= your-pos start))
+                  ;; (assert (<= your-pos start))
                   (when (< your-pos start)
                     (vector-push-extend
                      (cons kind (slice your-text your-pos start))
                      strings)
-                    (let ((len (- start your-pos)))
-                      (incf your-pos len)))
-                  (assert (= your-pos start)))))
+                    (setf your-pos start)
+                    (assert (= your-pos start))))))
              ;; (resync-your-pos-to (prefix)
              ;;   (let ((your-pos-start your-pos))
              ;;     (iter (until (string^= prefix your-text :start2 your-pos))
@@ -3011,7 +3077,7 @@ of a node."
                   ;; TODO This could be invalid if the substring
                   ;; occurs in structured text.
                   (let ((start (or (search string my-text :start2 my-pos)
-                                   (error "Cannot resync"))))
+                                   (error "Not inserted: ~s" string))))
                     (handle-edit
                      (cons :same (vector :my start (length string))))))
                  ((cons :same (and char (type character)))
@@ -3045,7 +3111,7 @@ of a node."
                   )
                  ((cons :insert (and string (type string)))
                   (let ((start (or (search string your-text :start2 your-pos)
-                                   (error "Not inserted: ~a" string))))
+                                   (error "Not inserted: ~s" string))))
                     (slice your-text start)
                     (handle-edit
                      (cons :insert (vector :your start (length string))))))
@@ -3122,160 +3188,131 @@ of a node."
                     (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
                     (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
                     (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
-                    (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
-                    (sort-insert-delete t))
+                    (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+))))
   "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
-  (nest
-   (let* ((my (astify my))
-          (your (astify your))
-          (my-text (source-text my))
-          (your-text (source-text your))
-          (diff
-           (if sort-insert-delete
-               (simplify-diff-for-printing diff)
-               diff))
-          (print-script
-           (merge-flat-span-diff
-            (flatten-span-diff (diff->spans diff my your)
-                               my-text your-text))))
-     (with-string (stream stream)
-       (dolist (edit print-script)
-         (ematch edit
-           ((cons :same (and string (type string)))
-            (write-string string stream))
-           ((cons :delete (and string (type string)))
-            (unless (emptyp string)
-              (format stream "~a~a~a"
-                      delete-start
-                      string
-                      delete-end)))
-           ((cons :insert (and string (type string)))
-            (unless (emptyp string)
-              (format stream "~a~a~a"
-                      insert-start
-                      string
-                      insert-end)))))))
-   ;; (let ((*print-escape* nil)
-   ;;       ;; These are used to track what color we should be printing
-   ;;       ;; in.
-   ;;       (*deletep* nil)
-   ;;       (*insertp* nil)
-   ;;       (insert-buffer nil)
-   ;;       (delete-buffer nil))
-   ;;   (declare (special *insertp* *deletep*)))
-   ;; (with-string (stream stream))
-   ;; (labels ((%p (c) "Print."
-   ;;            (write-string
-   ;;             (typecase c
-   ;;               (null "()")
-   ;;               (structured-text
-   ;;                (continue-color
-   ;;                 (string+
-   ;;                  (ts:before-text c)
-   ;;                  (source-text c)
-   ;;                  (ts:after-text c))))
-   ;;               (slot-specifier "")
-   ;;               (t (continue-color (source-text c))))
-   ;;             stream))
-   ;;          (continue-color (text)
-   ;;            (cond
-   ;;              (no-color text)
-   ;;              (*deletep*
-   ;;               (string-replace-all (string #\Newline) text
-   ;;                                   (format nil "~%~a" +color-RED+)))
-   ;;              (*insertp*
-   ;;               (string-replace-all (string #\Newline) text
-   ;;                                   (format nil "~%~a" +color-GRN+)))
-   ;;              (t text)))
-   ;;          (purge-insert ()
-   ;;            (setf *insertp* t)
-   ;;            (when insert-buffer
-   ;;              (mapc #'%p (reverse insert-buffer))
-   ;;              (write insert-end :stream stream)
-   ;;              (setf insert-buffer nil))
-   ;;            (setf *insertp* nil))
-   ;;          (purge-delete ()
-   ;;            (setf *deletep* t)
-   ;;            (when delete-buffer
-   ;;              (mapc #'%p (reverse delete-buffer))
-   ;;              (write delete-end :stream stream)
-   ;;              (setf delete-buffer nil))
-   ;;            (setf *deletep* nil))
-   ;;          (push-insert (c)
-   ;;            (unless (equal c "")
-   ;;              (purge-delete)
-   ;;              (unless insert-buffer
-   ;;                (write insert-start :stream stream))
-   ;;              (push c insert-buffer)))
-   ;;          (push-inserts (l) (mapc #'push-insert l))
-   ;;          (push-delete (c)
-   ;;            (unless (equal c "")
-   ;;              (purge-insert)
-   ;;              (unless delete-buffer
-   ;;                (write delete-start :stream stream))
-   ;;              (push c delete-buffer)))
-   ;;          (push-deletes (l) (mapc #'push-delete l))
-   ;;          (purge ()
-   ;;            (purge-insert)
-   ;;            (purge-delete))
-   ;;          (pr (c) (purge) (%p c))
-   ;;          (%print-wrap (content)
-   ;;            (destructuring-bind (sub-diff path left-wrap
-   ;;                                 right-wrap . rest)
-   ;;                content
-   ;;              (declare (ignore path rest))
-   ;;              (mapc #'push-inserts left-wrap)
-   ;;              (%print-diff sub-diff)
-   ;;              (mapc #'push-inserts (reverse right-wrap))))
-   ;;          (%print-unwrap (content)
-   ;;            (destructuring-bind (sub-diff path left-wrap right-wrap)
-   ;;                content
-   ;;              (declare (ignore path))
-   ;;              (mapc #'push-deletes left-wrap)
-   ;;              (%print-diff sub-diff)
-   ;;              (mapc #'push-deletes (reverse right-wrap))))
-   ;;          (%print-diff (diff)
-   ;;            (case (car diff)
-   ;;              ((:wrap) (%print-wrap (cdr diff)))
-   ;;              ((:unwrap) (%print-unwrap (cdr diff)))
-   ;;              (t
-   ;;               (assert (every #'consp diff))
-   ;;               (when sort-insert-delete
-   ;;                 (setf diff (simplify-diff-for-printing diff)))
-   ;;               (mapc (lambda-bind ((type . content))
-   ;;                       (ecase type
-   ;;                         (:same (pr content))
-   ;;                         (:delete (push-delete content))
-   ;;                         (:insert (push-insert content))
-   ;;                         ;; The :replace case is used only when
-   ;;                         ;; sort-insert-delete is NIL.  Otherwise,
-   ;;                         ;; these have been broken up into :insert
-   ;;                         ;; and :delete already
-   ;;                         (:replace
-   ;;                          (push-insert (cadr content))
-   ;;                          (push-delete (car content)))
-   ;;                         (:recurse (%print-diff content))
-   ;;                         (:same-sequence (map nil #'pr content))
-   ;;                         (:insert-sequence
-   ;;                          (map nil #'push-insert content))
-   ;;                         (:delete-sequence
-   ;;                          (map nil #'push-delete content))
-   ;;                         (:same-tail (map nil #'pr content))
-   ;;                         (:wrap-sequence (%print-wrap (cdr content)))
-   ;;                         (:unwrap-sequence (%print-unwrap content))
-   ;;                         (:recurse-tail
-   ;;                          (%print-diff
-   ;;                           (remove-if
-   ;;                            (lambda (e)
-   ;;                              (or (equal e '(:delete))
-   ;;                                  (equal e '(:insert))))
-   ;;                            content)))))
-   ;;                     diff)))))
-   ;;   (%print-diff diff)
-   ;;   (purge)
-   ;;   (values))
-   ))
+  (let* ((my (astify my))
+         (your (astify your))
+         (my-text (source-text my))
+         (your-text (source-text your))
+         (concordance
+          (ast-concordance diff my your))
+         (range-table
+          (merge-tables
+           (ast-range-table my)
+           (ast-range-table your)))
+         (my-pos 0)
+         (your-pos 0))
+    (declare (array-index my-pos your-pos))
+    (with-string (stream stream)
+      (labels ((print-intertext (v1 v2)
+                 (declare (string v1 v2))
+                 (cond
+                   ((equal v1 v2)
+                    (write-string v1 stream))
+                   (t
+                    ;; TODO colorize.
+                    ;; NB Inserts before deletes.
+                    (format stream
+                            "~a~a~a~a~a~a"
+                            insert-start
+                            v1
+                            insert-end
+                            delete-start
+                            v2
+                            delete-end))))
+               (rec (ast diff)
+                 (let ((children (remove "" (standardized-children ast)
+                                         :test #'equal)))
+                   (dolist (edit diff)
+                     (ematch (print edit)
+                       ((cons :same (and spec (slot-specifier)))
+                        ;; TODO
+                        (assert (equal
+                                 (princ-to-string spec)
+                                 (princ-to-string (pop children)))))
+                       ((cons :same (equal ""))
+                        ())
+                       ((cons :same (and ast (ast)))
+                        (assert (eql ast (pop children)))
+                        (destructuring-bind (start . end)
+                            (gethash ast range-table)
+                          (when (< my-pos start)
+                            (write-string my-text stream
+                                          :start my-pos :end start))
+                          (write-string my-text stream :start start :end end)
+                          (setf my-pos end
+                                your-pos
+                                (cdr (gethash (gethash ast concordance)
+                                              range-table)))))
+                       ((list :replace
+                              (and ast1 (ast))
+                              (and ast2 (ast)))
+                        (assert (eql ast1 (pop children)))
+                        (mvlet ((start1 end1
+                                 (car+cdr (gethash ast1 range-table)))
+                                (start2 end2
+                                 (car+cdr (gethash ast2 range-table))))
+                          (print-intertext
+                           (subseq my-text my-pos start1)
+                           (subseq your-text your-pos start2))
+                          (write-string your-text stream
+                                        :start start2
+                                        :end end2)
+                          (setf my-pos end1
+                                your-pos end2)))
+                       ((cons :recurse diff)
+                        (mvlet*
+                            ((ast1 (pop children))
+                             (start1 end1
+                              (car+cdr (gethash ast1 range-table)))
+                             (ast2 (gethash ast1 concordance))
+                             (start2 end2
+                              (car+cdr (gethash ast2 range-table)))
+                             ;; Tree-sitter children, not standardized children.
+                             (children1 children2
+                              (values (children ast1)
+                                      (children ast2)))
+                             (first-child1
+                              first-child2
+                              (values (first children1)
+                                      (first children2)))
+                             (last-child1
+                              last-child2
+                              (values (lastcar children1)
+                                      (lastcar children2)))
+                             (first-child1-start
+                              first-child2-start
+                              (values
+                               (car (gethash first-child1 range-table))
+                               (car (gethash first-child2 range-table))))
+                             (last-child1-end
+                              last-child2-end
+                              (values
+                               (cdr (gethash last-child1 range-table))
+                               (cdr (gethash last-child2 range-table))))
+                             (pretext1
+                              pretext2
+                              (values (subseq my-text start1 first-child1-start)
+                                      (subseq your-text start2 first-child2-start)))
+                             (posttext1
+                              posttext2
+                              (values (subseq my-text last-child1-end end1)
+                                      (subseq your-text last-child2-end end2))))
+                          (assert (eql (ts:tree-sitter-class-name
+                                        (class-of ast1))
+                                       (ts:tree-sitter-class-name
+                                        (class-of ast2))))
+                          (print-intertext pretext1 pretext2)
+                          (setf my-pos first-child1-start
+                                your-pos first-child2-start)
+                          (rec ast1 diff)
+                          (print-intertext posttext1 posttext2)
+                          (setf my-pos last-child1-end
+                                your-post last-child2-end)))
+                       ((cons :same (and string (type string)))
+                        (write-string string stream)))))))
+        (rec my diff)))))
 
 (defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the
@@ -3298,8 +3335,7 @@ Numerous options are provided to control presentation."
                  (:replace (collecting `(:insert . ,(caddr d)))
                   (push `(:delete . ,(cadr d)) saved-deletes))
                  (t
-                  (unless (equal d '(:same . ""))
-                    (%pop)))))))
+                  (%pop))))))
      (nreverse saved-deletes))))
 
 
