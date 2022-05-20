@@ -568,6 +568,12 @@
   (is (equal (ast-diff-alist-test '((a . 1)) '((b . 2) (a . 3)))
              '((a . 3) (b . 2)))))
 
+(defun apply-printed-diff (diff)
+  (let* ((diff (regex-replace-all "(\\[-.*?-\\])" diff ""))
+         (diff (string-replace-all "{+" diff ""))
+         (diff (string-replace-all "+}" diff "")))
+    diff))
+
 (deftest print-lisp-diff.1 ()
   (is (equalp (let ((v1 (from-string 'cl ""))
                     (v2 (from-string 'cl "")))
@@ -589,23 +595,25 @@
       "Print diff of list of empty list"))
 
 (deftest print-lisp-diff.3 ()
-  (is (equalp (let ((v1 (from-string 'cl ""))
-                    (v2 (from-string 'cl "()")))
+  (is (equal (let ((v1 (from-string 'cl ""))
+                   (v2 (from-string 'cl "()")))
+               (apply-printed-diff
                 (print-diff (ast-diff v1 v2)
                             v1 v2
                             :no-color t
-                            :stream nil))
-              "{+()+}")
+                            :stream nil)))
+             "()")
       "Print diff of insertion of empty list"))
 
 (deftest print-lisp-diff.4 ()
   (is (equalp (let ((v1 (from-string 'cl "()"))
                     (v2 (from-string 'cl "")))
-                (print-diff (ast-diff v1 v2)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-              "[-()-]")
+                (apply-printed-diff
+                 (print-diff (ast-diff v1 v2)
+                             v1 v2
+                             :no-color t
+                             :stream nil)))
+              "")
       "Print diff of deletion of empty list"))
 
 (deftest sexp-diff-on-ast-file ()
@@ -863,113 +871,85 @@
 
 (defun %f (s) (from-string (make-instance 'c) s))
 
+(defun test-print-diff (v1 v2 &optional reference)
+  (let* ((v1 (if (stringp v1) (%f v1) v1))
+         (v2 (if (stringp v2) (%f v2) v2))
+         (diff (print-diff (ast-diff v1 v2)
+                           v1 v2
+                           :no-color t
+                           :stream nil)))
+    (is (not (source-text= v1 v2)))
+    (dolist (v (list v1 v2))
+      (is (null (collect-if
+                 (of-type '(or parse-error-ast source-text-fragment))
+                 (genome v)))))
+    (when reference
+      (is (equal diff reference)))
+    (dolist (v (list v1 v2))
+      (is (not (equal diff (source-text v)))))
+    (is (equal (source-text v2)
+               (apply-printed-diff diff)))))
+
 (deftest print-diff.1 ()
-  (is (equalp (let ((v1 (%f "int a; int c;"))
-                    (v2 (%f "int a; int b; int c;")))
-                (print-diff (ast-diff v1 v2)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-              "int a;{+ int b;+} int c;")))
+  (test-print-diff "int a; int c;"
+                   "int a; int b; int c;"
+                   "int a;{+ int b;+} int c;"))
 
 (deftest print-diff.1a ()
   "Like print-diff.1, but a deletion instead of an insertion."
-  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
-                    (v2 (%f "int a; int c;")))
-                (print-diff (ast-diff v1 v2)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-              "int a;[- int b;-] int c;")))
+  (test-print-diff "int a; int b; int c;"
+                   "int a; int c;"
+                   "int a;[- int b;-] int c;"))
 
 (deftest print-diff.2 ()
   "Print diff of a deletion"
-  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
-                    (v2 (%f "int a; int c;")))
-                (print-diff (ast-diff v1 v2)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-	      "int a;[- int b;-] int c;")))
+  (test-print-diff "int a; int b; int c;"
+                   "int a; int c;"
+                   "int a;[- int b;-] int c;"))
 
 (deftest print-diff.3 ()
   "Print diff of a replacement"
-  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
-                    (v2 (%f "int a; int d; int c;")))
-                (print-diff (ast-diff v1 v2
-                                      :base-cost 0)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-	      "int a; int {+d+}[-b-]; int c;")))
+  (test-print-diff "int a; int b; int c;"
+                   "int a; int d; int c;"
+                   "int a; int {+d+}[-b-]; int c;"))
 
 ;; Increasing the base cost makes larger scale replacements
 ;; more prefered, vs. fine scaled replacement inside strings
 (deftest print-diff.3a ()
   "Print diff of a replacement"
-  (is (equalp (let ((v1 (%f "int a; int b; int c;"))
-                    (v2 (%f "int a; int d; int c;")))
-                (print-diff (ast-diff v1 v2
-                                      :base-cost 1)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-              "int a; int {+d+}[-b-]; int c;")))
+  (test-print-diff "int a; int b; int c;"
+                   "int a; int d; int c;"
+                   "int a; int {+d+}[-b-]; int c;"))
 
 (deftest print-diff.4 ()
   "Print diff of deletion of a character in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"abcd\";"))
-                    (v2 (%f "char *s = \"acd\";")))
-                (print-diff (ast-diff v1 v2
-                                      :base-cost 2)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-	      "char *s = \"a[-b-]cd\";")))
+  (test-print-diff "char *s = \"abcd\";"
+                   "char *s = \"acd\";"
+                   "char *s = \"a[-b-]cd\";"))
 
 (deftest print-diff.4a ()
   "Print diff of deletion of a character in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"abcd\";"))
-                    (v2 (%f "char *s = \"acd\";")))
-                (print-diff (ast-diff v1 v2
-                                      :base-cost 3)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-              "char *s = \"a[-b-]cd\";")))
+  (test-print-diff "char *s = \"abcd\";"
+                   "char *s = \"acd\";"
+                   "char *s = \"a[-b-]cd\";"))
 
 (deftest print-diff.5 ()
   "Print diff of deletion of substring in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"abcd\";"))
-                    (v2 (%f "char *s = \"ad\";")))
-                (print-diff (ast-diff v1 v2
-                                      :base-cost 1)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-	      "char *s = \"a[-bc-]d\";")))
+  (test-print-diff "char *s = \"abcd\";"
+                   "char *s = \"ad\";"
+                   "char *s = \"a[-bc-]d\";"))
 
 (deftest print-diff.6 ()
   "Print diff of insertion of a substring in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"ad\";"))
-                    (v2 (%f "char *s = \"abcd\";")))
-                (print-diff (ast-diff v1 v2
-                                      :base-cost 1)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-	      "char *s = \"a{+bc+}d\";")))
+  (test-print-diff "char *s = \"ad\";"
+                   "char *s = \"abcd\";"
+                   "char *s = \"a{+bc+}d\";"))
 
 (deftest print-diff.7 ()
   "Print diff of insertion of a character in a string"
-  (is (equalp (let ((v1 (%f "char *s = \"ad\";"))
-                    (v2 (%f "char *s = \"abd\";")))
-                (print-diff (ast-diff v1 v2
-                                      :base-cost 1)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-	      "char *s = \"a{+b+}d\";")))
+  (test-print-diff "char *s = \"ad\";"
+                   "char *s = \"abd\";"
+                   "char *s = \"a{+b+}d\";"))
 
 ;; See <https://difftastic.wilfred.me.uk/tricky_cases.html> for
 ;; tricky-print-diff.
@@ -984,127 +964,72 @@
 
 (deftest tricky-print-diff.1 ()
   "Adding delimiters."
-  (is (equal (let ((v1 (from-string* 'javascript "x"))
-                   (v2 (from-string* 'javascript "(x)")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "{+(+}x{+)+}")))
+  (test-print-diff "x;"
+                   "(x);"
+                   #+(or) "{+(+}x{+)+}"))
 
 (deftest tricky-print-diff.2 ()
   "Changing delimiters."
-  (is (equal (let ((v1 (from-string* 'javascript "(x)"))
-                   (v2 (from-string* 'javascript "[x]")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "{+[+}[-(-]x{+)+}[-]-]")))
+  (test-print-diff (from-string* 'javascript "(x)")
+                   (from-string* 'javascript "[x]")
+                   #+(or) "{+[+}[-(-]x{+)+}[-]-]"))
 
 (deftest tricky-print-diff.3 ()
   "Expanding delimiters."
-  (is (equal (let ((v1 (from-string* 'javascript "([x], y)"))
-                   (v2 (from-string* 'javascript "([x, y])")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "fn([x{+, y+}]{-, y-})")))
+  (test-print-diff (from-string* 'javascript "([x], y)")
+                   (from-string* 'javascript "([x, y])")
+                   #+(or) "fn([x{+, y+}]{-, y-})"))
 
 (deftest tricky-print-diff.4 ()
   "Contracting delimiters."
-  (is (equal (let ((v1 (from-string* 'javascript "fn([x, y]);"))
-                   (v2 (from-string* 'javascript "fn([x], y);")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "fn([x{+, y+}]{-, y-})")))
+  (test-print-diff (from-string* 'javascript "fn([x, y]);")
+                   (from-string* 'javascript "fn([x], y);")
+                   #+(or) "fn([x{+, y+}]{-, y-})"))
 
 (deftest tricky-print-diff.5 ()
   "Disconnected delimiters."
-  (is (equal (let ((v1 (from-string* 'javascript "(foo, (bar))"))
-                   (v2 (from-string* 'javascript "(foo, (novel), (bar))")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "(foo {+(novel)+} (bar))")))
+  (test-print-diff (from-string* 'javascript "(foo, (bar))")
+                   (from-string* 'javascript "(foo, (novel), (bar))")
+                   #+(or) "(foo, {+(novel)+}, (bar))"))
 
 (deftest tricky-print-diff.6 ()
   "Rewrapping large nodes."
-  (is (equal (let ((v1 (from-string* 'javascript "[[foo]]; (x, y)"))
-                   (v2 (from-string* 'javascript "([[foo]], x, y)")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "")))
+  (test-print-diff (from-string* 'javascript "[[foo]]; (x, y)")
+                   (from-string* 'javascript "([[foo]], x, y)")))
 
 (deftest tricky-print-diff.7 ()
   "Reordering within a list."
-  (is (equal (let ((v1 (from-string* 'javascript "(x, y)"))
-                   (v2 (from-string* 'javascript "(y, x)")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "")))
+  (test-print-diff (from-string* 'javascript "(x, y)")
+                   (from-string* 'javascript "(y, x)")))
 
 (deftest tricky-print-diff.8 ()
   "Middle insertions."
-  (is (equal (let ((v1 (from-string* 'javascript "foo(bar(123))"))
-                   (v2 (from-string* 'javascript "foo(extra(bar(123)))")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "")))
+  (test-print-diff (from-string* 'javascript "foo(bar(123))")
+                   (from-string* 'javascript "foo(extra(bar(123)))")))
 
 (deftest tricky-print-diff.9 ()
   "Depth."
-  (is (equal (let ((v1 (from-string* 'javascript "if (true) { foo(123); }; foo(456);"))
-                   (v2 (from-string* 'javascript "foo(789);")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "")))
+  (test-print-diff (from-string* 'javascript "if (true) { foo(123); }; foo(456);")
+                   (from-string* 'javascript "foo(789);")))
 
 (deftest tricky-print-diff.10 ()
   "Minor similarities."
-  (is (equal (let ((v1 (from-string* 'javascript "function foo(x) { return x + 1; }"))
-                   (v2 (from-string* 'javascript "function bar(y) { baz(y); }")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "")))
+  (test-print-diff (from-string* 'javascript "function foo(x) { return x + 1; }")
+                   (from-string* 'javascript "function bar(y) { baz(y); }")))
 
 (deftest tricky-print-diff.11 ()
   "Minor similarities."
-  (is (equal (let ((v1 (from-string* 'javascript "/* The quick brown fox. */ foobar();
-"))
-                   (v2 (from-string* 'javascript "/* The slow brown fox. */
+  (test-print-diff (from-string* 'javascript "/* The quick brown fox. */ foobar();
+")
+                   (from-string* 'javascript "/* The slow brown fox. */
 foobaz();")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "")))
 
 (deftest tricky-print-diff.12 ()
   "Minor similarities."
-  (is (equal (let ((v1 (from-string* 'javascript "/* The quick brown fox. */ foobar();
-"))
-                   (v2 (from-string* 'javascript "/* The slow brown fox. */
+  (test-print-diff (from-string* 'javascript "/* The quick brown fox. */ foobar();
+")
+                   (from-string* 'javascript "/* The slow brown fox. */
 foobaz();")))
-               (print-diff (ast-diff v1 v2)
-                           v1 v2
-                           :no-color t
-                           :stream nil))
-             "")))
 
 
 ;;;; Simple object ast-diff tests
