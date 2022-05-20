@@ -2914,24 +2914,17 @@ and replicating the others."
 FILE-DIFFS is an alist mapping strings (?) to diffs, which are as
 in AST-PATCH.  Returns a new SOFT with the patched files."))
 
-(defun ast-concordance (diff my your)
-  (let ((asts ())))
-  )
-
-(defconstructor string-span
-  (source (member :my :your))
-  (start array-index)
-  (length array-length))
-
 (defun source-range->string-span (source string range &optional cache)
   (let* ((begin (range:begin range))
          (end (range:end range))
          (start (range:source-location->position string begin cache))
          (end (range:source-location->position string end cache))
          (length (- end start)))
-    (string-span source start length)))
+    (vector source start length)))
 
 (defun diff->spans (diff my your)
+  "Rewrite DIFF so ASTs are replaced by triples of (source, start,
+length), where source is one of `:my` or `:your`."
   (let* ((my-text (source-text my))
          (your-text (source-text your))
          (my-newlines (range:precompute-newline-offsets my-text))
@@ -2952,46 +2945,56 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                     node))
               diff)))
 
-(defun span-diff->strings (diff my-text your-text)
+(-> flatten-span-diff (list string string)
+    (values
+     (soft-alist-of (member :same :insert :delete :unknown) string)
+     &optional))
+(defun flatten-span-diff (diff my-text your-text)
   (let ((strings (queue))
         (my-pos 0)
-        (your-pos 0))
-    (labels ((handle-skip (start)
-               "Handle the case where MY-POS has fallen behind START.
+        (your-pos 0)
+        ;; Track whether the last edit on my was same or delete.
+        (my-state :same))
+    (declare (type (member :same :delete) my-state))
+    (labels ((handle-skip (kind start)
+               "Handle the case where a pointer has fallen behind START.
 This means we have skipped over structured text, or into the children
 of a node."
-               (when (< my-pos start)
-                 (enq (cons :same (slice my-text my-pos start))
-                      strings)
-                 (let ((len (- start my-pos)))
-                   (incf my-pos len)
-                   (incf your-pos len))))
+               (ecase kind
+                 ((:same :delete)
+                  (assert (<= my-pos start))
+                  (when (< my-pos start)
+                    (enq
+                     ;; If the last edit was a delete, this should be
+                     ;; too.
+                     (cons my-state (slice my-text my-pos start))
+                     strings)
+                    (let ((len (- start my-pos)))
+                      (incf my-pos len)
+                      (when (eql kind :same)
+                        (incf your-pos len))))
+                  (setf my-state kind)
+                  (assert (= my-pos start)))
+                 (:insert
+                  (assert (<= your-pos start))
+                  (when (< your-pos start)
+                    (enq (cons kind (slice your-text your-pos start))
+                         strings)
+                    (let ((len (- start your-pos)))
+                      (incf your-pos len)))
+                  (assert (= your-pos start)))))
              ;; (resync-your-pos-to (prefix)
              ;;   (let ((your-pos-start your-pos))
              ;;     (iter (until (string^= prefix your-text :start2 your-pos))
              ;;           (incf your-pos))
              ;;     (when (< your-pos-start your-pos)
              ;;       (enq (subseq your-text your-pos-start your-pos) strings))))
-             (resync (start)
-               (handle-skip start)
+             (resync (kind start)
+               (handle-skip kind start)
                ;; (match (qback strings)
                ;;   ((cons :same (and prefix (type string)))
                ;;    (resync-your-pos-to prefix)))
                )
-             (flatten-diff (diff)
-               (when diff
-                 (iter (for run in (runs diff :key #'car))
-                       (ecase (caar run)
-                         (:same
-                          (appending run))
-                         (:delete
-                          (collecting
-                           (cons :delete
-                                 (apply #'string+ (mapcar #'cdr run)))))
-                         (:insert
-                          (collecting
-                           (cons :insert
-                                 (apply #'string+ (mapcar #'cdr run)))))))))
              (handle-edit (edit)
                (ematch edit
                  ((or (cons _ (type slot-specifier))
@@ -3002,27 +3005,27 @@ of a node."
                  ((cons :same (and string (type string)))
                   (assert (not (emptyp string)))
                   ;; TODO This could be invalid if the substring
-                  ;; occurs in structured tet.
+                  ;; occurs in structured text.
                   (let ((start (or (search string my-text :start2 my-pos)
                                    (error "Cannot resync"))))
                     (handle-edit
-                     (cons :same (string-span :my start (length string))))))
+                     (cons :same (vector :my start (length string))))))
                  ((cons :same (and char (type character)))
                   (handle-edit (cons :same (string char))))
                  ((cons :same-sequence (and string (type string)))
                   (handle-edit (cons :same string)))
-                 ((cons :same (string-span :my start length))
-                  (resync start)
+                 ((cons :same (vector :my start length))
+                  (resync :same start)
                   (enq (cons :same (slice my-text start (+ start length))) strings)
                   (incf my-pos length)
                   (incf your-pos length))
-                 ((cons :same (string-span :your start length))
-                  (resync start)
+                 ((cons :same (vector :your start length))
+                  (resync :same start)
                   (enq (cons :same (slice my-text start (+ start length))) strings)
                   (incf my-pos length)
                   (incf your-pos length))
-                 ((cons :insert (string-span :your start length))
-                  (resync start)
+                 ((cons :insert (vector :your start length))
+                  (resync :insert start)
                   ;; Take everything from the last marker to the beginning
                   ;; of the insertion.
                   (enq
@@ -3039,19 +3042,18 @@ of a node."
                                    (error "Not inserted: ~a" string))))
                     (slice your-text start)
                     (handle-edit
-                     (cons :insert (string-span :your start (length string))))))
+                     (cons :insert (vector :your start (length string))))))
                  ((cons :insert (and char (type character)))
                   (handle-edit (cons :insert (string char))))
                  ((cons :insert-sequence (and string (type string)))
                   (handle-edit
                    (cons :insert string)))
-                 ((cons :delete (string-span :my start length))
-                  (resync start)
+                 ((cons :delete (vector :my start length))
+                  (resync :delete start)
                   (enq (cons :delete
-                             (string+ (slice my-text my-pos start)
-                                      (slice my-text start (+ start length))))
+                             (slice my-text start (+ start length)))
                        strings)
-                  (setf my-pos (+ start length)))
+                  (incf my-pos length))
                  ((cons :delete (and char (type character)))
                   (handle-edit (cons :delete (string char))))
                  ((cons :delete (and string (type string)))
@@ -3068,14 +3070,43 @@ of a node."
                   (enq (cons :insert (string to)) strings)
                   (enq (cons :delete (string from)) strings)
                   (incf my-pos)
-                  (incf your-pos))))
+                  (incf your-pos))
+                 ((list :replace
+                        (vector :my my-start my-length)
+                        (vector :your your-start your-length))
+                  (resync :replace my-start)
+                  (qappend strings
+                           `((:insert . ,(subseq your-text your-start your-length))
+                             (:delete . ,(subseq my-text my-start my-length)))))))
              (walk-diff (diff)
                (dolist (edit diff)
                  (handle-edit edit))))
       (walk-diff diff)
       (when (< my-pos (length my-text))
         (enq (cons :same (slice my-text my-pos)) strings))
-      (flatten-diff (qlist strings)))))
+      (qlist strings))))
+
+(defun merge-flat-span-diff (diff)
+  (when diff
+    (let ((diff (mapcar (lambda (edit)
+                          (match edit
+                            ((list :unknown kind change)
+                             `(,kind . ,change))
+                            (otherwise edit)))
+                        diff)))
+      (iter (for run in (runs diff :key #'car))
+            (ecase (caar run)
+              (:unknown run)
+              (:same
+               (appending run))
+              (:delete
+               (collecting
+                (cons :delete
+                      (apply #'string+ (mapcar #'cdr run)))))
+              (:insert
+               (collecting
+                (cons :insert
+                      (apply #'string+ (mapcar #'cdr run))))))))))
 
 (defun print-diff
     (diff my your &key
@@ -3098,8 +3129,9 @@ Numerous options are provided to control presentation."
                (simplify-diff-for-printing diff)
                diff))
           (print-script
-           (span-diff->strings (diff->spans diff my your)
-                               my-text your-text)))
+           (merge-flat-span-diff
+            (flatten-span-diff (diff->spans diff my your)
+                               my-text your-text))))
      (with-string (stream stream)
        (dolist (edit print-script)
          (ematch edit
