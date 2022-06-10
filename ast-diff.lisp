@@ -3196,22 +3196,22 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                                    (children ast2)))
                           (first-child1
                            first-child2
-                           (values (first children1)
-                                   (first children2)))
+                           (values (or (first children1) ast1)
+                                   (or (first children2) ast2)))
                           (last-child1
                            last-child2
-                           (values (lastcar children1)
-                                   (lastcar children2)))
+                           (values (or (lastcar children1) ast1)
+                                   (or (lastcar children2) ast2)))
                           (first-child1-start
                            first-child2-start
                            (values
-                            (car (@ range-table (or first-child1 ast1)))
-                            (car (@ range-table (or first-child2 ast2)))))
+                            (car (@ range-table first-child1))
+                            (car (@ range-table first-child2))))
                           (last-child1-end
                            last-child2-end
                            (values
-                            (cdr (@ range-table (or last-child1 ast1)))
-                            (cdr (@ range-table (or last-child2 ast2)))))
+                            (cdr (@ range-table last-child1))
+                            (cdr (@ range-table last-child2))))
                           (pretext1
                            pretext2
                            (values
