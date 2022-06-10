@@ -141,15 +141,6 @@
     :wrap :wrap-sequence
     :unwrap :unwrap-sequence))
 
-(defcondition invalid-edit-action (error)
-  ((edit-action :initarg :edit-action :type edit-action)
-   (operation :initarg :operation :type symbol))
-  (:report (lambda (c s)
-             (with-slots (edit-action operation) c
-               (format s
-                       "Invalid edit action ~a for operation ~a"
-                       edit-action operation)))))
-
 (defparameter *base-cost* 2
   "Basic cost of a diff, before adding costs of components.")
 
@@ -1194,21 +1185,7 @@ Return the 2d array of the nodes."
          (b (when (> dest-b 0) (aref vec-b (1- dest-b)))))
     (declare (array-index dest-a dest-b))
     (let ((op
-           (ecase-of edit-action (rd-link-kind arc)
-             ((:bad
-               :conflict
-               :recurse :recurse-tail
-               :insert-sequence
-               :delete-sequence
-               :replace
-               :same
-               :same-tail
-               :same-sequence
-               :wrap
-               :unwrap)
-              (error 'invalid-edit-action
-                     :edit-action (rd-link-kind arc)
-                     :operation 'compute-arc-cost))
+           (ecase (assure edit-action (rd-link-kind arc))
              (:insert (assert b) (list (cons :insert b)))
              (:delete (assert a) (list (cons :delete a)))
              (:same-or-recurse
@@ -1247,8 +1224,7 @@ Return the 2d array of the nodes."
                      (sub-b (subseq vec-b src-b (+ src-b len))))
                 (list (ast-diff-unwrap-sequence a parent-b sub-b)))))))
       (setf (rd-link-op arc) op)
-      (values op (setf (rd-link-cost arc) (reduce #'+ op :key #'diff-cost :initial-value 0)))
-      )))
+      (values op (setf (rd-link-cost arc) (reduce #'+ op :key #'diff-cost :initial-value 0))))))
 
 (defun recursive-diff (total-a total-b parent-a parent-b)
   (flet ((%r (w uw)
@@ -1329,11 +1305,7 @@ Return the 2d array of the nodes."
     ((eql diff :bad) most-positive-fixnum)
     ((not (consp diff)) 0)
     ((symbolp (car diff))
-     (ecase-of edit-action (car diff)
-       ((:conflict :same-or-recurse)
-        (error 'invalid-edit-action
-               :edit-action (car diff)
-               :operation 'diff-cost))
+     (ecase (assure edit-action (car diff))
        (:bad most-positive-fixnum)
        (:insert (+ base-cost (ast-cost (cdr diff))))
        (:delete (+ base-cost (if (cdr diff) (ast-cost (cdr diff)) 1)))
@@ -1662,16 +1634,7 @@ Returns a list of edit tree nodes for these nodes."
                    source-segment-start (incf source-position n)
                    target-segment-start (incf target-position n))))
       (iter (for action in script)
-            (ecase-of edit-action (car action)
-              ((:bad
-                :conflict
-                :recurse-tail
-                :same-tail :same-or-recurse
-                :wrap :wrap-sequence
-                :unwrap :unwrap-sequence)
-               (error 'invalid-edit-action
-                      :edit-action (car action)
-                      :operation 'change-segment-on-seqs))
+            (ecase (assure edit-action (car action))
               (:same (finish))
               (:same-sequence
                (finish (length (cdr action))))
@@ -2540,11 +2503,7 @@ process with the rest of the script."
          ;; lists of the conflict versions (this will be three values).
          (when script
            (destructuring-bind (action . args) (car script)
-             (ecase-of edit-action action
-               ((:bad :unwrap :same-sequence :same-or-recurse)
-                (error 'invalid-edit-action
-                       :edit-action action
-                       :operation 'ast-patch*))
+             (ecase (assure edit-action action)
                (:conflict
                 (cond
                   (meld? ;; was handled by around method in false case
@@ -2823,15 +2782,7 @@ and replicating the others."
       (loop
         (unless script (return))
         (destructuring-bind (action . args) (pop script)
-          (ecase-of edit-action action
-            ((:bad
-              :same-or-recurse
-              :recurse-tail :same-tail
-              :wrap :wrap-sequence
-              :unwrap :unwrap-sequence)
-             (error 'invalid-edit-action
-                    :edit-action action
-                    :operation 'ast-patch*))
+          (ecase (assure edit-action action)
             (:conflict
              (setf script (append (meld-scripts (first args) (second args))
                                   script)))
