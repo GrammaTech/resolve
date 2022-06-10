@@ -3153,8 +3153,12 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                         (subseq your-text your-pos start2)
                         stream
                         :pre-replace-asts)
-                       (enq (cons :replace (subseq your-text start2 end2))
-                            strings)
+                       (save-intertext
+                        diff
+                        (subseq my-text start1 end1)
+                        (subseq your-text start2 end2)
+                        stream
+                        :replace-ast)
                        (setf my-pos end1
                              your-pos end2)))
                     ((list :replace
