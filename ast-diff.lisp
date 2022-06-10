@@ -3260,27 +3260,36 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                            (values
                             (cdr (@ range-table last-child1))
                             (cdr (@ range-table last-child2))))
+                          ;; NB "pretext" is distinct from before-text
+                          ;; in that it comes before the AST (it is
+                          ;; the leading structured text).
                           (pretext1
                            pretext2
                            (values
-                            (subseq my-text my-pos first-child1-start)
-                            (subseq your-text your-pos first-child2-start)))
-                          (posttext1
-                           posttext2
+                            (subseq my-text my-pos start1)
+                            (subseq your-text your-pos start2)))
+                          (before-text1
+                           before-text2
+                           (values
+                            (subseq my-text start1 first-child1-start)
+                            (subseq your-text start2 first-child2-start)))
+                          (after-text1
+                           after-text2
                            (values (subseq my-text last-child1-end end1)
                                    (subseq your-text last-child2-end end2))))
-                       (declare (ignore start1 start2))
                        (assert (eql (ts:tree-sitter-class-name
                                      (class-of ast1))
                                     (ts:tree-sitter-class-name
                                      (class-of ast2))))
                        (save-intertext diff pretext1 pretext2 stream
-                                       :pre-recurse)
+                                       :recurse-pre-text)
+                       (save-intertext diff before-text1 before-text2 stream
+                                       :recurse-before-text)
                        (setf my-pos first-child1-start
                              your-pos first-child2-start)
                        (print-diff-loop diff script ast1 stream)
-                       (save-intertext diff posttext1 posttext2 stream
-                                       :post-recurse)
+                       (save-intertext diff after-text1 after-text2 stream
+                                       :recurse-after-text)
                        (setf my-pos end1
                              your-pos end2))))
                   #+debug-print-diff
