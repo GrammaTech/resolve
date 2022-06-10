@@ -3088,7 +3088,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                     ((cons :same (and ast (ast)))
                      (assert (eql ast (pop children)))
                      (destructuring-bind (start . end)
-                         (gethash ast range-table)
+                         (@ range-table ast)
                        (when (< my-pos start)
                          (enq (cons :pre (subseq my-text my-pos start))
                               strings))
@@ -3096,8 +3096,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                             strings)
                        (setf my-pos end
                              your-pos
-                             (cdr (gethash (gethash ast concordance)
-                                           range-table)))))
+                             (cdr (@ range-table (@ concordance ast))))))
                     ((cons (or :same :same-sequence)
                            (and string (type string)))
                      (assert (equal string (pop children)))
@@ -3109,7 +3108,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                     ((cons :insert (slot-specifier)))
                     ((cons :insert (and new-ast (ast)))
                      (destructuring-bind (start . end)
-                         (gethash new-ast range-table)
+                         (@ range-table new-ast)
                        (enq (cons :insert insert-start) strings)
                        (enq (cons :insert-pre (subseq your-text your-pos start))
                             strings)
@@ -3120,7 +3119,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                     ((cons :delete (and old-ast (ast)))
                      (assert (eql old-ast (pop children)))
                      (destructuring-bind (start . end)
-                         (gethash old-ast range-table)
+                         (@ range-table old-ast)
                        (enq (cons :delete delete-start) strings)
                        (enq (cons :delete-pre (subseq my-text my-pos start))
                             strings)
@@ -3132,9 +3131,9 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                            (and ast2 (ast)))
                      (assert (eql ast1 (pop children)))
                      (mvlet ((start1 end1
-                              (car+cdr (gethash ast1 range-table)))
+                              (car+cdr (@ range-table ast1)))
                              (start2 end2
-                              (car+cdr (gethash ast2 range-table))))
+                              (car+cdr (@ range-table ast2))))
                        (save-intertext
                         diff
                         (subseq my-text my-pos start1)
@@ -3179,10 +3178,10 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                      (mvlet*
                          ((ast1 (assure ast (pop children)))
                           (start1 end1
-                           (car+cdr (gethash ast1 range-table)))
-                          (ast2 (assure ast (gethash ast1 concordance)))
+                           (car+cdr (@ range-table ast1)))
+                          (ast2 (assure ast (@ concordance ast1)))
                           (start2 end2
-                           (car+cdr (gethash ast2 range-table)))
+                           (car+cdr (@ range-table ast2)))
                           ;; Tree-sitter children, not standardized children.
                           (children1 children2
                            (values (children ast1)
@@ -3198,13 +3197,13 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                           (first-child1-start
                            first-child2-start
                            (values
-                            (car (gethash (or first-child1 ast1) range-table))
-                            (car (gethash (or first-child2 ast2) range-table))))
+                            (car (@ range-table (or first-child1 ast1)))
+                            (car (@ range-table (or first-child2 ast2)))))
                           (last-child1-end
                            last-child2-end
                            (values
-                            (cdr (gethash (or last-child1 ast1) range-table))
-                            (cdr (gethash (or last-child2 ast2) range-table))))
+                            (cdr (@ range-table (or last-child1 ast1)))
+                            (cdr (@ range-table (or last-child2 ast2)))))
                           (pretext1
                            pretext2
                            (values
