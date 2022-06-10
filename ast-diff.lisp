@@ -3071,6 +3071,11 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                 (return))
               (let ((edit (pop script)))
                 (nlet rec ((edit edit))
+                  #+debug-print-diff
+                  (format t "~&BEFORE EDIT: ~a~%MY   | ~a~%~&YOUR | ~a~2%"
+                          edit
+                          (subseq my-text my-pos)
+                          (subseq your-text your-pos))
                   (ematch edit
                     ;; Skip before and after text slots. This is
                     ;; useless to us because the way the before/after
@@ -3254,7 +3259,12 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                        (save-intertext diff posttext1 posttext2 stream
                                        :post-recurse)
                        (setf my-pos end1
-                             your-pos end2)))))))))))
+                             your-pos end2))))
+                  #+debug-print-diff
+                  (format t "~&AFTER EDIT: ~a~%MY   | ~a~%YOUR | ~a~2%"
+                          edit
+                          (subseq my-text my-pos)
+                          (subseq your-text your-pos)))))))))
 
 (defgeneric print-diff-print (diff stream)
   (:method ((diff print-diff) (stream stream))
