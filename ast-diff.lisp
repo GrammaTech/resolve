@@ -3235,12 +3235,13 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                           (pretext1
                            pretext2
                            (values
-                            (subseq my-text start1 first-child1-start)
-                            (subseq your-text start2 first-child2-start)))
+                            (subseq my-text my-pos first-child1-start)
+                            (subseq your-text your-pos first-child2-start)))
                           (posttext1
                            posttext2
                            (values (subseq my-text last-child1-end end1)
                                    (subseq your-text last-child2-end end2))))
+                       (declare (ignore start1 start2))
                        (assert (eql (ts:tree-sitter-class-name
                                      (class-of ast1))
                                     (ts:tree-sitter-class-name
