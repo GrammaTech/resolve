@@ -3077,6 +3077,8 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                           (subseq my-text my-pos)
                           (subseq your-text your-pos))
                   (ematch edit
+                    ;; "Same" edits.
+
                     ;; Skip before and after text slots. This is
                     ;; useless to us because the way the before/after
                     ;; text actually prints (in the presence of
@@ -3116,8 +3118,8 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                      (enq (cons :same string) strings)
                      (incf my-pos (length string))
                      (incf your-pos (length string)))
-                    ((cons :delete (slot-specifier))
-                     (assert (typep (pop children) 'slot-specifier)))
+
+                    ;; Insertions.
                     ((cons :insert (slot-specifier)))
                     ((cons :insert (and new-ast (ast)))
                      (destructuring-bind (start . end)
@@ -3129,6 +3131,14 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                             strings)
                        (enq (cons :insert insert-end) strings)
                        (setf your-pos end)))
+                    ;; Treat inserting a string as replacing nothing
+                    ;; with something.
+                    ((cons :insert (and string (type string)))
+                     (rec (list :replace "" string)))
+
+                    ;; Deletions.
+                    ((cons :delete (slot-specifier))
+                     (assert (typep (pop children) 'slot-specifier)))
                     ((cons :delete (and old-ast (ast)))
                      (assert (eql old-ast (pop children)))
                      (destructuring-bind (start . end)
@@ -3139,6 +3149,12 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                        (enq (cons :delete (subseq my-text start end)) strings)
                        (enq (cons :delete delete-end) strings)
                        (setf my-pos end)))
+                    ;; Treat deleting a string as replacing something
+                    ;; with nothing.
+                    ((cons :delete (and string (type string)))
+                     (rec (list :replace string "")))
+
+                    ;; Replacements.
                     ((list :replace
                            (and ast1 (ast))
                            (and ast2 (ast)))
@@ -3184,6 +3200,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                      (rec (list :replace
                                 (string before)
                                 (string after))))
+
                     ((list :recurse edit)
                      (rec edit))
                     ((cons :recurse script)
