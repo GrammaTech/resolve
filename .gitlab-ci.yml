@@ -61,13 +61,11 @@ binary-release-deploy:
     - master
 
 
-dependents:
+dependent-bug-injector:
   stage: deploy
-  script:
-    - "curl -X POST -F token=eb76bc2f8009af7005b43bf8f63bb0 -F ref=$CI_BUILD_REF_NAME https://git.grammatech.com/api/v4/projects/347/trigger/pipeline" # bug-injector
-  only:
-    - master
-
+  only: [master]
+  except: [schedules]
+  trigger: synthesis/bug-injector
 
 dependent-mergeresolver:
   stage: deploy
