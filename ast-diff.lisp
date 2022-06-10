@@ -2985,6 +2985,10 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                (ematch* ((pop children1) (pop children2))
                  (((and ast1 (type ast))
                    (and ast2 (type ast)))
+                  (assert (eql (ts:tree-sitter-class-name
+                                (class-of ast1))
+                               (ts:tree-sitter-class-name
+                                (class-of ast2))))
                   (add-to-concordance ast1 ast2)
                   (setf (values forward-map backward-map)
                         (ast-concordance diff
@@ -2994,7 +2998,11 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                                          backward-map)))
                  (((type (not ast))
                    (type (not ast))))))
-              ((list :replace _ _)))))
+              ((list :replace
+                     (and ast1 (ast))
+                     (and ast2 (ast)))
+               (assert (equal ast1 (pop children1)))
+               (assert (equal ast2 (pop children2)))))))
     (values forward-map backward-map)))
 
 (defclass print-diff ()
