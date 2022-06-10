@@ -3223,7 +3223,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                        (print-diff-loop diff script ast1 stream)
                        (save-intertext diff posttext1 posttext2 stream :post)
                        (setf my-pos end1
-                             your-post end2)))))))))))
+                             your-pos end2)))))))))))
 
 (defgeneric print-diff-print (diff stream)
   (:method ((diff print-diff) (stream stream))
