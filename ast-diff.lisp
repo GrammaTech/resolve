@@ -3072,7 +3072,10 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
               (let ((edit (pop script)))
                 (nlet rec ((edit edit))
                   (ematch edit
-                    ;; Skip before and after text slots.
+                    ;; Skip before and after text slots. This is
+                    ;; useless to us because the way the before/after
+                    ;; text actually prints (in the presence of
+                    ;; indentation) may be different.
                     ((cons :same (slot-specifier
                                   (slot-specifier-slot
                                    (or (eql 'ts:before-text)
