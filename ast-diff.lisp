@@ -3013,6 +3013,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
   (:method ((diff print-diff) (script list) (ast null) (stream stream))
     (error "What"))
   (:method ((diff print-diff) (script list) (string string) (stream stream))
+    (declare #+debug-print-diff (optimize debug))
     (with-slots (my-pos your-pos
                  my-text your-text
                  strings
@@ -3051,7 +3052,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                    (enq (cons :delete-string delete-end) strings)
                    (incf my-pos (length string)))))))))
   (:method ((diff print-diff) (script list) (ast ast) (stream stream))
-    (declare (optimize debug))          ;TODO
+    (declare #+debug-print-diff (optimize debug))
     (with-slots (my your
                  my-text your-text
                  my-pos your-pos
