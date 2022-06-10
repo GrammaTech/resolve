@@ -3018,11 +3018,52 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
 (defgeneric print-diff-loop (diff script ast stream)
   (:method ((diff print-diff) (script list) (ast null) (stream stream))
     (error "What"))
+  (:method ((diff print-diff) (script list) (string string) (stream stream))
+    (with-slots (my-pos your-pos
+                 my-text your-text
+                 strings
+                 insert-start insert-end
+                 delete-start delete-end)
+        diff
+      (loop (unless script (return))
+            (let ((edit (pop script)))
+              (nlet rec ((edit edit))
+                (ematch edit
+                  ((cons :delete (and char (type character)))
+                   (rec (cons :delete (string char))))
+                  ((cons :insert (and char (type character)))
+                   (rec (cons :insert (string char))))
+                  ((cons :same (and char (type character)))
+                   (rec (cons :same (string char))))
+                  ((cons :same-sequence (and string (type string)))
+                   (rec (cons :same string)))
+                  ((cons :delete-sequence (and string (type string)))
+                   (rec (cons :delete string)))
+                  ((cons :insert-sequence (and string (type string)))
+                   (rec (cons :insert string)))
+
+                  ((cons :same (and string (type string)))
+                   (enq (cons :same-string string) strings)
+                   (incf my-pos (length string))
+                   (incf your-pos (length string)))
+                  ((cons :insert (and string (type string)))
+                   (enq (cons :insert-string insert-start) strings)
+                   (enq (cons :insert-string string) strings)
+                   (enq (cons :insert-string insert-end) strings)
+                   (incf your-pos (length string)))
+                  ((cons :delete (and string (type string)))
+                   (enq (cons :delete-string delete-start) strings)
+                   (enq (cons :delete-string string) strings)
+                   (enq (cons :delete-string delete-end) strings)
+                   (incf my-pos (length string)))))))))
   (:method ((diff print-diff) (script list) (ast ast) (stream stream))
     (declare (optimize debug))          ;TODO
-    (with-slots
-          (my your my-text your-text concordance range-table my-pos your-pos
-           strings insert-start insert-end delete-start delete-end)
+    (with-slots (my your
+                 my-text your-text
+                 my-pos your-pos
+                 concordance range-table strings
+                 insert-start insert-end
+                 delete-start delete-end)
         diff
       (assert (and my-pos your-pos))
       (let ((children (standardized-children ast)))
@@ -3137,6 +3178,26 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                     ((list :recurse edit)
                      (rec edit))
                     ((cons :recurse script)
+                     (unless (typep (car children) 'string)
+                       (fail))
+                     (let ((string (pop children)))
+                       ;; XXX
+                       (let* ((start1 (search string my-text :start2 my-pos))
+                              ;; TODO Is this right?
+                              (start2 (+ your-pos (- start1 my-pos))))
+                         (subseq my-text my-pos)
+                         (save-intertext
+                          diff
+                          (subseq my-text my-pos start1)
+                          (subseq your-text your-pos start2)
+                          stream
+                          :pre-string)
+                         (setf my-pos start1
+                               your-pos start2))
+                       (print-diff-loop diff script string stream)))
+                    ((cons :recurse script)
+                     (unless (typep (car children) 'ast)
+                       (fail))
                      ;; This grabs the "before" and "after" text from
                      ;; the AST being recursed on. Note this may not
                      ;; be the same as what is stored in the
@@ -3216,7 +3277,8 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
   "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
   (let* ((diff (make-print-diff
-                diff my your
+                diff
+                my your
                 :no-color no-color
                 :delete-start delete-start
                 :delete-end delete-end
