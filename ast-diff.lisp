@@ -3298,26 +3298,177 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
              string)
          stream)))))
 
-(defun print-diff
-    (diff my your &key
-                    (stream *standard-output*)
-                    (no-color nil)
-                    (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
-                    (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
-                    (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
-                    (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+))))
-  "Return a string form of DIFF suitable for printing at the command line.
+(defgeneric print-diff
+    (diff my your &key .
+                    #1=(stream
+                        no-color
+                        delete-start
+                        delete-end
+                        insert-start
+                        insert-end
+                        sort-insert-delete))
+  (:documentation
+   "Return a string form of DIFF suitable for printing at the command line.
+Numerous options are provided to control presentation.")
+  (:method ((diff list) (my software) (your software)
+            &rest kwargs
+            &key . #1#)
+    (declare (ignore . #1#))
+    (apply #'print-diff diff (genome my) (genome your) kwargs))
+  (:method
+      ((diff list) (my ast) (your ast)
+       &key
+         (stream *standard-output*)
+         (no-color nil)
+         (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
+         (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
+         (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
+         (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
+         (sort-insert-delete t))
+    "Return a string form of DIFF suitable for printing at the command line.
 Numerous options are provided to control presentation."
-  (let* ((diff (make-print-diff
-                diff
-                my your
-                :no-color no-color
-                :delete-start delete-start
-                :delete-end delete-end
-                :insert-start insert-start
-                :insert-end insert-end)))
-    (with-string (stream stream)
-      (print-diff-print diff stream))))
+    (nest
+     (let ((*print-escape* nil)
+           ;; These are used to track what color we should be printing
+           ;; in.
+           (*deletep* nil)
+           (*insertp* nil)
+           (insert-buffer nil)
+           (delete-buffer nil))
+       (declare (special *insertp* *deletep*)))
+     (with-string (stream stream))
+     (labels ((%p (c) "Print."
+                (write-string
+                 (typecase c
+                   (null "()")
+                   (structured-text
+                    (continue-color
+                     (string+
+                      (ts:before-text c)
+                      (source-text c)
+                      (ts:after-text c))))
+                   (slot-specifier "")
+                   (t (continue-color (source-text c))))
+                 stream))
+              (continue-color (text)
+                (cond
+                  (no-color text)
+                  (*deletep*
+                   (string-replace-all (string #\Newline) text
+                                       (format nil "~%~a" +color-RED+)))
+                  (*insertp*
+                   (string-replace-all (string #\Newline) text
+                                       (format nil "~%~a" +color-GRN+)))
+                  (t text)))
+              (purge-insert ()
+                (setf *insertp* t)
+                (when insert-buffer
+                  (mapc #'%p (reverse insert-buffer))
+                  (write insert-end :stream stream)
+                  (setf insert-buffer nil))
+                (setf *insertp* nil))
+              (purge-delete ()
+                (setf *deletep* t)
+                (when delete-buffer
+                  (mapc #'%p (reverse delete-buffer))
+                  (write delete-end :stream stream)
+                  (setf delete-buffer nil))
+                (setf *deletep* nil))
+              (push-insert (c)
+                (unless (equal c "")
+                  (purge-delete)
+                  (unless insert-buffer
+                    (write insert-start :stream stream))
+                  (push c insert-buffer)))
+              (push-inserts (l) (mapc #'push-insert l))
+              (push-delete (c)
+                (unless (equal c "")
+                  (purge-insert)
+                  (unless delete-buffer
+                    (write delete-start :stream stream))
+                  (push c delete-buffer)))
+              (push-deletes (l) (mapc #'push-delete l))
+              (purge ()
+                (purge-insert)
+                (purge-delete))
+              (pr (c) (purge) (%p c))
+              (%print-wrap (content)
+                (destructuring-bind (sub-diff path left-wrap
+                                     right-wrap . rest)
+                    content
+                  (declare (ignore path rest))
+                  (mapc #'push-inserts left-wrap)
+                  (%print-diff sub-diff)
+                  (mapc #'push-inserts (reverse right-wrap))))
+              (%print-unwrap (content)
+                (destructuring-bind (sub-diff path left-wrap right-wrap)
+                    content
+                  (declare (ignore path))
+                  (mapc #'push-deletes left-wrap)
+                  (%print-diff sub-diff)
+                  (mapc #'push-deletes (reverse right-wrap))))
+              (%print-diff (diff)
+                (case (car diff)
+                  ((:wrap) (%print-wrap (cdr diff)))
+                  ((:unwrap) (%print-unwrap (cdr diff)))
+                  (t
+                   (assert (every #'consp diff))
+                   (when sort-insert-delete
+                     (setf diff (simplify-diff-for-printing diff)))
+                   (mapc (lambda-bind ((type . content))
+                           (ecase type
+                             (:same (pr content))
+                             (:delete (push-delete content))
+                             (:insert (push-insert content))
+                             ;; The :replace case is used only when
+                             ;; sort-insert-delete is NIL.  Otherwise,
+                             ;; these have been broken up into :insert
+                             ;; and :delete already
+                             (:replace
+                              (push-insert (cadr content))
+                              (push-delete (car content)))
+                             (:recurse (%print-diff content))
+                             (:same-sequence (map nil #'pr content))
+                             (:insert-sequence
+                              (map nil #'push-insert content))
+                             (:delete-sequence
+                              (map nil #'push-delete content))
+                             (:same-tail (map nil #'pr content))
+                             (:wrap-sequence (%print-wrap (cdr content)))
+                             (:unwrap-sequence (%print-unwrap content))
+                             (:recurse-tail
+                              (%print-diff
+                               (remove-if
+                                (lambda (e)
+                                  (or (equal e '(:delete))
+                                      (equal e '(:insert))))
+                                content)))))
+                         diff)))))
+       (%print-diff diff)
+       (purge)
+       (values))))
+  (:method ((diff list)
+            (my structured-text)
+            (your structured-text)
+            &key
+              (stream *standard-output*)
+              (no-color nil)
+              (delete-start (if no-color "[-" (format nil "~a[-" +color-RED+)))
+              (delete-end (if no-color "-]" (format nil "-]~a" +color-RST+)))
+              (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
+              (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
+              sort-insert-delete)
+    (declare (ignore sort-insert-delete))
+    (let* ((diff (make-print-diff
+                  diff
+                  my your
+                  :no-color no-color
+                  :delete-start delete-start
+                  :delete-end delete-end
+                  :insert-start insert-start
+                  :insert-end insert-end)))
+      (with-string (stream stream)
+        (print-diff-print diff stream)))))
 
 (defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the

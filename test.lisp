@@ -575,46 +575,44 @@
     diff))
 
 (deftest print-lisp-diff.1 ()
-  (is (equalp (let ((v1 (from-string 'cl ""))
-                    (v2 (from-string 'cl "")))
-                (print-diff (ast-diff v1 v2)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-              "")
-      "Print diff of empty lists"))
+  (let ((v1 (astify '()))
+        (v2 (astify '())))
+    (is (equalp (with-output-to-string (s)
+                  (print-diff (ast-diff v1 v2)
+                              v1 v2
+                              :no-color t :stream s))
+                "")
+        "Print diff of empty lists")))
 
 (deftest print-lisp-diff.2 ()
-  (is (equalp (let ((v1 (from-string 'cl "()"))
-                    (v2 (from-string 'cl "()")))
-                (print-diff (ast-diff v1 v2)
-                            v1 v2
-                            :no-color t
-                            :stream nil))
-              "()")
-      "Print diff of list of empty list"))
+  (let ((v1 (astify '(())))
+        (v2 (astify '(()))))
+    (is (equalp (with-output-to-string (s)
+                  (print-diff (ast-diff v1 v2)
+                              v1 v2
+                              :no-color t :stream s))
+                "()")
+        "Print diff of list of empty list")))
 
 (deftest print-lisp-diff.3 ()
-  (is (equal (let ((v1 (from-string 'cl ""))
-                   (v2 (from-string 'cl "()")))
-               (apply-printed-diff
-                (print-diff (ast-diff v1 v2)
-                            v1 v2
-                            :no-color t
-                            :stream nil)))
-             "()")
-      "Print diff of insertion of empty list"))
+  (let ((v1 (astify '()))
+        (v2 (astify '(()))))
+    (is (equalp (with-output-to-string (s)
+                  (print-diff (ast-diff v1 v2)
+                              v1 v2
+                              :no-color t :stream s))
+                "{+()+}")
+        "Print diff of insertion of empty list")))
 
 (deftest print-lisp-diff.4 ()
-  (is (equalp (let ((v1 (from-string 'cl "()"))
-                    (v2 (from-string 'cl "")))
-                (apply-printed-diff
-                 (print-diff (ast-diff v1 v2)
-                             v1 v2
-                             :no-color t
-                             :stream nil)))
-              "")
-      "Print diff of deletion of empty list"))
+  (let  ((v1 (astify '(())))
+         (v2 (astify '())))
+    (is (equalp (with-output-to-string (s)
+                  (print-diff (ast-diff v1 v2)
+                              v1 v2
+                              :no-color t :stream s))
+                "[-()-]")
+        "Print diff of deletion of empty list")))
 
 (deftest sexp-diff-on-ast-file ()
   (with-fixture resolve-asd-file-forms
