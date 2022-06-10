@@ -2905,11 +2905,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                  (assert (typep ast2 'slot-specifier))
                  (progn
                    (when (typep (list ast1 ast2)
-                                '(tuple tree-sitter-ast tree-sitter-ast))
-                     (assert (eql (ts:tree-sitter-class-name
-                                   (class-of ast1))
-                                  (ts:tree-sitter-class-name
-                                   (class-of ast2)))))
+                                '(tuple tree-sitter-ast tree-sitter-ast)))
                    (setf (gethash ast1 forward-map) ast2
                          (gethash ast2 backward-map) ast1)))))
       (iter (while (or children1 children2))
@@ -2938,10 +2934,6 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                (ematch* ((pop children1) (pop children2))
                  (((and ast1 (type ast))
                    (and ast2 (type ast)))
-                  (assert (eql (ts:tree-sitter-class-name
-                                (class-of ast1))
-                               (ts:tree-sitter-class-name
-                                (class-of ast2))))
                   (add-to-concordance ast1 ast2)
                   (setf (values forward-map backward-map)
                         (ast-concordance diff
@@ -3277,10 +3269,6 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                            after-text2
                            (values (subseq my-text last-child1-end end1)
                                    (subseq your-text last-child2-end end2))))
-                       (assert (eql (ts:tree-sitter-class-name
-                                     (class-of ast1))
-                                    (ts:tree-sitter-class-name
-                                     (class-of ast2))))
                        (save-intertext diff pretext1 pretext2 stream
                                        :recurse-pre-text)
                        (save-intertext diff before-text1 before-text2 stream
