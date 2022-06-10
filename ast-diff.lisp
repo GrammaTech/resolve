@@ -3147,7 +3147,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                         (subseq my-text my-pos start1)
                         (subseq your-text your-pos start2)
                         stream
-                        :pre)
+                        :pre-replace-asts)
                        (enq (cons :replace (subseq your-text start2 end2))
                             strings)
                        (setf my-pos end1
@@ -3163,7 +3163,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                                        (subseq my-text my-pos before-start)
                                        (subseq your-text your-pos after-start)
                                        stream
-                                       :pre)
+                                       :pre-replace-strings)
                        (setf my-pos before-start
                              your-pos after-start))
                      (save-intertext diff before after stream :replace)
@@ -3225,11 +3225,13 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                                      (class-of ast1))
                                     (ts:tree-sitter-class-name
                                      (class-of ast2))))
-                       (save-intertext diff pretext1 pretext2 stream :pre)
+                       (save-intertext diff pretext1 pretext2 stream
+                                       :pre-recurse)
                        (setf my-pos first-child1-start
                              your-pos first-child2-start)
                        (print-diff-loop diff script ast1 stream)
-                       (save-intertext diff posttext1 posttext2 stream :post)
+                       (save-intertext diff posttext1 posttext2 stream
+                                       :post-recurse)
                        (setf my-pos end1
                              your-pos end2)))))))))))
 
