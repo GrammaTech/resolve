@@ -3088,18 +3088,23 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                     ;; ((cons :same (and string (type string)))
                     ;;  (assert (equal string (pop children)))
                     ;;  (enq (cons :same string) strings))
-                    ((cons :same (and ast (ast)))
-                     (assert (eql ast (pop children)))
-                     (destructuring-bind (start . end)
-                         (@ range-table ast)
-                       (when (< my-pos start)
-                         (enq (cons :pre (subseq my-text my-pos start))
-                              strings))
-                       (enq (cons :pre (subseq my-text start end))
+                    ((cons :same (and my-ast (ast)))
+                     (assert (eql my-ast (pop children)))
+                     (mvlet* ((your-ast (@ concordance my-ast))
+                              (my-start my-end
+                               (car+cdr (@ range-table my-ast)))
+                              (your-start your-end
+                               (car+cdr (@ range-table your-ast))))
+                       (save-intertext
+                        diff
+                        (subseq my-text my-pos my-start)
+                        (subseq your-text your-pos your-start)
+                        stream
+                        :pre-same-ast)
+                       (enq (cons :same (subseq my-text my-start my-end))
                             strings)
-                       (setf my-pos end
-                             your-pos
-                             (cdr (@ range-table (@ concordance ast))))))
+                       (setf my-pos my-end
+                             your-pos your-end)))
                     ((cons (or :same :same-sequence)
                            (and string (type string)))
                      (assert (equal string (pop children)))
