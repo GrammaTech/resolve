@@ -3018,10 +3018,10 @@ or insert-delete pair.")
                           delete-end))
             strings)))))))
 
-(defgeneric print-diff-loop (diff script ast stream)
-  (:method ((diff print-diff) (script list) (ast null) (stream stream))
-    (error "What"))
-  (:method ((diff print-diff) (script list) (string string) (stream stream))
+(defgeneric print-diff-loop (diff script ast)
+  (:method ((diff print-diff) (script list) (ast null))
+    (error "This shouldn't happen."))
+  (:method ((diff print-diff) (script list) (string string))
     (declare #+debug-print-diff (optimize debug))
     (with-slots (my-pos your-pos
                  my-text your-text
@@ -3060,7 +3060,7 @@ or insert-delete pair.")
                    (enq (cons :delete-string string) strings)
                    (enq (cons :delete-string delete-end) strings)
                    (incf my-pos (length string)))))))))
-  (:method ((diff print-diff) (script list) (ast ast) (stream stream))
+  (:method ((diff print-diff) (script list) (ast ast))
     (declare #+debug-print-diff (optimize debug))
     (with-slots (my your
                  my-text your-text
@@ -3219,7 +3219,7 @@ or insert-delete pair.")
                           :pre-string)
                          (setf my-pos start1
                                your-pos start2))
-                       (print-diff-loop diff script string stream)))
+                       (print-diff-loop diff script string)))
                     ((cons :recurse script)
                      (unless (typep (car children) 'ast)
                        (fail))
@@ -3280,7 +3280,7 @@ or insert-delete pair.")
                                        :recurse-before-text)
                        (setf my-pos first-child1-start
                              your-pos first-child2-start)
-                       (print-diff-loop diff script ast1 stream)
+                       (print-diff-loop diff script ast1)
                        (save-intertext diff after-text1 after-text2
                                        :recurse-after-text)
                        (setf my-pos end1
@@ -3294,7 +3294,7 @@ or insert-delete pair.")
 (defgeneric print-diff-print (diff stream)
   (:method ((diff print-diff) (stream stream))
     (with-slots (my script strings) diff
-      (print-diff-loop diff script my stream)
+      (print-diff-loop diff script my)
       (dolist (string (qlist strings))
         (write-string
          (if (listp string)
