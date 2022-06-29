@@ -3018,6 +3018,36 @@ or insert-delete pair.")
                           delete-end))
             strings)))))))
 
+(defun normalize-edit-for-print (edit)
+  (match edit
+    ((cons :delete (and char (type character)))
+     (cons :delete (string char)))
+    ((cons :insert (and char (type character)))
+     (cons :insert (string char)))
+    ((cons :same (and char (type character)))
+     (cons :same (string char)))
+    ((cons :same-sequence (and string (type string)))
+     (cons :same string))
+    ((cons :delete-sequence (and string (type string)))
+     (cons :delete string))
+    ((cons :insert-sequence (and string (type string)))
+     (cons :insert string))
+    ;; Treat inserting a string as replacing nothing
+    ;; with something.
+    ((cons :insert (and string (type string)))
+     (list :replace "" string))
+    ;; Treat deleting a string as replacing something
+    ;; with nothing.
+    ((cons :delete (and string (type string)))
+     (list :replace string ""))
+    ((list :replace
+           (and before (character))
+           (and after (character)))
+     (list :replace
+           (string before)
+           (string after)))
+    (otherwise edit)))
+
 (defgeneric print-diff-loop (diff script ast)
   (:documentation "Loop through SCRIPT, pointers in the AST and source
   text of both versions, using a precomputed \"concordance\" of AST
@@ -3026,6 +3056,7 @@ or insert-delete pair.")
   (:method ((diff print-diff) (script list) (ast null))
     (error "This shouldn't happen."))
   (:method ((diff print-diff) (script list) (string string))
+    "Handle printing the diff of two strings."
     (declare #+debug-print-diff (optimize debug))
     (with-slots (my-pos your-pos
                  my-text your-text
@@ -3033,37 +3064,22 @@ or insert-delete pair.")
                  insert-start insert-end
                  delete-start delete-end)
         diff
-      (loop (unless script (return))
-            (let ((edit (pop script)))
-              (nlet rec ((edit edit))
-                (ematch edit
-                  ((cons :delete (and char (type character)))
-                   (rec (cons :delete (string char))))
-                  ((cons :insert (and char (type character)))
-                   (rec (cons :insert (string char))))
-                  ((cons :same (and char (type character)))
-                   (rec (cons :same (string char))))
-                  ((cons :same-sequence (and string (type string)))
-                   (rec (cons :same string)))
-                  ((cons :delete-sequence (and string (type string)))
-                   (rec (cons :delete string)))
-                  ((cons :insert-sequence (and string (type string)))
-                   (rec (cons :insert string)))
-
-                  ((cons :same (and string (type string)))
-                   (enq (cons :same-string string) strings)
-                   (incf my-pos (length string))
-                   (incf your-pos (length string)))
-                  ((cons :insert (and string (type string)))
-                   (enq (cons :insert-string insert-start) strings)
-                   (enq (cons :insert-string string) strings)
-                   (enq (cons :insert-string insert-end) strings)
-                   (incf your-pos (length string)))
-                  ((cons :delete (and string (type string)))
-                   (enq (cons :delete-string delete-start) strings)
-                   (enq (cons :delete-string string) strings)
-                   (enq (cons :delete-string delete-end) strings)
-                   (incf my-pos (length string)))))))))
+      (dolist (edit script)
+        (ematch (normalize-edit-for-print edit)
+          ((cons :same (and string (type string)))
+           (enq (cons :same-string string) strings)
+           (incf my-pos (length string))
+           (incf your-pos (length string)))
+          ((cons :insert (and string (type string)))
+           (enq (cons :insert-string insert-start) strings)
+           (enq (cons :insert-string string) strings)
+           (enq (cons :insert-string insert-end) strings)
+           (incf your-pos (length string)))
+          ((cons :delete (and string (type string)))
+           (enq (cons :delete-string delete-start) strings)
+           (enq (cons :delete-string string) strings)
+           (enq (cons :delete-string delete-end) strings)
+           (incf my-pos (length string)))))))
   (:method ((diff print-diff) (script list) (ast ast))
     (declare #+debug-print-diff (optimize debug))
     (with-slots (my your
@@ -3078,13 +3094,13 @@ or insert-delete pair.")
         (loop (unless script
                 (return))
               (let ((edit (pop script)))
-                (nlet rec ((edit edit))
+                (nlet recurse ((edit edit))
                   #+debug-print-diff
                   (format t "~&BEFORE EDIT: ~a~%MY   | ~a~%~&YOUR | ~a~2%"
                           edit
                           (subseq my-text my-pos)
                           (subseq your-text your-pos))
-                  (ematch edit
+                  (ematch (normalize-edit-for-print edit)
                     ;; "Same" edits.
 
                     ;; Skip before and after text slots. This is
@@ -3138,10 +3154,6 @@ or insert-delete pair.")
                             strings)
                        (enq (cons :insert insert-end) strings)
                        (setf your-pos end)))
-                    ;; Treat inserting a string as replacing nothing
-                    ;; with something.
-                    ((cons :insert (and string (type string)))
-                     (rec (list :replace "" string)))
 
                     ;; Deletions.
                     ((cons :delete (slot-specifier))
@@ -3156,10 +3168,6 @@ or insert-delete pair.")
                        (enq (cons :delete (subseq my-text start end)) strings)
                        (enq (cons :delete delete-end) strings)
                        (setf my-pos end)))
-                    ;; Treat deleting a string as replacing something
-                    ;; with nothing.
-                    ((cons :delete (and string (type string)))
-                     (rec (list :replace string "")))
 
                     ;; Replacements.
                     ((list :replace
@@ -3198,15 +3206,9 @@ or insert-delete pair.")
                      (save-intertext diff before after :replace)
                      (incf my-pos (length before))
                      (incf your-pos (length after)))
-                    ((list :replace
-                           (and before (character))
-                           (and after (character)))
-                     (rec (list :replace
-                                (string before)
-                                (string after))))
 
                     ((list :recurse edit)
-                     (rec edit))
+                     (recurse edit))
                     ((cons :recurse script)
                      (unless (typep (car children) 'string)
                        (fail))
