@@ -3019,6 +3019,10 @@ or insert-delete pair.")
             strings)))))))
 
 (defgeneric print-diff-loop (diff script ast)
+  (:documentation "Loop through SCRIPT, pointers in the AST and source
+  text of both versions, using a precomputed \"concordance\" of AST
+  that are the same between versions to isolate changed string
+  segments for printing.")
   (:method ((diff print-diff) (script list) (ast null))
     (error "This shouldn't happen."))
   (:method ((diff print-diff) (script list) (string string))
