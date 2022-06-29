@@ -2984,9 +2984,14 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
           (ast-range-table your))
          kwargs))
 
-(defgeneric save-intertext (diff v1 v2 stream &optional key)
-  (:documentation "Record the differences between V1 and V2, if any, in DIFF.")
-  (:method ((diff print-diff) (v1 string) (v2 string) (stream stream)
+(defgeneric save-intertext (diff v1 v2 &optional key)
+  (:documentation "Record, in DIFF, the relationship between V1 and
+  V2, if any, in DIFF, indexed by KEY for debugging purposes.
+
+V1 and V2 are two strings that are known to be \"the same\", such that
+any difference between them should be recorded as an insert, delete,
+or insert-delete pair.")
+  (:method ((diff print-diff) (v1 string) (v2 string)
             &optional (key :unknown))
     (with-slots (insert-start insert-end delete-start delete-end strings) diff
       (cond
@@ -3105,7 +3110,6 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                         diff
                         (subseq my-text my-pos my-start)
                         (subseq your-text your-pos your-start)
-                        stream
                         :pre-same-ast)
                        (enq (cons :same (subseq my-text my-start my-end))
                             strings)
@@ -3166,13 +3170,11 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                         diff
                         (subseq my-text my-pos start1)
                         (subseq your-text your-pos start2)
-                        stream
                         :pre-replace-asts)
                        (save-intertext
                         diff
                         (subseq my-text start1 end1)
                         (subseq your-text start2 end2)
-                        stream
                         :replace-ast)
                        (setf my-pos end1
                              your-pos end2)))
@@ -3186,11 +3188,10 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                        (save-intertext diff
                                        (subseq my-text my-pos before-start)
                                        (subseq your-text your-pos after-start)
-                                       stream
                                        :pre-replace-strings)
                        (setf my-pos before-start
                              your-pos after-start))
-                     (save-intertext diff before after stream :replace)
+                     (save-intertext diff before after :replace)
                      (incf my-pos (length before))
                      (incf your-pos (length after)))
                     ((list :replace
@@ -3215,7 +3216,6 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                           diff
                           (subseq my-text my-pos start1)
                           (subseq your-text your-pos start2)
-                          stream
                           :pre-string)
                          (setf my-pos start1
                                your-pos start2))
@@ -3274,14 +3274,14 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                            after-text2
                            (values (subseq my-text last-child1-end end1)
                                    (subseq your-text last-child2-end end2))))
-                       (save-intertext diff pretext1 pretext2 stream
+                       (save-intertext diff pretext1 pretext2
                                        :recurse-pre-text)
-                       (save-intertext diff before-text1 before-text2 stream
+                       (save-intertext diff before-text1 before-text2
                                        :recurse-before-text)
                        (setf my-pos first-child1-start
                              your-pos first-child2-start)
                        (print-diff-loop diff script ast1 stream)
-                       (save-intertext diff after-text1 after-text2 stream
+                       (save-intertext diff after-text1 after-text2
                                        :recurse-after-text)
                        (setf my-pos end1
                              your-pos end2))))
