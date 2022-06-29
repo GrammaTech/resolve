@@ -3103,38 +3103,51 @@ or insert-delete pair.")
                   (ematch (normalize-edit-for-print edit)
                     ;; "Same" edits.
 
-                    ;; Skip before and after text slots. This is
-                    ;; useless to us because the way the before/after
-                    ;; text actually prints (in the presence of
-                    ;; indentation) may be different.
+                    ;; Skip the before-text and after-text slot
+                    ;; specifiers and their values. They is useless
+                    ;; for printing, because the way the before/after
+                    ;; text actually prints may change in the presence
+                    ;; of indentation.
                     ((cons :same (slot-specifier
                                   (slot-specifier-slot
                                    (or (eql 'ts:before-text)
                                        (eql 'ts:after-text)))))
+                     ;; Pop the value from the script.
                      (pop script)
+                     ;; Pop the specifier and value from the children.
                      (assert (typep (pop children) 'slot-specifier))
                      (pop children))
+
+                    ;; Skip all other slot specifiers.
                     ((cons :same (slot-specifier))
                      (assert (typep (pop children) 'slot-specifier)))
                     ;; ((cons :same (and string (type string)))
                     ;;  (assert (equal string (pop children)))
                     ;;  (enq (cons :same string) strings))
                     ((cons :same (and my-ast (ast)))
+                     ;; Given an AST that is unchanged, use the
+                     ;; concordance to find the same AST in the other
+                     ;; tree, and collect edits accordingly.
                      (assert (eql my-ast (pop children)))
                      (mvlet* ((your-ast (@ concordance my-ast))
                               (my-start my-end
                                (car+cdr (@ range-table my-ast)))
                               (your-start your-end
                                (car+cdr (@ range-table your-ast))))
+                       ;; Record any changes before the AST.
                        (save-intertext
                         diff
                         (subseq my-text my-pos my-start)
                         (subseq your-text your-pos your-start)
                         :pre-same-ast)
+                       ;; Record the text of the AST itself.
+                       ;; TODO Is this right, if indentation has changed?
                        (enq (cons :same (subseq my-text my-start my-end))
                             strings)
+                       ;; Increment the pointers.
                        (setf my-pos my-end
                              your-pos your-end)))
+                    ;; Print two strings that are the same.
                     ((cons (or :same :same-sequence)
                            (and string (type string)))
                      (assert (equal string (pop children)))
@@ -3142,12 +3155,16 @@ or insert-delete pair.")
                      (incf my-pos (length string))
                      (incf your-pos (length string)))
 
-                    ;; Insertions.
+                    ;; INSERTIONS.
+
+                    ;; Skip slot specifiers.
                     ((cons :insert (slot-specifier)))
+                    ;; Insert a new AST.
                     ((cons :insert (and new-ast (ast)))
                      (destructuring-bind (start . end)
                          (@ range-table new-ast)
                        (enq (cons :insert insert-start) strings)
+                       ;; Pick up structured text inserted before the AST.
                        (enq (cons :insert-pre (subseq your-text your-pos start))
                             strings)
                        (enq (cons :insert (subseq your-text start end))
@@ -3155,21 +3172,28 @@ or insert-delete pair.")
                        (enq (cons :insert insert-end) strings)
                        (setf your-pos end)))
 
-                    ;; Deletions.
+                    ;; DELETIONS.
+
+                    ;; Skip slot specifiers.
                     ((cons :delete (slot-specifier))
                      (assert (typep (pop children) 'slot-specifier)))
+                    ;; Delete an AST (without replacing it).
                     ((cons :delete (and old-ast (ast)))
                      (assert (eql old-ast (pop children)))
                      (destructuring-bind (start . end)
                          (@ range-table old-ast)
                        (enq (cons :delete delete-start) strings)
+                       ;; Catch structured text that was deleted along
+                       ;; with the AST.
                        (enq (cons :delete-pre (subseq my-text my-pos start))
                             strings)
                        (enq (cons :delete (subseq my-text start end)) strings)
                        (enq (cons :delete delete-end) strings)
                        (setf my-pos end)))
 
-                    ;; Replacements.
+                    ;; REPLACEMENTS
+
+                    ;; Replace an AST with another AST.
                     ((list :replace
                            (and ast1 (ast))
                            (and ast2 (ast)))
@@ -3178,11 +3202,13 @@ or insert-delete pair.")
                               (car+cdr (@ range-table ast1)))
                              (start2 end2
                               (car+cdr (@ range-table ast2))))
+                       ;; Pick up changes to the before text.
                        (save-intertext
                         diff
                         (subseq my-text my-pos start1)
                         (subseq your-text your-pos start2)
                         :pre-replace-asts)
+                       ;; Record the changed AST.
                        (save-intertext
                         diff
                         (subseq my-text start1 end1)
@@ -3197,6 +3223,7 @@ or insert-delete pair.")
                      (let ((before-start (search before my-text :start2 my-pos))
                            (after-start (search after your-text :start2 your-pos)))
                        (assert (and before-start after-start))
+                       ;; Pick up changes to the before text.
                        (save-intertext diff
                                        (subseq my-text my-pos before-start)
                                        (subseq your-text your-pos after-start)
@@ -3207,17 +3234,27 @@ or insert-delete pair.")
                      (incf my-pos (length before))
                      (incf your-pos (length after)))
 
+                    ;; RECURSION.
+
+                    ;; Recurse on a single edit.
                     ((list :recurse edit)
                      (recurse edit))
+                    ;; Recursion on a string.
                     ((cons :recurse script)
                      (unless (typep (car children) 'string)
                        (fail))
                      (let ((string (pop children)))
-                       ;; XXX
+                       ;; TODO Find the start of the string by syncing
+                       ;; it against the source text. Could this
+                       ;; produce false positives?
                        (let* ((start1 (search string my-text :start2 my-pos))
-                              ;; TODO Is this right?
+                              ;; TODO Is this right? How could we get
+                              ;; the text of the other string? Do we
+                              ;; need a way of tracking the start and
+                              ;; end of strings so we can add them to
+                              ;; the concordance?
                               (start2 (+ your-pos (- start1 my-pos))))
-                         (subseq my-text my-pos)
+                         ;; Pick up the before text.
                          (save-intertext
                           diff
                           (subseq my-text my-pos start1)
@@ -3225,15 +3262,14 @@ or insert-delete pair.")
                           :pre-string)
                          (setf my-pos start1
                                your-pos start2))
+                       ;; Actually recurse into the string diff.
                        (print-diff-loop diff script string)))
+                    ;; Recursion on an AST.
                     ((cons :recurse script)
                      (unless (typep (car children) 'ast)
                        (fail))
                      ;; This grabs the "before" and "after" text from
-                     ;; the AST being recursed on. Note this may not
-                     ;; be the same as what is stored in the
-                     ;; before-text and after-text slots, because of
-                     ;; automatically calculated indentation.
+                     ;; the AST being recursed on.
                      (mvlet*
                          ((ast1 (assure ast (pop children)))
                           (start1 end1
@@ -3241,7 +3277,8 @@ or insert-delete pair.")
                           (ast2 (assure ast (@ concordance ast1)))
                           (start2 end2
                            (car+cdr (@ range-table ast2)))
-                          ;; Tree-sitter children, not standardized children.
+                          ;; NB Tree-sitter children, not standardized
+                          ;; children.
                           (children1 children2
                            (values (children ast1)
                                    (children ast2)))
@@ -3271,6 +3308,10 @@ or insert-delete pair.")
                            (values
                             (subseq my-text my-pos start1)
                             (subseq your-text your-pos start2)))
+                          ;; NB before-text and after-text are not be
+                          ;; the same as what is stored in the
+                          ;; before-text and after-text slots, because
+                          ;; of automatically calculated indentation.
                           (before-text1
                            before-text2
                            (values
@@ -3280,13 +3321,19 @@ or insert-delete pair.")
                            after-text2
                            (values (subseq my-text last-child1-end end1)
                                    (subseq your-text last-child2-end end2))))
+                       ;; Record changes in the pretext.
                        (save-intertext diff pretext1 pretext2
                                        :recurse-pre-text)
+                       ;; Record changes in the before text.
                        (save-intertext diff before-text1 before-text2
                                        :recurse-before-text)
                        (setf my-pos first-child1-start
                              your-pos first-child2-start)
+                       ;; Recurse on the children.
                        (print-diff-loop diff script ast1)
+                       ;; Record changes in the after text. This is
+                       ;; the only case where structured text inserted
+                       ;; after a node is picked up.
                        (save-intertext diff after-text1 after-text2
                                        :recurse-after-text)
                        (setf my-pos end1
