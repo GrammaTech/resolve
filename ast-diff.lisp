@@ -2965,9 +2965,12 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
    (delete-end :initarg :delete-end :type string)
    (insert-start :initarg :insert-start :type string)
    (insert-end :initarg :insert-end :type string)
-   (strings :initform (queue))))
+   (strings :initform (queue)))
+  (:documentation "Encapsulation of the state and configuration
+  required to print a diff."))
 
 (defun make-print-diff (script my your &rest kwargs &key &allow-other-keys)
+  "Make a `print-diff' instance from SCRIPT, MY, YOUR, and KWARGS."
   (apply #'make 'print-diff
          :script script
          :my (astify my)
@@ -2982,6 +2985,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
          kwargs))
 
 (defgeneric save-intertext (diff v1 v2 stream &optional key)
+  (:documentation "Record the differences between V1 and V2, if any, in DIFF.")
   (:method ((diff print-diff) (v1 string) (v2 string) (stream stream)
             &optional (key :unknown))
     (with-slots (insert-start insert-end delete-start delete-end strings) diff
