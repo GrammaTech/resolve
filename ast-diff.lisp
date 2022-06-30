@@ -4056,7 +4056,11 @@ and convert it back to whatever internal form this kind of AST uses."))
                 `(,(caar ordering)
                   ,@(mappend #'cdr ordering)))
               (assort (children-slot-specifier-alist ast) :key #'car))))
-    (flatten (ordered-calist))))
+    (flatten
+     (remove '(ts::before-asts ts::after-asts)
+             (ordered-calist)
+             :key (compose #'slot-specifier-slot #'car)
+             :test (flip #'memq)))))
 
 (defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
   "The default method uses ordinary copy, treating the children list
