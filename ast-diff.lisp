@@ -3215,6 +3215,7 @@ or insert-delete pair.")
                         :replace-ast)
                        (setf my-pos end1
                              your-pos end2)))
+                    ;; Replace a string with another string.
                     ((list :replace
                            (and before (type string))
                            (and after (type string)))
@@ -3238,7 +3239,7 @@ or insert-delete pair.")
                     ;; Recurse on a single edit.
                     ((list :recurse edit)
                      (recurse edit))
-                    ;; Recursion on a string.
+                    ;; Recurse on a string.
                     ((cons :recurse script)
                      (unless (typep (car children) 'string)
                        (fail))
@@ -3266,7 +3267,7 @@ or insert-delete pair.")
                                your-pos start2))
                        ;; Actually recurse into the string diff.
                        (print-diff-loop diff script my-string)))
-                    ;; Recursion on an AST.
+                    ;; Recurse on an AST.
                     ((cons :recurse script)
                      (unless (typep (car children) 'ast)
                        (fail))
@@ -3347,6 +3348,7 @@ or insert-delete pair.")
                           (subseq your-text your-pos)))))))))
 
 (defgeneric print-diff-print (diff stream)
+  (:documentation "Print DIFF (a `print-diff' instance) to STREAM.")
   (:method ((diff print-diff) (stream stream))
     (with-slots (my script strings) diff
       (print-diff-loop diff script my)
@@ -3384,8 +3386,7 @@ Numerous options are provided to control presentation.")
          (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
          (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
          (sort-insert-delete t))
-    "Return a string form of DIFF suitable for printing at the command line.
-Numerous options are provided to control presentation."
+    "Default method for ASTs that do not inherit from structured text."
     (nest
      (let ((*print-escape* nil)
            ;; These are used to track what color we should be printing
@@ -3517,6 +3518,7 @@ Numerous options are provided to control presentation."
               (insert-start (if no-color "{+" (format nil "~a{+" +color-GRN+)))
               (insert-end (if no-color "+}" (format nil "+}~a" +color-RST+)))
               sort-insert-delete)
+    "Print a diff between structured text ASTs."
     (declare (ignore sort-insert-delete))
     (let* ((diff (make-print-diff
                   diff
