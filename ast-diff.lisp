@@ -3019,34 +3019,39 @@ or insert-delete pair.")
             strings)))))))
 
 (defun normalize-edit-for-print (edit)
-  (match edit
-    ((cons :delete (and char (type character)))
-     (cons :delete (string char)))
-    ((cons :insert (and char (type character)))
-     (cons :insert (string char)))
-    ((cons :same (and char (type character)))
-     (cons :same (string char)))
-    ((cons :same-sequence (and string (type string)))
-     (cons :same string))
-    ((cons :delete-sequence (and string (type string)))
-     (cons :delete string))
-    ((cons :insert-sequence (and string (type string)))
-     (cons :insert string))
-    ;; Treat inserting a string as replacing nothing
-    ;; with something.
-    ((cons :insert (and string (type string)))
-     (list :replace "" string))
-    ;; Treat deleting a string as replacing something
-    ;; with nothing.
-    ((cons :delete (and string (type string)))
-     (list :replace string ""))
-    ((list :replace
-           (and before (character))
-           (and after (character)))
-     (list :replace
-           (string before)
-           (string after)))
-    (otherwise edit)))
+  (flet ((normalize (edit)
+           (match edit
+             ((cons :delete (and char (type character)))
+              (cons :delete (string char)))
+             ((cons :insert (and char (type character)))
+              (cons :insert (string char)))
+             ((cons :same (and char (type character)))
+              (cons :same (string char)))
+             ((cons :same-sequence (and string (type string)))
+              (cons :same string))
+             ((cons :delete-sequence (and string (type string)))
+              (cons :delete string))
+             ((cons :insert-sequence (and string (type string)))
+              (cons :insert string))
+             ;; Treat inserting a string as replacing nothing
+             ;; with something.
+             ((cons :insert (and string (type string)))
+              (list :replace "" string))
+             ;; Treat deleting a string as replacing something
+             ;; with nothing.
+             ((cons :delete (and string (type string)))
+              (list :replace string ""))
+             ((list :replace
+                    (and before (character))
+                    (and after (character)))
+              (list :replace
+                    (string before)
+                    (string after)))
+             (otherwise edit))))
+    (nlet fix ((edit edit))
+      (let ((normalized (normalize edit)))
+        (if (eql normalized edit) edit
+            (fix normalized))))))
 
 (defgeneric print-diff-loop (diff script ast)
   (:documentation "Loop through SCRIPT, pointers in the AST and source
@@ -3070,16 +3075,12 @@ or insert-delete pair.")
            (enq (cons :same-string string) strings)
            (incf my-pos (length string))
            (incf your-pos (length string)))
-          ((cons :insert (and string (type string)))
-           (enq (cons :insert-string insert-start) strings)
-           (enq (cons :insert-string string) strings)
-           (enq (cons :insert-string insert-end) strings)
-           (incf your-pos (length string)))
-          ((cons :delete (and string (type string)))
-           (enq (cons :delete-string delete-start) strings)
-           (enq (cons :delete-string string) strings)
-           (enq (cons :delete-string delete-end) strings)
-           (incf my-pos (length string)))))))
+          ((list :replace "" (and y (type string)))
+           (save-intertext diff "" y :insert))
+          ((list :replace (and x (type string)) "")
+           (save-intertext diff x "" :delete))
+          ((list :replace (and x (type string)) (and y (type string)))
+           (save-intertext diff x y :replace))))))
   (:method ((diff print-diff) (script list) (ast ast))
     (declare #+debug-print-diff (optimize debug))
     (with-slots (my your
