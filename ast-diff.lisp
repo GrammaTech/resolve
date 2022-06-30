@@ -3141,7 +3141,6 @@ or insert-delete pair.")
                         (subseq your-text your-pos your-start)
                         :pre-same-ast)
                        ;; Record the text of the AST itself.
-                       ;; TODO Is this right, if indentation has changed?
                        (enq (cons :same (subseq my-text my-start my-end))
                             strings)
                        ;; Increment the pointers.
@@ -3243,17 +3242,20 @@ or insert-delete pair.")
                     ((cons :recurse script)
                      (unless (typep (car children) 'string)
                        (fail))
-                     (let ((string (pop children)))
+                     (let ((my-string (pop children)))
                        ;; TODO Find the start of the string by syncing
                        ;; it against the source text. Could this
                        ;; produce false positives?
-                       (let* ((start1 (search string my-text :start2 my-pos))
-                              ;; TODO Is this right? How could we get
-                              ;; the text of the other string? Do we
-                              ;; need a way of tracking the start and
-                              ;; end of strings so we can add them to
-                              ;; the concordance?
-                              (start2 (+ your-pos (- start1 my-pos))))
+                       (let* ((start1
+                               (or (search my-string my-text :start2 my-pos)
+                                   (error "Unable to sync on ~s" my-string)))
+                              ;; Reconstruct the text of the second string.
+                              (your-string (ast-patch my-string script))
+                              (start2
+                               (or (search your-string your-text
+                                           :start2 your-pos)
+                                   (error "Unable to sync on ~s (reconstructed)"
+                                          your-string))))
                          ;; Pick up the before text.
                          (save-intertext
                           diff
@@ -3263,7 +3265,7 @@ or insert-delete pair.")
                          (setf my-pos start1
                                your-pos start2))
                        ;; Actually recurse into the string diff.
-                       (print-diff-loop diff script string)))
+                       (print-diff-loop diff script my-string)))
                     ;; Recursion on an AST.
                     ((cons :recurse script)
                      (unless (typep (car children) 'ast)
