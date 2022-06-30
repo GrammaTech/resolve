@@ -4024,7 +4024,7 @@ and convert it back to whatever internal form this kind of AST uses."))
 
 (let ((before-asts-slot-specifier
         (make-instance 'slot-specifier
-                       :class t :slot 'ts::before-asts :arity 1))
+                       :class t :slot 'ts::before-asts :arity 0))
       (before-text-slot-specifier
        (make-instance 'slot-specifier
                       :class t :slot 'ts::before-text :arity 1))
@@ -4033,7 +4033,7 @@ and convert it back to whatever internal form this kind of AST uses."))
                        :class t :slot 'ts::after-text :arity 1))
       (after-asts-slot-specifier
        (make-instance 'slot-specifier
-                      :class t :slot 'ts::after-asts :arity 1)))
+                      :class t :slot 'ts::after-asts :arity 0)))
   (defmethod standardized-children :around ((ast structured-text))
     ;; Add information in for the 'text slot.
     `(,before-asts-slot-specifier
@@ -4059,7 +4059,7 @@ and convert it back to whatever internal form this kind of AST uses."))
     (flatten
      (remove '(ts::before-asts ts::after-asts)
              (ordered-calist)
-             :key (compose #'slot-specifier-slot #'car)
+             :key [#'slot-specifier-slot #'car]
              :test (flip #'memq)))))
 
 (defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
