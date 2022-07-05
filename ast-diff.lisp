@@ -3290,84 +3290,77 @@ before and after ASTs."
                     (fail))
                   ;; This grabs the "before" and "after" text from
                   ;; the AST being recursed on.
-                  (mvlet*
-                      ((ast1 (assure ast (pop children)))
-                       (start1 end1 (get-range ast1))
-                       (ast2 (assure ast (@ concordance ast1)))
-                       (start2 end2 (get-range ast2))
-                       ;; NB Tree-sitter children, not standardized
-                       ;; children.
-                       (children1 children2
-                        (values
-                         (children ast1)
-                         (children ast2)))
-                       (first-child1
-                        first-child2
-                        (values (or (first children1) ast1)
-                                (or (first children2) ast2)))
-                       (last-child1
-                        last-child2
-                        (values (or (lastcar children1) ast1)
-                                (or (lastcar children2) ast2)))
-                       (first-child1-start
-                        first-child2-start
-                        (values
-                         (get-range first-child1)
-                         (get-range first-child2)))
-                       (last-child1-end
-                        last-child2-end
-                        (values
-                         (nth-value 1 (get-range last-child1))
-                         (nth-value 1 (get-range last-child2))))
-                       ;; NB "pretext" is distinct from before-text
-                       ;; in that it comes before the AST (it is
-                       ;; the leading structured text).
-                       (pretext1
-                        pretext2
-                        (progn
-                          (assert (<= my-pos start1))
-                          (assert (<= your-pos start2))
-                          (values
-                           (subseq my-text my-pos start1)
-                           (subseq your-text your-pos start2))))
-                       ;; NB before-text and after-text are not be
-                       ;; the same as what is stored in the
-                       ;; before-text and after-text slots, because
-                       ;; of automatically calculated indentation.
-                       (before-text1
-                        before-text2
-                        (progn
-                          (assert (<= start1 first-child1-start))
-                          (assert (<= start2 first-child2-start))
-                          (values
-                           (subseq my-text start1 first-child1-start)
-                           (subseq your-text start2 first-child2-start))))
-                       (after-text1
-                        after-text2
-                        (values (subseq my-text last-child1-end end1)
-                                (subseq your-text last-child2-end end2))))
-                    (declare (array-index
-                              first-child1-start first-child2-start
-                              last-child1-end last-child2-end))
-                    ;; (assert (<= my-pos start1 first-child1-start last-child1-end))
-                    ;; (assert (<= your-pos start2 first-child2-start last-child2-end))
-                    ;; Record changes in the pretext.
-                    (save-intertext diff pretext1 pretext2
-                                    :recurse-pre-text)
-                    ;; Record changes in the before text.
-                    (save-intertext diff before-text1 before-text2
-                                    :recurse-before-text)
-                    (setf my-pos first-child1-start
-                          your-pos first-child2-start)
-                    ;; Recurse on the children.
-                    (print-diff-loop diff script ast1)
-                    ;; Record changes in the after text. This is
-                    ;; the only case where structured text inserted
-                    ;; after a node is picked up.
-                    (save-intertext diff after-text1 after-text2
-                                    :recurse-after-text)
-                    (setf my-pos end1
-                          your-pos end2))))
+                  (flet ((get-child-bounds (ast)
+                           "Return four values: the start of AST, the
+                           start of AST's first child, the end of
+                           AST's last child, and the end of AST."
+                           (mvlet ((start end (get-range ast))
+                                   (children (children ast)))
+                             (values start
+                                     (if children
+                                         (get-range (first children))
+                                         start)
+                                     (if children
+                                         (nth-value 1
+                                                    (get-range (lastcar children)))
+                                         end)
+                                     end))))
+                    (mvlet*
+                        ((ast1 (assure ast (pop children)))
+                         (ast2 (assure ast (@ concordance ast1)))
+                         (start1 first-child1-start last-child1-end end1
+                          (get-child-bounds ast1))
+                         (start2 first-child2-start last-child2-end end2
+                          (get-child-bounds ast2))
+                         ;; NB "pretext" is distinct from before-text
+                         ;; in that it comes before the AST (it is
+                         ;; the leading structured text).
+                         (pretext1
+                          pretext2
+                          (progn
+                            (assert (<= my-pos start1))
+                            (assert (<= your-pos start2))
+                            (values
+                             (subseq my-text my-pos start1)
+                             (subseq your-text your-pos start2))))
+                         ;; NB before-text and after-text are not be
+                         ;; the same as what is stored in the
+                         ;; before-text and after-text slots, because
+                         ;; of automatically calculated indentation.
+                         (before-text1
+                          before-text2
+                          (progn
+                            (assert (<= start1 first-child1-start))
+                            (assert (<= start2 first-child2-start))
+                            (values
+                             (subseq my-text start1 first-child1-start)
+                             (subseq your-text start2 first-child2-start))))
+                         (after-text1
+                          after-text2
+                          (values (subseq my-text last-child1-end end1)
+                                  (subseq your-text last-child2-end end2))))
+                      (declare (array-index
+                                first-child1-start first-child2-start
+                                last-child1-end last-child2-end))
+                      ;; (assert (<= my-pos start1 first-child1-start last-child1-end))
+                      ;; (assert (<= your-pos start2 first-child2-start last-child2-end))
+                      ;; Record changes in the pretext.
+                      (save-intertext diff pretext1 pretext2
+                                      :recurse-pre-text)
+                      ;; Record changes in the before text.
+                      (save-intertext diff before-text1 before-text2
+                                      :recurse-before-text)
+                      (setf my-pos first-child1-start
+                            your-pos first-child2-start)
+                      ;; Recurse on the children.
+                      (print-diff-loop diff script ast1)
+                      ;; Record changes in the after text. This is
+                      ;; the only case where structured text inserted
+                      ;; after a node is picked up.
+                      (save-intertext diff after-text1 after-text2
+                                      :recurse-after-text)
+                      (setf my-pos end1
+                            your-pos end2)))))
                #+debug-print-diff
                (format t "~&AFTER EDIT: ~a~%MY   | ~a~%YOUR | ~a~2%"
                        edit
