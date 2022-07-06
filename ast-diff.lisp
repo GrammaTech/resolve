@@ -2893,6 +2893,15 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                                                         newlines)))))
      (ast-source-ranges root))))
 
+(-> range-table-starting-positions (hash-table)
+    (values vector &optional))
+(Defun range-table-starting-positions (table)
+  (let (starting-positions)
+    (do-hash-table (k v table)
+      (declare (ignore k))
+      (push (car v) starting-positions))
+    (sort-new starting-positions #'<)))
+
 (defun ast-concordance (diff root1 root2
                         &optional
                           (forward-map (make-hash-table))
@@ -2958,6 +2967,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
    (your-text :initarg :your-text :type string)
    (concordance :initarg :concordance :type hash-table)
    (range-table :initarg :range-table :type hash-table)
+   (starting-positions :initarg :starting-positions :type vector)
    (my-pos :initarg :my-pos :initform 0 :type array-index)
    (your-pos :initarg :your-pos :initform 0 :type array-index)
    (no-color :initarg :no-color :type boolean)
@@ -2971,18 +2981,20 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
 
 (defun make-diff-printer (script my your &rest kwargs &key &allow-other-keys)
   "Make a `diff-printer' instance from SCRIPT, MY, YOUR, and KWARGS."
-  (apply #'make 'diff-printer
-         :script script
-         :my (astify my)
-         :your (astify your)
-         :my-text (source-text my)
-         :your-text (source-text your)
-         :concordance (ast-concordance script my your)
-         :range-table
+  (let ((range-table
          (merge-tables
           (ast-range-table my)
-          (ast-range-table your))
-         kwargs))
+          (ast-range-table your))))
+    (apply #'make 'diff-printer
+           :script script
+           :my (astify my)
+           :your (astify your)
+           :my-text (source-text my)
+           :your-text (source-text your)
+           :concordance (ast-concordance script my your)
+           :range-table range-table
+           :starting-positions (range-table-starting-positions range-table)
+           kwargs)))
 
 (defgeneric save-intertext (diff v1 v2 &optional key)
   (:documentation "Record, in DIFF, the relationship between V1 and
@@ -3070,6 +3082,13 @@ before and after ASTs."
                          (get-range
                           (or (lastcar (ts:after-asts ast))
                               ast)))))))
+
+(defun next-ast-start (diff pos)
+  (flet ((next-ast-start (starting-positions pos)
+           (let ((idx (bisect-left starting-positions pos #'<)))
+             (aref starting-positions idx))))
+    (with-slots (starting-positions) diff
+      (next-ast-start starting-positions pos))))
 
 (defgeneric print-diff-loop (diff script ast)
   (:documentation "Loop through SCRIPT, pointers in the AST and source
