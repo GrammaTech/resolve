@@ -3084,8 +3084,10 @@ before and after ASTs."
                               ast)))))))
 
 (defun next-ast-start (diff pos)
+  "Get the starting position of the next AST after POS.
+Note that this does not include ASTs that start on POS."
   (flet ((next-ast-start (starting-positions pos)
-           (let ((idx (bisect-left starting-positions pos #'<)))
+           (let ((idx (bisect-right starting-positions pos #'<)))
              (aref starting-positions idx))))
     (with-slots (starting-positions) diff
       (next-ast-start starting-positions pos))))
