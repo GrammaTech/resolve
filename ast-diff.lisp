@@ -3111,7 +3111,11 @@ before and after ASTs."
          diff
        (assert (and my-pos your-pos)))
      (let ((children (standardized-children ast))))
-     (flet ((get-range (ast) (get-range diff ast))))
+     (flet ((get-range (ast) (get-range diff ast))
+            (get-start (ast) (nth-value 0 (get-range diff ast)))
+            (get-end (ast) (nth-value 1 (get-range diff ast))))
+       (declare (inline get-range get-start get-end)
+                (ignorable #'get-start #'get-end)))
      (loop (unless script
              (return))
            (let ((edit (pop script)))
@@ -3291,20 +3295,25 @@ before and after ASTs."
                   ;; This grabs the "before" and "after" text from
                   ;; the AST being recursed on.
                   (flet ((get-child-bounds (ast)
-                           "Return four values: the start of AST, the
-                           start of AST's first child, the end of
-                           AST's last child, and the end of AST."
-                           (mvlet ((start end (get-range ast))
-                                   (children (children ast)))
-                             (values start
-                                     (if children
-                                         (get-range (first children))
-                                         start)
-                                     (if children
-                                         (nth-value 1
-                                                    (get-range (lastcar children)))
-                                         end)
-                                     end))))
+                           "Return four values: the start of
+                           AST (inclusive of before-asts), the start
+                           of AST's first child, the end of AST's last
+                           child, and the end of AST (inclusive of
+                           after-asts)."
+                           (mvlet ((ast-start ast-end (get-range ast))
+                                   (children
+                                    (append (ts:before-asts ast)
+                                            (children ast)
+                                            (ts:after-asts ast))))
+                             (values
+                              ast-start
+                              (if children
+                                  (get-start (first children))
+                                  ast-start)
+                              (if children
+                                  (get-end (lastcar children))
+                                  ast-end)
+                              ast-end))))
                     (mvlet*
                         ((ast1 (assure ast (pop children)))
                          (ast2 (assure ast (@ concordance ast1)))
