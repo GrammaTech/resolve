@@ -3137,11 +3137,10 @@ before and after ASTs."
                (ematch (normalize-edit-for-print edit)
                  ;; "Same" edits.
 
-                 ;; Skip the before-text and after-text slot
-                 ;; specifiers and their values. They is useless
-                 ;; for printing, because the way the before/after
-                 ;; text actually prints may change in the presence
-                 ;; of indentation.
+                 ;; TODO Disabled, but we're still going to need
+                 ;; special handling of before-text and after-text
+                 ;; because they can vary with indentation.
+                 #+(or)
                  ((cons :same (slot-specifier
                                (slot-specifier-slot
                                 (or (eql 'ts:before-text)
@@ -3337,36 +3336,25 @@ before and after ASTs."
                           pretext2
                           (values
                            (subseq* my-text my-pos start1)
-                           (subseq* your-text your-pos start2)))
-                         ;; NB before-text and after-text are not be
-                         ;; the same as what is stored in the
-                         ;; before-text and after-text slots, because
-                         ;; of automatically calculated indentation.
-                         (before-text1
-                          before-text2
-                          (progn
-                            (assert (<= start1 first-child1-start))
-                            (assert (<= start2 first-child2-start))
-                            (values
-                             (subseq my-text start1 first-child1-start)
-                             (subseq your-text start2 first-child2-start))))
+                           (subseq* your-text your-pos start2)))p
                          (after-text1
                           after-text2
                           (values (subseq my-text last-child1-end end1)
                                   (subseq your-text last-child2-end end2))))
                       (declare (array-index
                                 first-child1-start first-child2-start
-                                last-child1-end last-child2-end))
+                                last-child1-end last-child2-end)
+                               (ignore first-child1-start first-child2-start))
                       ;; (assert (<= my-pos start1 first-child1-start last-child1-end))
                       ;; (assert (<= your-pos start2 first-child2-start last-child2-end))
                       ;; Record changes in the pretext.
                       (save-intertext diff pretext1 pretext2
                                       :recurse-pre-text)
                       ;; Record changes in the before text.
-                      (save-intertext diff before-text1 before-text2
-                                      :recurse-before-text)
-                      (setf my-pos first-child1-start
-                            your-pos first-child2-start)
+                      ;; (save-intertext diff before-text1 before-text2
+                      ;;                 :recurse-before-text)
+                      (incf my-pos (length pretext1))
+                      (incf your-pos (length pretext2))
                       ;; Recurse on the children.
                       (print-diff-loop diff script ast1)
                       ;; Record changes in the after text. This is
