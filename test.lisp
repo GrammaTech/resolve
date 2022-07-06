@@ -569,7 +569,7 @@
              '((a . 3) (b . 2)))))
 
 (defun apply-printed-diff (diff)
-  (let* ((diff (regex-replace-all "(\\[-.*?-\\])" diff ""))
+  (let* ((diff (regex-replace-all "((?s)\\[-.*?-\\])" diff ""))
          (diff (string-replace-all "{+" diff ""))
          (diff (string-replace-all "+}" diff "")))
     diff))
