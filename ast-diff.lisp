@@ -3117,7 +3117,7 @@ before and after ASTs."
            (let ((edit (pop script)))
              (nlet recurse ((edit edit))
                #+debug-print-diff
-               (format t "~&BEFORE EDIT: ~a~%MY   | ~a~%~&YOUR | ~a~2%"
+               (format t "~&BEFORE EDIT: ~s~%MY   | ~s~%~&YOUR | ~s~2%"
                        edit
                        (subseq my-text my-pos)
                        (subseq your-text your-pos))
@@ -3362,7 +3362,7 @@ before and after ASTs."
                       (setf my-pos end1
                             your-pos end2)))))
                #+debug-print-diff
-               (format t "~&AFTER EDIT: ~a~%MY   | ~a~%YOUR | ~a~2%"
+               (format t "~&AFTER EDIT: ~s~%MY   | ~s~%YOUR | ~s~2%"
                        edit
                        (subseq my-text my-pos)
                        (subseq your-text your-pos))))))))
