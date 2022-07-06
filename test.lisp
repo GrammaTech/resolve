@@ -798,9 +798,10 @@
           (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000 :base-cost 0)
         (is (equal (keys diff) '(c-binary-expression :delete :recurse :same :wrap)))
         (is (= cost 6))
-        ;; (print-diff diff :no-color t)
+        #+debug-print-diff (print-diff diff :no-color t)
         (is (source-text= s2 (ast-patch obj1 diff)))
         ;; TODO
+        #+debug-print-diff
         (is (equal (with-output-to-string (*standard-output*)
                      (print-diff diff obj1 obj2 :no-color t))
                    "int f() { return 1{++2+}; }")))
@@ -809,6 +810,7 @@
         (is (equal (keys diff) '(:insert :recurse :same :unwrap)))
         (is (= cost 6))
         (is (source-text= s1 (ast-patch obj2 diff)))
+        #+debug-print-diff
         (is (equal (with-output-to-string (*standard-output*)
                      (print-diff diff :no-color t))
                    "int f() { return 1[-+2-]; }")))
@@ -836,6 +838,7 @@
       (is (= cost 35))
       ;; TODO
       (is (source-text= s2 (ast-patch obj1 diff)))
+      #+debug-print-diff
       (let ((s (with-output-to-string (*standard-output*)
                  (print-diff diff :no-color t))))
         (is (equal s "int f(int x, int y{+, int p+}) { int c = 1; {+if (p == 0) { +}int z = x+y; return z+c;{+ } return 0;+} }"))))
@@ -846,6 +849,7 @@
         (is (equal k '(:delete :recurse :same :unwrap-sequence))))
       (is (= cost 35))
       (is (source-text= s1 (ast-patch obj2 diff)))
+      #+debug-print-diff
       (let ((s (with-output-to-string (*standard-output*) (print-diff diff :no-color t))))
         (is (equal s "int f(int x, int y[-, int p-]) { int c = 1; [-if (p == 0) { -]int z = x+y; return z+c;[- } return 0;-] }")))
       )))
