@@ -3111,6 +3111,15 @@ before and after ASTs."
          diff
        (assert (and my-pos your-pos)))
      (let ((children (standardized-children ast))))
+     (macrolet ((subseq* (seq start &optional end)
+                  "Make it easier to track down subseq bounds errors."
+                  (if (and end (featurep :debug-print-diff))
+                      (progn
+                        (assert (every #'symbolp (list start end)))
+                        `(progn
+                           (assert (<= ,start ,end))
+                           (subseq ,seq ,start ,end)))
+                      `(subseq ,seq ,start ,@(and end (list end)))))))
      (flet ((get-range (ast) (get-range diff ast))
             (get-start (ast) (nth-value 0 (get-range diff ast)))
             (get-end (ast) (nth-value 1 (get-range diff ast))))
@@ -3123,8 +3132,8 @@ before and after ASTs."
                #+debug-print-diff
                (format t "~&BEFORE EDIT: ~s~%MY   | ~s~%~&YOUR | ~s~2%"
                        edit
-                       (subseq my-text my-pos)
-                       (subseq your-text your-pos))
+                       (subseq* my-text my-pos)
+                       (subseq* your-text your-pos))
                (ematch (normalize-edit-for-print edit)
                  ;; "Same" edits.
 
@@ -3160,11 +3169,11 @@ before and after ASTs."
                     ;; Record any changes before the AST.
                     (save-intertext
                      diff
-                     (subseq my-text my-pos my-start)
-                     (subseq your-text your-pos your-start)
+                     (subseq* my-text my-pos my-start)
+                     (subseq* your-text your-pos your-start)
                      :pre-same-ast)
                     ;; Record the text of the AST itself.
-                    (enq (cons :same (subseq my-text my-start my-end))
+                    (enq (cons :same (subseq* my-text my-start my-end))
                          strings)
                     ;; Increment the pointers.
                     (setf my-pos my-end
@@ -3186,9 +3195,9 @@ before and after ASTs."
                   (multiple-value-bind (start end) (get-range new-ast)
                     (enq (cons :insert insert-start) strings)
                     ;; Pick up structured text inserted before the AST.
-                    (enq (cons :insert-pre (subseq your-text your-pos start))
+                    (enq (cons :insert-pre (subseq* your-text your-pos start))
                          strings)
-                    (enq (cons :insert (subseq your-text start end))
+                    (enq (cons :insert (subseq* your-text start end))
                          strings)
                     (enq (cons :insert insert-end) strings)
                     (setf your-pos end)))
@@ -3205,9 +3214,9 @@ before and after ASTs."
                     (enq (cons :delete delete-start) strings)
                     ;; Catch structured text that was deleted along
                     ;; with the AST.
-                    (enq (cons :delete-pre (subseq my-text my-pos start))
+                    (enq (cons :delete-pre (subseq* my-text my-pos start))
                          strings)
-                    (enq (cons :delete (subseq my-text start end)) strings)
+                    (enq (cons :delete (subseq* my-text start end)) strings)
                     (enq (cons :delete delete-end) strings)
                     (setf my-pos end)))
 
@@ -3224,14 +3233,14 @@ before and after ASTs."
                     ;; Pick up changes to the before text.
                     (save-intertext
                      diff
-                     (subseq my-text my-pos start1)
-                     (subseq your-text your-pos start2)
+                     (subseq* my-text my-pos start1)
+                     (subseq* your-text your-pos start2)
                      :pre-replace-asts)
                     ;; Record the changed AST.
                     (save-intertext
                      diff
-                     (subseq my-text start1 end1)
-                     (subseq your-text start2 end2)
+                     (subseq* my-text start1 end1)
+                     (subseq* your-text start2 end2)
                      :replace-ast)
                     (setf my-pos end1
                           your-pos end2)))
@@ -3245,8 +3254,8 @@ before and after ASTs."
                     (declare (array-index before-start after-start))
                     ;; Pick up changes to the before text.
                     (save-intertext diff
-                                    (subseq my-text my-pos before-start)
-                                    (subseq your-text your-pos after-start)
+                                    (subseq* my-text my-pos before-start)
+                                    (subseq* your-text your-pos after-start)
                                     :pre-replace-strings)
                     (setf my-pos before-start
                           your-pos after-start))
@@ -3268,21 +3277,21 @@ before and after ASTs."
                     ;; it against the source text. Could this
                     ;; produce false positives?
                     (let* ((start1
-                            (or (search my-string my-text :start2 my-pos)
-                                (error "Unable to sync on ~s" my-string)))
+                             (or (search my-string my-text :start2 my-pos)
+                                 (error "Unable to sync on ~s" my-string)))
                            ;; Reconstruct the text of the second string.
                            (your-string (ast-patch my-string script))
                            (start2
-                            (or (search your-string your-text
-                                        :start2 your-pos)
-                                (error "Unable to sync on ~s (reconstructed)"
-                                       your-string))))
+                             (or (search your-string your-text
+                                         :start2 your-pos)
+                                 (error "Unable to sync on ~s (reconstructed)"
+                                        your-string))))
                       (declare (array-index start1 start2))
                       ;; Pick up the before text.
                       (save-intertext
                        diff
-                       (subseq my-text my-pos start1)
-                       (subseq your-text your-pos start2)
+                       (subseq* my-text my-pos start1)
+                       (subseq* your-text your-pos start2)
                        :pre-string)
                       (setf my-pos start1
                             your-pos start2))
@@ -3326,12 +3335,9 @@ before and after ASTs."
                          ;; the leading structured text).
                          (pretext1
                           pretext2
-                          (progn
-                            (assert (<= my-pos start1))
-                            (assert (<= your-pos start2))
-                            (values
-                             (subseq my-text my-pos start1)
-                             (subseq your-text your-pos start2))))
+                          (values
+                           (subseq* my-text my-pos start1)
+                           (subseq* your-text your-pos start2)))
                          ;; NB before-text and after-text are not be
                          ;; the same as what is stored in the
                          ;; before-text and after-text slots, because
