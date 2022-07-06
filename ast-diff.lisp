@@ -2950,7 +2950,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                (assert (equal ast2 (pop children2)))))))
     (values forward-map backward-map)))
 
-(defclass print-diff ()
+(defclass diff-printer ()
   ((script :initarg :script :type list)
    (my :initarg :my :type ast)
    (your :initarg :your :type ast)
@@ -2969,9 +2969,9 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
   (:documentation "Encapsulation of the state and configuration
   required to print a diff."))
 
-(defun make-print-diff (script my your &rest kwargs &key &allow-other-keys)
-  "Make a `print-diff' instance from SCRIPT, MY, YOUR, and KWARGS."
-  (apply #'make 'print-diff
+(defun make-diff-printer (script my your &rest kwargs &key &allow-other-keys)
+  "Make a `diff-printer' instance from SCRIPT, MY, YOUR, and KWARGS."
+  (apply #'make 'diff-printer
          :script script
          :my (astify my)
          :your (astify your)
@@ -2991,7 +2991,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
 V1 and V2 are two strings that are known to be \"the same\", such that
 any difference between them should be recorded as an insert, delete,
 or insert-delete pair.")
-  (:method ((diff print-diff) (v1 string) (v2 string)
+  (:method ((diff diff-printer) (v1 string) (v2 string)
             &optional (key :unknown))
     (with-slots (insert-start insert-end delete-start delete-end strings) diff
       (cond
@@ -3076,9 +3076,9 @@ before and after ASTs."
   text of both versions, using a precomputed \"concordance\" of AST
   that are the same between versions to isolate changed string
   segments for printing.")
-  (:method ((diff print-diff) (script list) (ast null))
+  (:method ((diff diff-printer) (script list) (ast null))
     (error "This shouldn't happen."))
-  (:method ((diff print-diff) (script list) (string string))
+  (:method ((diff diff-printer) (script list) (string string))
     "Handle printing the diff of two strings."
     (declare #+debug-print-diff (optimize debug))
     (with-slots (my-pos your-pos
@@ -3099,7 +3099,7 @@ before and after ASTs."
            (save-intertext diff x "" :delete))
           ((list :replace (and x (type string)) (and y (type string)))
            (save-intertext diff x y :replace))))))
-  (:method ((diff print-diff) (script list) (ast ast))
+  (:method ((diff diff-printer) (script list) (ast ast))
     (declare #+debug-print-diff (optimize debug))
     (nest
      (with-slots (my your
@@ -3367,9 +3367,9 @@ before and after ASTs."
                        (subseq my-text my-pos)
                        (subseq your-text your-pos))))))))
 
-(defgeneric print-diff-print (diff stream)
-  (:documentation "Print DIFF (a `print-diff' instance) to STREAM.")
-  (:method ((diff print-diff) (stream stream))
+(defgeneric diff-printer-print (diff stream)
+  (:documentation "Print DIFF (a `diff-printer' instance) to STREAM.")
+  (:method ((diff diff-printer) (stream stream))
     (with-slots (my script strings) diff
       (print-diff-loop diff script my)
       (dolist (string (qlist strings))
@@ -3540,7 +3540,7 @@ Numerous options are provided to control presentation.")
               sort-insert-delete)
     "Print a diff between structured text ASTs."
     (declare (ignore sort-insert-delete))
-    (let* ((diff (make-print-diff
+    (let* ((diff (make-diff-printer
                   diff
                   my your
                   :no-color no-color
@@ -3549,7 +3549,7 @@ Numerous options are provided to control presentation.")
                   :insert-start insert-start
                   :insert-end insert-end)))
       (with-string (stream stream)
-        (print-diff-print diff stream)))))
+        (diff-printer-print diff stream)))))
 
 (defun simplify-diff-for-printing (diff)
   "Rearrange DIFF so that in each chunk of inserts and delete, the
