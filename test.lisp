@@ -1026,11 +1026,23 @@
                    (from-string* 'javascript "/* The slow brown fox. */
 foobaz();")))
 
+(deftest tricky-print-diff.11a ()
+  "Minor similarities."
+  (test-print-diff (from-string* 'javascript "\" The quick brown fox. \"; foobar();
+")
+                   (from-string* 'javascript "\" The slow brown fox. \";
+foobaz();")))
+
 (deftest tricky-print-diff.12 ()
   "Minor similarities."
-  (test-print-diff (from-string* 'javascript "/* The quick brown fox. */ foobar();
-")
+  (test-print-diff (from-string* 'javascript "/* The quick brown fox. */ foobar();")
                    (from-string* 'javascript "/* The slow brown fox. */
+foobaz();")))
+
+(deftest tricky-print-diff.12a ()
+  "Minor similarities."
+  (test-print-diff (from-string* 'javascript "\" The quick brown fox. \"; foobar();")
+                   (from-string* 'javascript "\" The slow brown fox. \";
 foobaz();")))
 
 
