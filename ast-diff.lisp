@@ -2671,8 +2671,9 @@ and replicating the others."
             (let* ((action1 (caar script1))
                    (action2 (caar script2))
                    (val (list action1 action2)))
-              (declare (type (member :same :delete :recurse) action1 action2))
-              ;; actions are one of: :same, :delete, :recurse
+              (declare (type (member :same :delete :recurse :replace)
+                             action1 action2))
+              ;; actions are one of: :same, :delete, :recurse, :replace
               ;; Don't do :same-tail, :recurse-tail here
               (flet ((%check (s1 s2)
                        (assert (equal? s1 s2) () "MELD-SCRIPTS ~a: ~
