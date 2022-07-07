@@ -4152,7 +4152,9 @@ as the ordinary children list."
               if the slot doesn't have any children."
              (map nil
                   (lambda (slot-specifier)
-                    (unless (assoc slot-specifier child-alist)
+                    (unless (assoc slot-specifier child-alist
+                                   :test (op (eql (slot-specifier-slot _)
+                                                  (slot-specifier-slot _))))
                       (push (list slot-specifier) child-alist)))
                   (child-slot-specifiers ast))
              child-alist)
