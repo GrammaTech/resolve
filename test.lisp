@@ -871,11 +871,17 @@
               (source-text ast3) (ast-to-list-form ast3)))
     (is (equal? ast2 ast3))))
 
-(defun %f (s) (from-string (make-instance 'c) s))
+(defun from-string* (class string)
+  "Like `from-string', but assert there are no parse errors or source
+text fragments."
+  (lret ((result (genome (from-string class string))))
+    (assert (notany (of-type '(or parse-error-ast
+                               source-text-fragment))
+                    result))))
 
-(defun test-print-diff (v1 v2 &key result base-cost)
-  (let* ((v1 (if (stringp v1) (%f v1) v1))
-         (v2 (if (stringp v2) (%f v2) v2))
+(defun test-print-diff (v1 v2 &key result base-cost (lang 'c))
+  (let* ((v1 (if (stringp v1) (from-string lang v1) v1))
+         (v2 (if (stringp v2) (from-string lang v2) v2))
          (diff (print-diff (multiple-value-call #'ast-diff
                              v1 v2
                              (if base-cost
@@ -967,12 +973,6 @@
 ;; See <https://difftastic.wilfred.me.uk/tricky_cases.html> for
 ;; tricky-print-diff.
 
-(defun from-string* (class string)
-  (lret ((result (genome (from-string class string))))
-    (assert (notany (of-type '(or parse-error-ast
-                               source-text-fragment))
-                    result))))
-
 ;;; Using Javascript for these since its parser is so robust.
 
 (deftest tricky-print-diff.1 ()
@@ -983,78 +983,101 @@
 
 (deftest tricky-print-diff.2 ()
   "Changing delimiters."
-  (test-print-diff (from-string* 'javascript "(x)")
-                   (from-string* 'javascript "[x]")
+  (test-print-diff "(x)"
+                   "[x]"
+                   :lang 'javascript
                    #+(or) "{+[+}[-(-]x{+)+}[-]-]"))
 
 (deftest tricky-print-diff.3 ()
   "Expanding delimiters."
-  (test-print-diff (from-string* 'javascript "([x], y)")
-                   (from-string* 'javascript "([x, y])")
+  (test-print-diff "([x], y)"
+                   "([x, y])"
+                   :lang 'javascript
                    #+(or) "fn([x{+, y+}]{-, y-})"))
 
 (deftest tricky-print-diff.4 ()
   "Contracting delimiters."
-  (test-print-diff (from-string* 'javascript "fn([x, y]);")
-                   (from-string* 'javascript "fn([x], y);")
+  (test-print-diff "fn([x, y]);"
+                   "fn([x], y);"
+                   :lang 'javascript
                    #+(or) "fn([x{+, y+}]{-, y-})"))
 
 (deftest tricky-print-diff.5 ()
   "Disconnected delimiters."
-  (test-print-diff (from-string* 'javascript "(foo, (bar))")
-                   (from-string* 'javascript "(foo, (novel), (bar))")
+  (test-print-diff "(foo, (bar))"
+                   "(foo, (novel), (bar))"
+                   :lang 'javascript
                    #+(or) "(foo, {+(novel)+}, (bar))"))
 
 (deftest tricky-print-diff.6 ()
   "Rewrapping large nodes."
-  (test-print-diff (from-string* 'javascript "[[foo]]; (x, y)")
-                   (from-string* 'javascript "([[foo]], x, y)")))
+  (test-print-diff "[[foo]]; (x, y)"
+                   "([[foo]], x, y)"
+                   :lang 'javascript))
 
 (deftest tricky-print-diff.7 ()
   "Reordering within a list."
-  (test-print-diff (from-string* 'javascript "(x, y)")
-                   (from-string* 'javascript "(y, x)")))
+  (test-print-diff "(x, y)"
+                   "(y, x)"
+                   :lang 'javascript))
 
 (deftest tricky-print-diff.8 ()
   "Middle insertions."
-  (test-print-diff (from-string* 'javascript "foo(bar(123))")
-                   (from-string* 'javascript "foo(extra(bar(123)))")))
+  (test-print-diff "foo(bar(123))"
+                   "foo(extra(bar(123)))"
+                   :lang 'javascript))
 
 (deftest tricky-print-diff.9 ()
   "Depth."
-  (test-print-diff (from-string* 'javascript "if (true) { foo(123); }; foo(456);")
-                   (from-string* 'javascript "foo(789);")))
+  (test-print-diff
+   "if (true) {
+    foo(123);
+};
+foo(456);"
+   "foo(789);"
+   :lang 'javascript))
 
 (deftest tricky-print-diff.10 ()
   "Minor similarities."
-  (test-print-diff (from-string* 'javascript "function foo(x) { return x + 1; }")
-                   (from-string* 'javascript "function bar(y) { baz(y); }")))
+  (test-print-diff
+   "function foo(x) {
+    return x + 1;
+}"
+   "function bar(y) {
+  baz(y);
+}"
+   :lang 'javascript))
 
 (deftest tricky-print-diff.11 ()
   "Minor similarities."
-  (test-print-diff (from-string* 'javascript "/* The quick brown fox. */ foobar();
-")
-                   (from-string* 'javascript "/* The slow brown fox. */
-foobaz();")))
+  (test-print-diff
+   "/* The quick brown fox. */ foobar();
+"
+   "/* The slow brown fox. */
+foobaz();"
+   :lang 'javascript))
 
 (deftest tricky-print-diff.11a ()
   "Minor similarities."
-  (test-print-diff (from-string* 'javascript "\" The quick brown fox. \"; foobar();
-")
-                   (from-string* 'javascript "\" The slow brown fox. \";
-foobaz();")))
+  (test-print-diff "\" The quick brown fox. \"; foobar();
+"
+                   "\" The slow brown fox. \";
+foobaz();"
+                   :lang 'javascript))
 
 (deftest tricky-print-diff.12 ()
   "Minor similarities."
-  (test-print-diff (from-string* 'javascript "/* The quick brown fox. */ foobar();")
-                   (from-string* 'javascript "/* The slow brown fox. */
-foobaz();")))
+  (test-print-diff "/* The quick brown fox. */ foobar();"
+                   "/* The slow brown fox. */
+foobaz();"
+                   :lang 'javascript))
 
 (deftest tricky-print-diff.12a ()
   "Minor similarities."
-  (test-print-diff (from-string* 'javascript "\" The quick brown fox. \"; foobar();")
-                   (from-string* 'javascript "\" The slow brown fox. \";
-foobaz();")))
+  (test-print-diff "\" The quick brown fox. \"; foobar();"
+                   "\" The slow brown fox. \";
+foobaz();"
+                   :lang 'javascript))
 
 
 ;;;; Simple object ast-diff tests
