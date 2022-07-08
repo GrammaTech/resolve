@@ -873,10 +873,14 @@
 
 (defun %f (s) (from-string (make-instance 'c) s))
 
-(defun test-print-diff (v1 v2 &optional reference)
+(defun test-print-diff (v1 v2 &key result base-cost)
   (let* ((v1 (if (stringp v1) (%f v1) v1))
          (v2 (if (stringp v2) (%f v2) v2))
-         (diff (print-diff (ast-diff v1 v2)
+         (diff (print-diff (multiple-value-call #'ast-diff
+                             v1 v2
+                             (if base-cost
+                                 (values :base-cost base-cost)
+                                 (values)))
                            v1 v2
                            :no-color t
                            :stream nil)))
@@ -885,8 +889,8 @@
       (is (null (collect-if
                  (of-type '(or parse-error-ast source-text-fragment))
                  (genome v)))))
-    (when reference
-      (is (equal diff reference)))
+    (when result
+      (is (equal diff result)))
     (dolist (v (list v1 v2))
       (is (not (equal diff (source-text v)))))
     (is (equal (source-text v2)
@@ -895,25 +899,26 @@
 (deftest print-diff.1 ()
   (test-print-diff "int a; int c;"
                    "int a; int b; int c;"
-                   "int a;{+ int b;+} int c;"))
+                   :result "int a;{+ int b;+} int c;"))
 
 (deftest print-diff.1a ()
   "Like print-diff.1, but a deletion instead of an insertion."
   (test-print-diff "int a; int b; int c;"
                    "int a; int c;"
-                   "int a;[- int b;-] int c;"))
+                   :result "int a;[- int b;-] int c;"))
 
 (deftest print-diff.2 ()
   "Print diff of a deletion"
   (test-print-diff "int a; int b; int c;"
                    "int a; int c;"
-                   "int a;[- int b;-] int c;"))
+                   :result "int a;[- int b;-] int c;"))
 
 (deftest print-diff.3 ()
   "Print diff of a replacement"
   (test-print-diff "int a; int b; int c;"
                    "int a; int d; int c;"
-                   "int a; int {+d+}[-b-]; int c;"))
+                   :result "int a; int {+d+}[-b-]; int c;"
+                   :base-cost 0))
 
 ;; Increasing the base cost makes larger scale replacements
 ;; more prefered, vs. fine scaled replacement inside strings
@@ -921,37 +926,43 @@
   "Print diff of a replacement"
   (test-print-diff "int a; int b; int c;"
                    "int a; int d; int c;"
-                   "int a; int {+d+}[-b-]; int c;"))
+                   :result "int a; int {+d+}[-b-]; int c;"
+                   :base-cost 1))
 
 (deftest print-diff.4 ()
   "Print diff of deletion of a character in a string"
   (test-print-diff "char *s = \"abcd\";"
                    "char *s = \"acd\";"
-                   "char *s = \"a[-b-]cd\";"))
+                   :result "char *s = \"a[-b-]cd\";"
+                   :base-cost 2))
 
 (deftest print-diff.4a ()
   "Print diff of deletion of a character in a string"
   (test-print-diff "char *s = \"abcd\";"
                    "char *s = \"acd\";"
-                   "char *s = \"a[-b-]cd\";"))
+                   :result "char *s = \"a[-b-]cd\";"
+                   :base-cost 3))
 
 (deftest print-diff.5 ()
   "Print diff of deletion of substring in a string"
   (test-print-diff "char *s = \"abcd\";"
                    "char *s = \"ad\";"
-                   "char *s = \"a[-bc-]d\";"))
+                   :result "char *s = \"a[-bc-]d\";"
+                   :base-cost 1))
 
 (deftest print-diff.6 ()
   "Print diff of insertion of a substring in a string"
   (test-print-diff "char *s = \"ad\";"
                    "char *s = \"abcd\";"
-                   "char *s = \"a{+bc+}d\";"))
+                   :result "char *s = \"a{+bc+}d\";"
+                   :base-cost 1))
 
 (deftest print-diff.7 ()
   "Print diff of insertion of a character in a string"
   (test-print-diff "char *s = \"ad\";"
                    "char *s = \"abd\";"
-                   "char *s = \"a{+b+}d\";"))
+                   :result "char *s = \"a{+b+}d\";"
+                   :base-cost 1))
 
 ;; See <https://difftastic.wilfred.me.uk/tricky_cases.html> for
 ;; tricky-print-diff.
