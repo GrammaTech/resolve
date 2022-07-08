@@ -5,14 +5,18 @@
         :software-evolution-library/software/parseable)
   (:import-from :resolve/ast-diff :ast-diff* :ast-patch*)
   (:import-from :software-evolution-library/software/tree-sitter
-   :source-text-fragment)
+                :source-text-fragment-variation-point)
   (:export ast-stub))
 (in-package :resolve/software/parseable)
 (in-readtable :curry-compose-reader-macros)
 
-;;; TODO: using source-text-fragment here is a bit of a hack, but it isn't
-;;;       strictly incorrect. Maybe find a better way to do this in the future.
-(defclass ast-stub (source-text-fragment functional-tree-ast)
+;;; TODO: using source-text-fragment-variation-point here is a bit of
+;;;       a hack, but it isn't strictly incorrect. Maybe find a better
+;;;       way to do this in the future. NOTE: This used to inherit
+;;;       directly from source-text-fragment, but that's no longer
+;;;       considered a wildcard, so we use
+;;;       source-text-fragment-variation-point, which is.
+(defclass ast-stub (source-text-fragment-variation-point functional-tree-ast)
   ((children :type list
              :initarg :children
              :initform nil
