@@ -3358,7 +3358,7 @@ Note that this does not include ASTs that start on POS."
                           pretext2
                           (values
                            (subseq* my-text my-pos start1)
-                           (subseq* your-text your-pos start2)))p
+                           (subseq* your-text your-pos start2)))
                          (after-text1
                           after-text2
                           (values (subseq my-text last-child1-end end1)
