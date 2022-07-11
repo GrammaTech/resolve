@@ -3337,9 +3337,12 @@ Note that this does not include ASTs that start on POS."
                               (if children
                                   (get-start (first children))
                                   ast-start)
-                              (if children
-                                  (get-end (lastcar children))
-                                  ast-end)
+                              (+ (if children
+                                     (get-end (lastcar children))
+                                     ast-end)
+                                 ;; This prevents us from grabbing the
+                                 ;; parent's after-text.
+                                 (length (ts:after-text ast)))
                               ast-end))))
                     (mvlet*
                         ((ast1 (assure ast (pop children)))
