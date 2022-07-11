@@ -1079,6 +1079,44 @@ foobaz();"
 foobaz();"
                    :lang 'javascript))
 
+(deftest jq-print-diff.1 ()
+  (test-print-diff "if ( selector[0] === \"<\" && selector[ selector.length - 1 ] === \">\" && selector.length >= 3 ) {
+				// Assume that strings that start and end with <> are HTML and skip the regex check
+				match = [ null, selector, null ];
+
+			}"
+                   "if ( selector.charAt(0) === \"<\" && selector.charAt( selector.length - 1 ) === \">\" && selector.length >= 3 ) {
+				// Assume that strings that start and end with <> are HTML and skip the regex check
+				match = [ null, selector, null ];
+
+			}"
+                   :lang 'javascript))
+
+(deftest jq-print-diff.2 ()
+  (test-print-diff "( selector[0] === \"<\" && selector[ selector.length - 1 ] === \">\" && selector.length >= 3 )"
+                   "( selector[0] === \"<\" &&
+				selector[ selector.length - 1 ] === \">\" &&
+				selector.length >= 3 )"
+                   :lang 'javascript))
+
+(deftest jq-print-diff.3 ()
+  (test-print-diff "if ( jQuery.isFunction( selector ) ) {
+			return typeof rootjQuery.ready !== \"undefined\" ?
+				rootjQuery.ready( selector ) :
+				// Execute immediately if ready is not present
+				selector( jQuery );
+		}"
+                   "if ( jQuery.isFunction( selector ) ) {
+			return rootjQuery.ready !== undefined ?
+				rootjQuery.ready( selector ) :
+				// Execute immediately if ready is not present
+				selector( jQuery );
+		}"
+                   :lang 'javascript))
+
+
+
+
 
 ;;;; Simple object ast-diff tests
 (deftest simple.ast-diff.1 ()
