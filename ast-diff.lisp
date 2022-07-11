@@ -1769,39 +1769,37 @@ during calls to MAP-EDIT-TREE.")
 
 (defmethod print-edit-tree-node
     ((node edit-tree-node) &key print-asts coherence
-                             stream)
+                             (stream *standard-output*))
   ;; If COHERENCE is specified, print only the highest edit tree
   ;; nodes whose coherence is >= this limit
   (let ((node-coherence (coherence node))
-        (parent (car *map-edit-tree-ancestors*))
-        (*standard-output* (or stream *standard-output*)))
+        (parent (car *map-edit-tree-ancestors*)))
     (when (or (not coherence)
               (and (>= node-coherence coherence)
                    (or (null parent)
                        (< (coherence parent) coherence))))
       (let ((source-text (source-text (edit-tree-node-source node)))
             (target-text (source-text (edit-tree-node-target node)))
-            (per-line-prefix
-             (make-string (* (length *map-edit-tree-ancestors*) 2)
-                          :initial-element #\>)))
-        (terpri)
-        (loop repeat 6 do (princ "----------"))
-        (terpri)
-        (format t "Coherence: ~a~%" node-coherence)
+            (prefix-length (* (length *map-edit-tree-ancestors*) 2)))
+        (format stream "~%~v@{----------~1@*~}~%Coherence: ~a~%"
+                6 node-coherence)
         (if (and (not (position #\Newline source-text))
                  (not (position #\Newline target-text)))
             ;; No newlines, so print in a compact form on a single line
-            (format t "~a ~s => ~s~%" per-line-prefix source-text target-text)
+            (format stream "~v@{<~1@*~} ~s => ~s~%"
+                    prefix-length
+                    source-text target-text)
             ;; Otherwise, print as a text block, with indentation
-            (let ((*print-pretty* t))
+            (let ((per-line-prefix
+                   (make-string prefix-length :initial-element #\>))
+                  (*print-pretty* t))
               (pprint-logical-block (*standard-output*
                                      nil ; node
                                      :per-line-prefix per-line-prefix)
-                (format t "~a~%---------------~%~a~&"
+                (format stream "~a~%---------------~%~a~&"
                         source-text target-text))))
         (when print-asts
-          (format t "---------------~%")
-          (format t "~s~%==>~%~s~%"
+          (format stream "---------------~%~s~%==>~%~s~%"
                   (ast-to-list-form (edit-tree-node-source node))
                   (ast-to-list-form (edit-tree-node-target node))))))))
 
