@@ -3594,7 +3594,8 @@ Numerous options are provided to control presentation.")
                  (:replace (collecting `(:insert . ,(caddr d)))
                   (push `(:delete . ,(cadr d)) saved-deletes))
                  (t
-                  (%pop))))))
+                  (unless (equal d '(:same . ""))
+                    (%pop)))))))
      (nreverse saved-deletes))))
 
 
