@@ -1770,7 +1770,6 @@ during calls to MAP-EDIT-TREE.")
 (defmethod print-edit-tree-node
     ((node edit-tree-node) &key print-asts coherence
                              stream)
-  (assert (typep node 'edit-tree-node))
   ;; If COHERENCE is specified, print only the highest edit tree
   ;; nodes whose coherence is >= this limit
   (let ((node-coherence (coherence node))
