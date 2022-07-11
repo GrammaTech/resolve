@@ -1085,10 +1085,9 @@ foobaz();"
                    :lang 'javascript))
 
 (deftest jq-print-diff.2 ()
-  (test-print-diff "( selector[0] === \"<\" && selector[ selector.length - 1 ] === \">\" && selector.length >= 3 )"
-                   "( selector[0] === \"<\" &&
-				selector[ selector.length - 1 ] === \">\" &&
-				selector.length >= 3 )"
+  (test-print-diff "(x && z)"
+                   "(x &&
+ z)"
                    :lang 'javascript))
 
 
