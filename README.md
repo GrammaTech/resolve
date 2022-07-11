@@ -90,12 +90,17 @@ and represented by [SEL][]. This includes, but is not limited to:
 - Rust
 
 ## Copyright and License
-Copyright (c) 2020 GrammaTech, Inc. All rights reserved.
 
-Resolve, and any accompanying documentation or other materials are
-GrammaTech, Inc. (GrammaTech) Proprietary Information.
+Copyright (c) 2020 GrammaTech, Inc.
 
 See [LICENSE.txt](LICENSE.txt) for more information.
+
+We ask that all contributors complete our Contributor License
+Agreement (CLA), which can be found at
+[GrammaTech-CLA-resolve.pdf](./GrammaTech-CLA-resolve.pdf),
+and email the completed form to `CLA@GrammaTech.com`.  Under this
+agreement contributors retain the copyright to their work but grants
+GrammaTech unlimited license to the work.
 
 ## Acknowledgment
 This material is based upon work supported by the Defense Advanced
