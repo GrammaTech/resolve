@@ -3361,8 +3361,8 @@ Note that this does not include ASTs that start on POS."
                            (subseq* your-text your-pos start2)))
                          (after-text1
                           after-text2
-                          (values (subseq my-text last-child1-end end1)
-                                  (subseq your-text last-child2-end end2))))
+                          (values (subseq* my-text last-child1-end end1)
+                                  (subseq* your-text last-child2-end end2))))
                       (declare (array-index
                                 first-child1-start first-child2-start
                                 last-child1-end last-child2-end)
