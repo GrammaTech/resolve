@@ -2916,8 +2916,6 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                    (setf (gethash ast1 forward-map) ast2
                          (gethash ast2 backward-map) ast1)))))
       (iter (while (or children1 children2))
-            ;; If they get out of sync, there's a problem.
-            (assert (and children1 children2))
             (while diff)
             (for operation = (pop diff))
             (ematch operation
