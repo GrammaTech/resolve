@@ -24,6 +24,7 @@
         :resolve/software/parseable
         :resolve/software/lisp)
   #+gt (:shadowing-import-from :testbot :batch-test)
+  (:import-from :cmd)
   (:local-nicknames (:diff :resolve/ast-diff))
   (:shadow :function-body)
   (:import-from :uiop/stream :read-file-forms)
@@ -1082,6 +1083,11 @@ foobaz();"
 (deftest jq-print-diff.1 ()
   (test-print-diff "if ( x + 1 ) {}"
                    "if ( y + 1 ) {}"
+                   :lang 'javascript))
+
+(deftest jq-print-diff.1a ()
+  (test-print-diff "if ( x + 1 ) {}"
+                   "if ( y + 1 /* x? */) {}"
                    :lang 'javascript))
 
 (deftest jq-print-diff.2 ()
