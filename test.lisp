@@ -1912,6 +1912,84 @@ foobaz();"
   (is (equal (simplify-diff-for-printing
               '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))
              '((:delete y) (:delete w) (:same z) (:insert v) (:insert x)))))
+
+
+;;; Replaying file diffs.
+
+(-> list-file-commits ((or string pathname))
+    (values (soft-list-of string) &optional))
+(defun list-file-commits (file)
+  "List all the commits that changed FILE, most recent first."
+  (lines (cmd:$cmd "git log --pretty=format:%H" file)))
+
+(-> find-git-root ((or string pathname)) directory-pathname)
+(defun find-git-root (file)
+  "Get the root of the Git repository for file."
+  (let* ((start-dir
+          (if (directory-pathname-p file)
+              file
+              (pathname-directory-pathname file))))
+    (nlet find-git-root ((dir start-dir))
+      (if (directory-exists-p (path-join dir ".git/"))
+          dir
+          (let ((parent (pathname-parent-directory-pathname dir)))
+            (if (equal parent dir)
+                (error "No git repository for ~a:" file)
+                (find-git-root parent)))))))
+
+(-> git-root-relative-namestring ((or pathname string)
+                                  &key (:root directory-pathname))
+    (values string &optional))
+(defun git-root-relative-namestring (file &key (root (find-git-root file)))
+  (enough-namestring (path-join root file) root))
+
+(-> get-file-at-commit ((or string pathname) string)
+    (values string &optional))
+(defun get-file-at-commit (file commit)
+  (let ((path (git-root-relative-namestring file)))
+    (values (cmd:$cmd "git show" (list (fmt "~a:~a" commit path))))))
+
+(defun replay-file-diffs (file &key (lang 'javascript) ignore-whitespace)
+  (declare (optimize debug))
+  (let ((commits (reverse (list-file-commits file))))
+    (iter (for commit1 in commits)
+          (for commit2 in (rest commits))
+          (tagbody
+           :retry
+             (let* ((text1 (get-file-at-commit file commit1))
+                    (text2 (get-file-at-commit file commit2))
+                    (sw1 (from-string* lang text1))
+                    (sw2 (from-string* lang text2)))
+               (princ "." *error-output*)
+               (restart-case
+                   (test-print-diff sw1 sw2 :lang lang
+                                            :ignore-whitespace ignore-whitespace)
+                 (continue ()
+                   :report "Skip this test"
+                   (next-iteration))
+                 (retry ()
+                   :report "Retry the diff"
+                   (go :retry))))))))
+
+(defun single-branch-clone (url)
+  (cmd:cmd "git clone --single-branch" (list url)))
+
+(defun test-file-versions-in-repo (url dir file &key ignore-whitespace)
+  (let ((dir (pathname-as-directory dir)))
+    (with-temporary-directory (:pathname d)
+      (let ((*default-pathname-defaults* (pathname d)))
+        (single-branch-clone url)
+        (cmd:with-working-directory ((path-join d dir))
+          (replay-file-diffs (path-join d dir file)
+                             :ignore-whitespace ignore-whitespace))))))
+
+#+(or)
+(deftest (test-jquery-file-versions :long-running) ()
+  (test-file-versions-in-repo "https://github.com/jquery/jquery.git"
+                              "jquery"
+                              #p"src/core/init.js"
+                              :ignore-whitespace t))
+
 
 ;;; Functions for interactive testing and experimentation.
 (defun do-populate (my your)
