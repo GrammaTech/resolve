@@ -3070,9 +3070,12 @@ before and after ASTs."
   (declare (ast ast))
   (with-slots (range-table) diff
     (flet ((get-range (ast)
-             (destructuring-bind (start . end) (@ range-table ast)
-               (declare (array-index start end))
-               (values start end))))
+             (multiple-value-bind (pair present?) (@ range-table ast)
+               (unless present?
+                 (error "AST not recognized: ~s" ast))
+               (destructuring-bind (start . end) pair
+                 (declare (array-index start end))
+                 (values start end)))))
       (values (get-range
                (or (first (ts:before-asts ast))
                    ast))
