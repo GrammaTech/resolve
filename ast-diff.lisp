@@ -1781,7 +1781,7 @@ during calls to MAP-EDIT-TREE.")
       (let ((source-text (source-text (edit-tree-node-source node)))
             (target-text (source-text (edit-tree-node-target node)))
             (prefix-length (* (length *map-edit-tree-ancestors*) 2)))
-        (format stream "~%~v@{----------~1@*~}~%Coherence: ~a~%"
+        (format stream "~%~v@{----------~0@*~}~%Coherence: ~a~%"
                 6 node-coherence)
         (if (and (not (position #\Newline source-text))
                  (not (position #\Newline target-text)))
