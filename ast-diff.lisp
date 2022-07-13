@@ -3352,7 +3352,7 @@ Note that this does not include ASTs that start on POS."
                                      (get-end (lastcar children))
                                      ast-end)
                                  ;; This prevents us from grabbing the
-                                 ;; parent's after-text.
+                                 ;; parent's after-text as post-text.
                                  (length (ts:after-text ast)))
                               ast-end))))
                     (mvlet*
