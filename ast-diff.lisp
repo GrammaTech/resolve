@@ -3338,23 +3338,28 @@ Note that this does not include ASTs that start on POS."
                            of AST's first child, the end of AST's last
                            child, and the end of AST (inclusive of
                            after-asts)."
-                           (mvlet ((ast-start ast-end (get-range ast))
-                                   (children
-                                    (append (ts:before-asts ast)
-                                            (children ast)
-                                            (ts:after-asts ast))))
+                           (mvlet* ((ast-start ast-end (get-range ast))
+                                    (children
+                                     (append (ts:before-asts ast)
+                                             (children ast)
+                                             (ts:after-asts ast)))
+                                    (child-start
+                                     (if children
+                                         (get-start (first children))
+                                         ast-start))
+                                    (child-end
+                                     (+ (if children
+                                            (get-end (lastcar children))
+                                            ast-end)
+                                        ;; This prevents us from grabbing the
+                                        ;; parent's after-text as post-text.
+                                        (length (ts:after-text ast)))))
                              (values
-                              ast-start
-                              (if children
-                                  (get-start (first children))
-                                  ast-start)
-                              (+ (if children
-                                     (get-end (lastcar children))
-                                     ast-end)
-                                 ;; This prevents us from grabbing the
-                                 ;; parent's after-text as post-text.
-                                 (length (ts:after-text ast)))
-                              ast-end))))
+                              ;; Before and after ASTs aren't included in the range.
+                              (min ast-start child-start)
+                              child-start
+                              child-end
+                              (max child-end ast-end)))))
                     (mvlet*
                         ((ast1 (assure ast (pop children)))
                          (ast2 (assure ast (@ concordance ast1)))
