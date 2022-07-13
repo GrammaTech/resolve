@@ -9,6 +9,7 @@
         :software-evolution-library/software/cl
         :software-evolution-library/software/c
         :software-evolution-library/software/javascript
+        :software-evolution-library/software/typescript
         :software-evolution-library/software/project
         :software-evolution-library/software/javascript-project
         :software-evolution-library/software/simple
