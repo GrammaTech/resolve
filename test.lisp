@@ -667,27 +667,24 @@
       (is (equal? (genome (ast-patch (copy orig) diff-a))
                   (genome a)))
       (is (equal? (mapcar #'car diff-a)
-                  '(:same :same :same :same :insert
-                    :recurse :same :same :same :same
-                    :same :same))))
+                  '(:same :same :same :same :same :insert
+                    :recurse :same :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
       (is (equal?
            (genome (ast-patch (copy orig) diff-b))
            (genome b)))
       (is (equal? (mapcar #'car diff-b)
-                  '(:same :same :same :same :same
-                    :insert :same :same :same :same
-                    :same :same))))
+                  '(:same :same :same :same :same :same
+                    :insert :same :same :same :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
       (is (equal?
            (genome (ast-patch (copy orig) diff-c))
            (genome c)))
       (is (equal? (mapcar #'car diff-c)
-                  '(:same :same :same :same :same :same
-                    :same :insert :same :same :same
-                    :same))))))
+                  '(:same :same :same :same :same :same :same
+                    :same :insert :same :same :same))))))
 
 (deftest (diff-delete :long-running) ()
   (let ((orig (from-string (make-instance 'c)
@@ -704,24 +701,24 @@
            (genome (ast-patch (copy orig) diff-a))
            (genome a)))
       (is (equal? (mapcar #'car diff-a)
-                  '(:same :same :same :same :delete :recurse
-                    :same :same :same :same :same))))
+                  '(:same :same :same :same :same :delete
+                    :recurse :same :same :same :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
       (is (equal?
            (genome (ast-patch (copy orig) diff-b))
            (genome b)))
       (is (equal? (mapcar #'car diff-b)
-                  '(:same :same :same :same :same :delete
-                    :same :same :same :same :same ))))
+                  '(:same :same :same :same :same :same
+                    :delete :same :same :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
       (is (equal?
            (genome (ast-patch (copy orig) diff-c))
            (genome c)))
       (is (equal? (mapcar #'car diff-c)
-                  '(:same :same :same :same :same :same
-                    :delete :same :same :same :same ))))))
+                  '(:same :same :same :same :same :same :same
+                    :delete :same :same :same))))))
 
 (deftest (diff-recursive :long-running) ()
   (let* ((orig (from-string (make-instance 'c)
@@ -733,8 +730,8 @@
     (is (equal? (genome (ast-patch (copy orig) diff))
                 (genome new)))
     (is (equal? (mapcar #'car diff)
-                '(:same :same :same :same :same :recurse
-                  :same :same :same :same :same )))))
+                '(:same :same :same :same :same :same
+                  :recurse :same :same :same :same)))))
 
 (deftest (diff-text-changes :long-running) ()
   (let ((orig (from-string (make-instance 'c)
@@ -751,16 +748,17 @@
            (genome (ast-patch (copy orig) diff-a))
            (genome a)))
       (is (equal? (mapcar #'car diff-a)
-                  '(:same :same :same :same :recurse
-                    :same :same :same :same :same :same))))
+                  '(:same :same :same :same :same
+                    :recurse :same :same :same :same
+                    :same))))
     (let ((diff-b (ast-diff orig b)))
       (is diff-b)
       (is (equal?
            (genome (ast-patch (copy orig) diff-b))
            (genome b)))
       (is (equal? (mapcar #'car diff-b)
-                  '(:same :same :same :same :same :recurse
-                    :same :same :same :same :same ))))
+                  '(:same :same :same :same :same :same
+                    :recurse :same :same :same :same))))
     (let ((diff-c (ast-diff orig c)))
       (is diff-c)
       (is (equal?
@@ -768,7 +766,7 @@
            (genome c)))
       (is (equal? (mapcar #'car diff-c)
                   '(:same :same :same :same :same :same
-                    :recurse :same :same :same :same))))))
+                    :same :recurse :same :same :same))))))
 
 (deftest diff-elide-same-test ()
   (with-each-fixture (javascript-abacus-variants typescript-abacus-variants)
