@@ -4104,6 +4104,39 @@ and convert it back to whatever internal form this kind of AST uses."))
       ,after-asts-slot-specifier
       ,@(ts::after-asts ast))))
 
+(defun sort-children-alist-textually (ast alist)
+  "This sorts the standardized children list ALIST in textual order.
+
+Textual order is defined according to AST's output transformation.
+
+Note that after this, if a single slot's children are contiguous
+order, that slot may occur more than once in the resulting \"alist\"."
+  ;; Flatten the pairs, sort them, and then combine the runs.
+  (cond
+    ((null alist) alist)
+    ;; TODO Inefficient.
+    ((single (mapcar #'cdr alist))
+     ;; Only one child, don't bother sorting.
+     alist)
+    (t
+     (let* ((pairs
+             (iter outer
+                   (for (spec . children) in alist)
+                   (if children
+                       (iter (for child in children)
+                             (in outer (collect (cons spec child))))
+                       ;; Placeholder for a specifier with no children.
+                       (collect (cons spec :empty)))))
+            (sorted-pairs
+             (stable-sort-new pairs
+                              (ordering (output-transformation ast))
+                              :key #'cdr)))
+       (mapcar (lambda (run)
+                 (cons (car (first-elt run))
+                       (remove :empty
+                               (map 'list #'cdr run))))
+               (runs sorted-pairs :key #'car))))))
+
 (defmethod standardized-children ((ast tree-sitter-ast))
   (check-child-lists ast)
   (labels ((ordered-calist ()
@@ -4115,10 +4148,12 @@ and convert it back to whatever internal form this kind of AST uses."))
                   ,@(mappend #'cdr ordering)))
               (assort (children-slot-specifier-alist ast) :key #'car))))
     (flatten
-     (remove '(ts::before-asts ts::after-asts)
-             (ordered-calist)
-             :key [#'slot-specifier-slot #'car]
-             :test (flip #'memq)))))
+     (sort-children-alist-textually
+      ast
+      (remove '(ts::before-asts ts::after-asts)
+              (ordered-calist)
+              :key [#'slot-specifier-slot #'car]
+              :test (flip #'memq))))))
 
 (defmethod copy-with-standardized-children ((ast ast) (children list) &rest args)
   "The default method uses ordinary copy, treating the children list
@@ -4248,8 +4283,6 @@ each slot. ."
         (typecase c
           (slot-specifier
            (setf current-slot c)
-           ;; TODO Is it actually possible for a specifier to occur
-           ;; more than once?
            (if-let (pair (assoc c child-alist))
              (setf slot-pair pair)
              (progn

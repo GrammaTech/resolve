@@ -1112,6 +1112,25 @@ foobaz();"
  z)"
                    :lang 'javascript))
 
+(deftest colors-print-diff.1 ()
+  "Test that we can handle inner-whitespace ASTS. This more generally
+tests that standardized-children are in textual order."
+  (test-print-diff (fmt "~
+for (var style in theme) {
+  (function(style){
+    colors[style] = function(str){};
+  })(style)
+}")
+                   (fmt "~
+for (var style in theme) {
+  (function(style){
+    colors[style] = function(str){
+      if (theme[style]){}
+    };
+  })(style)
+}")
+                   :lang 'javascript))
+
 
 ;;;; Simple object ast-diff tests
 (deftest simple.ast-diff.1 ()
