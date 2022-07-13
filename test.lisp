@@ -880,28 +880,44 @@ text fragments."
                                source-text-fragment))
                     result))))
 
-(defun test-print-diff (v1 v2 &key result base-cost (lang 'c))
+(defun test-print-diff (v1 v2 &key result base-cost (lang 'c)
+                                ignore-whitespace)
+  (declare (optimize debug))
   (let* ((v1 (if (stringp v1) (from-string lang v1) v1))
          (v2 (if (stringp v2) (from-string lang v2) v2))
-         (diff (print-diff (multiple-value-call #'ast-diff
-                             v1 v2
-                             (if base-cost
-                                 (values :base-cost base-cost)
-                                 (values)))
-                           v1 v2
-                           :no-color t
-                           :stream nil)))
+         (diff (multiple-value-call #'ast-diff
+                 v1 v2
+                 (if base-cost
+                     (values :base-cost base-cost)
+                     (values))))
+         (pdiff (print-diff diff
+                            v1 v2
+                            :no-color t
+                            :stream nil)))
     (is (not (source-text= v1 v2)))
+    (is (not (source-text= pdiff v1)))
+    (is (not (source-text= pdiff v2)))
+    ;; We actually parsed v1 and v2.
     (dolist (v (list v1 v2))
       (is (null (collect-if
                  (of-type '(or parse-error-ast source-text-fragment))
                  (genome v)))))
     (when result
-      (is (equal diff result)))
-    (dolist (v (list v1 v2))
-      (is (not (equal diff (source-text v)))))
-    (is (equal (source-text v2)
-               (apply-printed-diff diff)))))
+      (is (equal pdiff result)))
+    ;; The diff applies.
+    (mvlet* ((v2-text (source-text v2))
+             (applied-diff (apply-printed-diff pdiff))
+             (v2-text applied-diff
+              (if ignore-whitespace
+                  (values (collapse-whitespace v2-text)
+                          (collapse-whitespace applied-diff))
+                  (values v2-text applied-diff)))
+             (mismatch (mismatch v2-text applied-diff)))
+      (is (null mismatch)
+          "Mismatch: ~s~2%~s~2%~s"
+          (take 100 (subseq v2-text mismatch))
+          (take 100 (subseq applied-diff mismatch))
+          pdiff))))
 
 (deftest print-diff.1 ()
   (test-print-diff "int a; int c;"
