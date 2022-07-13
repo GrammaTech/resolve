@@ -829,8 +829,8 @@
 (deftest diff-sequence-wrap/unwrap.1 ()
   (let* ((s1 "int f(int x, int y) { int c = 1; int z = x+y; return z+c; }")
          (s2 "int f(int x, int y, int p) { int c = 1; if (p == 0) { int z = x+y; return z+c; } return 0; }")
-         (obj1 (from-string (make-instance 'c) s1))
-         (obj2 (from-string (make-instance 'c) s2)))
+         (obj1 (from-string* (make-instance 'c) s1))
+         (obj2 (from-string* (make-instance 'c) s2)))
     (multiple-value-bind (diff cost)
         (ast-diff obj1 obj2 :wrap t :max-wrap-diff 1000
                             :wrap-sequences t)
@@ -1610,6 +1610,8 @@ foobaz();"
             "string is deleted on one branch, so is deleted on merge")
         ))))
 
+
+#+(or)
 (deftest (gcd-conflict-merge3 :long-running) ()
   (with-fixture gcd-conflict-c
     (multiple-value-bind (merged unstable)
@@ -1618,6 +1620,8 @@ foobaz();"
       ;; TODO: This *should* be the case but it isn't.
       #+regression (is unstable))))
 
+
+#+(or)
 (deftest (gcd-conflict-merge3-js :long-running) ()
   (with-each-fixture (gcd-conflict-javascript gcd-conflict-typescript)
     (multiple-value-bind (merged unstable)
@@ -1996,21 +2000,35 @@ foobaz();"
 (defun single-branch-clone (url)
   (cmd:cmd "git clone --single-branch" (list url)))
 
-(defun test-file-versions-in-repo (url dir file &key ignore-whitespace)
+(defun test-file-versions-in-repo (url dir file
+                                   &key ignore-whitespace
+                                     (lang 'javascript))
   (let ((dir (pathname-as-directory dir)))
     (with-temporary-directory (:pathname d)
       (let ((*default-pathname-defaults* (pathname d)))
         (single-branch-clone url)
         (cmd:with-working-directory ((path-join d dir))
           (replay-file-diffs (path-join d dir file)
-                             :ignore-whitespace ignore-whitespace))))))
+                             :ignore-whitespace ignore-whitespace
+                             :lang lang))))))
 
-#+(or)
 (deftest (test-jquery-file-versions :long-running) ()
   (test-file-versions-in-repo "https://github.com/jquery/jquery.git"
                               "jquery"
                               #p"src/core/init.js"
                               :ignore-whitespace t))
+
+(deftest (test-colors-file-version :long-running) ()
+  (test-file-versions-in-repo "https://github.com/Marak/colors.js.git"
+                              "colors.js"
+                              #p"lib/colors.js"
+                              :ignore-whitespace t))
+
+(deftest (test-textblob-file-version :long-running) ()
+  (test-file-versions-in-repo "https://github.com/sloria/TextBlob.git"
+                              "TextBlob"
+                              #p"textblob/classifiers.py"
+                              :lang 'python))
 
 
 ;;; Functions for interactive testing and experimentation.
