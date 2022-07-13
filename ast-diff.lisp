@@ -3196,6 +3196,8 @@ Note that this does not include ASTs that start on POS."
                     (enq (cons :same (subseq* my-text my-start my-end))
                          strings)
                     ;; Increment the pointers.
+                    (assert (<= my-pos my-end))
+                    (assert (<= your-pos your-end))
                     (setf my-pos my-end
                           your-pos your-end)))
                  ;; Print two strings that are the same.
@@ -3238,6 +3240,7 @@ Note that this does not include ASTs that start on POS."
                          strings)
                     (enq (cons :delete (subseq* my-text start end)) strings)
                     (enq (cons :delete delete-end) strings)
+                    (assert (<= my-pos end))
                     (setf my-pos end)))
 
                  ;; REPLACEMENTS
@@ -3262,6 +3265,8 @@ Note that this does not include ASTs that start on POS."
                      (subseq* my-text start1 end1)
                      (subseq* your-text start2 end2)
                      :replace-ast)
+                    (assert (<= my-pos end1))
+                    (assert (<= your-pos end2))
                     (setf my-pos end1
                           your-pos end2)))
                  ;; Replace a string with another string.
@@ -3277,6 +3282,8 @@ Note that this does not include ASTs that start on POS."
                                     (subseq* my-text my-pos before-start)
                                     (subseq* your-text your-pos after-start)
                                     :pre-replace-strings)
+                    (assert (<= my-pos before-start))
+                    (assert (<= your-pos after-start))
                     (setf my-pos before-start
                           your-pos after-start))
                   (save-intertext diff before after :replace)
@@ -3313,6 +3320,8 @@ Note that this does not include ASTs that start on POS."
                        (subseq* my-text my-pos start1)
                        (subseq* your-text your-pos start2)
                        :pre-string)
+                      (assert (<= my-pos start1))
+                      (assert (<= your-pos start2))
                       (setf my-pos start1
                             your-pos start2))
                     ;; Actually recurse into the string diff.
@@ -3382,10 +3391,12 @@ Note that this does not include ASTs that start on POS."
                       ;; Recurse on the children.
                       (print-diff-loop diff script ast1)
                       ;; Record changes in the after text. This is
-                      ;; the only case where structured text inserted
+                      ;; the only place where structured text inserted
                       ;; after a node is picked up.
                       (save-intertext diff after-text1 after-text2
                                       :recurse-after-text)
+                      (assert (<= my-pos end1))
+                      (assert (<= your-pos end2))
                       (setf my-pos end1
                             your-pos end2)))))
                #+debug-print-diff
