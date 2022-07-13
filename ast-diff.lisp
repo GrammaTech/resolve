@@ -2904,7 +2904,7 @@ in AST-PATCH.  Returns a new SOFT with the patched files."))
                         &optional
                           (forward-map (make-hash-table))
                           (backward-map (make-hash-table)))
-  (declare (optimize debug))            ;TODO
+  (declare #+debug-print-diff (optimize debug))
   (let ((children1 (standardized-children (genome root1)))
         (children2 (standardized-children (genome root2))))
     (flet ((add-to-concordance (ast1 ast2)
