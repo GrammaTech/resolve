@@ -4133,9 +4133,16 @@ order, that slot may occur more than once in the resulting \"alist\"."
                        ;; Placeholder for a specifier with no children.
                        (collect (cons spec :empty)))))
             (sorted-pairs
-             (stable-sort-new pairs
-                              (ordering (output-transformation ast))
-                              :key #'cdr)))
+             (stable-sort-new
+              pairs
+              (fbind ((ot<
+                       (ordering (output-transformation ast)
+                                 :unordered-to-end t)))
+                (lambda (x y)
+                  (cond ((eql (cdr x) :empty))
+                        ((eql (cdr y) :empty))
+                        (t
+                         (ot< (cdr x) (cdr y)))))))))
        (mapcar (lambda (run)
                  (cons (car (first-elt run))
                        (remove :empty
