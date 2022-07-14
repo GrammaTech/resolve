@@ -1,7 +1,7 @@
 Resolve
 =======
 
-TRL: 5
+TRL: 6
 
 Software AST-based diff calculation, display, and automated resolution.
 
@@ -53,6 +53,17 @@ existing code base.  By calculating syntactically aware differences
 over software abstract syntax trees (ASTs) we provide more informative
 and meaningful views of software changes.
 
+#### Limitations
+
+Currently the reliability of printed diffs is limited. In particular
+irregular indentation may result in malformed diffs or errors during
+diff printing.
+
+This is in consequence of the high-level representation of ASTs in
+Resolve: because the representation abstracts away details such as
+indentation and syntactic delimiters and separators, they have to be
+carefully reconstructed to present the result to humans.
+
 ### Automated merge conflict resolution
 On project with multiple developers, a significant portion of time is
 typically spent manually resolving conflicting changes between
@@ -67,10 +78,16 @@ job of manual conflict resolution.
 - test-suite guided merge conflict resolution
 
 ## Language Support
-- JavaScript via ESTree ASTs (w/acorn)
-- C/C++ via Clang ASTs
-- Java via JavaParser ASTs
-- Common-Lisp via Eclector
+
+Resolve supports any language that can be parsed by [tree-sitter][]
+and represented by [SEL][]. This includes, but is not limited to:
+
+- C
+- C++
+- JavaScript
+- Python
+- TypeScript
+- Rust
 
 ## Copyright and License
 Copyright (c) 2020 GrammaTech, Inc. All rights reserved.
@@ -89,3 +106,6 @@ reflect the views of the Defense Advanced Research Projects Agency
 (DARPA); or its Contracting Agent, the U.S. Department of the
 Interior, Interior Business Center, Acquisition Services Directorate,
 Division III.
+
+[tree-sitter]: https://tree-sitter.github.io/tree-sitter/
+[SEL]: https://github.com/GrammaTech/sel
