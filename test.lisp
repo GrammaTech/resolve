@@ -112,7 +112,7 @@
            (make-pathname :directory (append +javascript-dir+ '("package-json"))
                           :type "json"
                           :name name)))
-        '("d5da5eb" "ea14630" "6655688"))
+        '("base-d5da5eb" "left-ea14630" "right-6655688"))
      (setf *old* base *my* left *your* right)))
   (:teardown
    (setf *old* nil *my* nil *your* nil)))
