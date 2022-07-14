@@ -2059,19 +2059,22 @@ for (var style in theme) {
                              :lang lang))))))
 
 
-#+(or) (deftest (test-jquery-file-versions :long-running) ()
+#+(or)
+(deftest (test-jquery-file-versions :long-running) ()
   (test-file-versions-in-repo "https://github.com/jquery/jquery.git"
                               "jquery"
                               #p"src/core/init.js"
                               :ignore-whitespace t))
 
-#+(or) (deftest (test-colors-file-version :long-running) ()
+#+(or)
+(deftest (test-colors-file-version :long-running) ()
   (test-file-versions-in-repo "https://github.com/Marak/colors.js.git"
                               "colors.js"
                               #p"lib/colors.js"
                               :ignore-whitespace t))
 
-#+(or) (deftest (test-textblob-file-version :long-running) ()
+#+(or)
+(deftest (test-textblob-file-version :long-running) ()
   (test-file-versions-in-repo "https://github.com/sloria/TextBlob.git"
                               "TextBlob"
                               #p"textblob/classifiers.py"
