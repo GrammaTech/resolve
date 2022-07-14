@@ -1105,7 +1105,7 @@ foobaz();"
                    "if ( y + 1 /* x? */) {}"
                    :lang 'javascript))
 
-(deftest jq-print-diff.2 ()
+#+(or) (deftest jq-print-diff.2 ()
   (test-print-diff "(x && z)"
                    "(x &&
  z)"
