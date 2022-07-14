@@ -1628,6 +1628,34 @@ for (var style in theme) {
             "string is deleted on one branch, so is deleted on merge")
         ))))
 
+(deftest test-internal-ast-unstandardizing ()
+  "Check that children ASTs don't get stuffed into an internal AST slot."
+  (finishes
+   (multiple-value-bind (merged unstable)
+       (converge
+        (from-string* 'json
+                      "{ \"dependencies\" : {
+  \"wordwrap\" : \"~0.0.2\"
+} }")
+        (from-string* 'json
+                      "{ \"dependencies\" : {
+  \"wordwrap\" : \"~0.0.2\",
+  \"minimist\" : \"~0.0.1\"
+}}")
+        (from-string* 'json
+                      "{ \"dependencies\" : {
+}}"))
+     (source-text merged))))
+
+(deftest test-internal-ast-ordering ()
+  "Test that internal AST slot specifiers stay in order."
+  (let* ((v1 (javascript "\"\""))
+         (v2 (javascript "''"))
+         (diff (ast-diff v1 v2)))
+    (values diff
+            (print-diff diff v1 v2 :no-color t :stream nil))))
+
+
 
 #+(or)
 (deftest (gcd-conflict-merge3 :long-running) ()
