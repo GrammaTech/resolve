@@ -342,12 +342,12 @@ command-line options processed by the returned function."
                              (mapcar «list #'car #'cdr» diff))))
              (t
               (if (zerop unified)
-                  (print-diff diff :no-color no-color)
+                  (print-diff diff old-sw new-sw :no-color no-color)
                   (let ((diff-lines
                          (split-sequence
                           #\Newline
                           (with-output-to-string (str)
-                            (print-diff diff :no-color no-color :stream str))))
+                            (print-diff diff old-sw new-sw :no-color no-color :stream str))))
                         (in-diff-p nil)
                         (trailing-context 0)
                         (context-buffer nil)
