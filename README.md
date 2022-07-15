@@ -43,6 +43,20 @@ resolution.  This provides developers with more meaningful views of
 software changes and it frees developers from the tedious manual task
 of merge conflict resolution.
 
+## Usage
+
+You can get pre-built binaries of `ast-diff` and `ast-merge` for AMD64
+from the [releases page][].
+
+If you want to build them yourself:
+
+1. Check out the submodules for this repository.
+    git submodule update --init --recursive
+2. Install [SBCL][] and [Quicklisp][].
+3. In this repository, run
+    make bin/ast-diff
+    make bin/ast-merge
+
 ## Use Cases
 
 ### Improved difference calculation and view
@@ -114,3 +128,6 @@ Division III.
 
 [tree-sitter]: https://tree-sitter.github.io/tree-sitter/
 [SEL]: https://github.com/GrammaTech/sel
+[releases-page]: https://github.com/GrammaTech/resolve/releases
+[SBCL]: http://www.sbcl.org
+[Quicklisp]: https://www.quicklisp.org/beta/
